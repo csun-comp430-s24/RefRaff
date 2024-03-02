@@ -70,6 +70,25 @@ stmt ::= type var `=` exp `;` | Variable declaration
 program ::= structdef* fdef* stmt* stmt* is the entry point
 ```
 
+### Valid symbols
+
+```
+`,`, `{`, `}`, `;`, `(`, `)`, `.`, `!`, `*`, `/`, `+`,
+`-`, `<=`, `>=`, `<`, `>`, `==`, `!=`, `&&`, `||`, `=`
+```
+
+### Keywords
+
+```
+`int`, `bool`, `void`, `struct`, `func`, `true`, `false`, `null`,
+`new`, `if`, `while`, `break`, `println`, `return`
+```
+
+### Identifier restrictions
+
+1. Must start with an alphabetic character [a-zA-Z]
+2. Followed by zero or more alphanumeric characters (a-zA-Z0-9)*
+
 ## Example Program
 ```
 struct Node {
