@@ -1,6 +1,9 @@
 package refraff.tokenizer;
 
 import org.junit.Test;
+
+import refraff.tokenizer.reserved.FuncToken;
+import refraff.tokenizer.reserved.IntToken;
 import refraff.tokenizer.symbol.*;
 
 import java.util.Arrays;
@@ -75,6 +78,16 @@ public class TokenizerTest {
     @Test
     public void testTokenizeAssignment() {
         testTokenizerInputMatchesExpectedTokens("=", new AssignmentToken());
+    }
+
+    @Test
+    public void testTokenizeFunc() {
+        testTokenizerInputMatchesExpectedTokens("func", new FuncToken());
+    }
+
+    @Test
+    public void testTokenizeStruct() {
+        testTokenizerInputMatchesExpectedTokens("int", new IntToken());
     }
 
     // Test invalid inputs
