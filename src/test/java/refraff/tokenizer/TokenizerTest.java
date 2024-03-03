@@ -3,6 +3,8 @@ package refraff.tokenizer;
 import org.junit.Test;
 
 import refraff.tokenizer.reserved.FuncToken;
+import refraff.tokenizer.reserved.BoolToken;
+import refraff.tokenizer.reserved.StructToken;
 import refraff.tokenizer.reserved.IntToken;
 import refraff.tokenizer.symbol.*;
 
@@ -81,13 +83,83 @@ public class TokenizerTest {
     }
 
     @Test
+    public void testTokenizeSemicolon() {
+        testTokenizerInputMatchesExpectedTokens(";", new SemicolonToken());
+    }
+
+    @Test
+    public void testTokenizeLeftParenToken() {
+        testTokenizerInputMatchesExpectedTokens("(", new LeftParenToken());
+    }
+
+    @Test
+    public void testTokenizeRightParenToken() {
+        testTokenizerInputMatchesExpectedTokens(")", new RightParenToken());
+    }
+
+    @Test
+    public void testTokenizeDotToken() {
+        testTokenizerInputMatchesExpectedTokens(".", new DotToken());
+    }
+
+    @Test
+    public void testMultiplyToken() {
+        testTokenizerInputMatchesExpectedTokens("*", new MultiplyToken());
+    }
+
+    @Test
+    public void testTokenizeDivisionToken() {
+        testTokenizerInputMatchesExpectedTokens("/", new DivisionToken());
+    }
+
+    @Test
+    public void testTokenizePlusToken() {
+        testTokenizerInputMatchesExpectedTokens("+", new PlusToken());
+    }
+
+    @Test
+    public void testTokenizeMinusToken() {
+        testTokenizerInputMatchesExpectedTokens("-", new MinusToken());
+    }
+
+    // @Test
+    // public void testTokenizeNotEqualToken() {
+    //     testTokenizerInputMatchesExpectedTokens(")", new NotEqualToken());
+    // }
+
+    // @Test
+    // public void testTokenizeNotToken() {
+    //     testTokenizerInputMatchesExpectedTokens(")", new NotToken());
+    // }
+
+    // @Test
+    // public void testTokenizeGreaterThanEqualsToken() {
+    //     testTokenizerInputMatchesExpectedTokens(")", new GreaterThanEqualsToken());
+    // }
+
+    // @Test
+    // public void testTokenizeGreaterThanToken() {
+    //     testTokenizerInputMatchesExpectedTokens(")", new GreaterThanToken());
+    // }
+
+    @Test
     public void testTokenizeFunc() {
         testTokenizerInputMatchesExpectedTokens("func", new FuncToken());
     }
 
     @Test
     public void testTokenizeStruct() {
+        testTokenizerInputMatchesExpectedTokens("struct", new StructToken());
+    }
+
+    @Test 
+    public void testTokenizeInt() {
         testTokenizerInputMatchesExpectedTokens("int", new IntToken());
+    }
+
+    @Test
+    public void testTokenizeBool() {
+        testTokenizerInputMatchesExpectedTokens("bool", new BoolToken());
     }
 
     // Test invalid inputs

@@ -20,18 +20,18 @@ public class Tokenizer {
             new CommaToken(),
             new LeftBraceToken(),
             new RightBraceToken(),
-            // new SemicolonToken(),
-            // new LeftParenToken(),
-            // new RightParenToken(),
+            new SemicolonToken(),
+            new LeftParenToken(),
+            new RightParenToken(),
 
             // Operator symbols
-            // new DotToken(),
+            new DotToken(),
 
             // Arithmetic operators
-            // new MultiplyToken(),
-            // new DivisionToken(),
-            // new PlusToken(),
-            // new MinusToken(),
+            new MultiplyToken(),
+            new DivisionToken(),
+            new PlusToken(),
+            new MinusToken(),
 
             // Logical operators
             new AndToken(),
