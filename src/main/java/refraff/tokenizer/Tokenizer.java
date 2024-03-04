@@ -190,14 +190,16 @@ public class Tokenizer {
             return Optional.empty();
         }
 
+        // Try to find a symbol
         Matcher matcher = pattern.matcher(input);
-
+        
         // If we didn't find any tokens that match a token exactly, return an empty list
-        if (!matcher.find(tokenizerPosition)) {
+        // Or if the position of the found token isn't our current position
+        if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
             return Optional.empty();
         }
 
-        // Get the exact token from our map
+        // Get the token from input
         String symbol = matcher.group();
         Token token = tokenMap.get(symbol);
 
@@ -224,7 +226,7 @@ public class Tokenizer {
         Matcher matcher = pattern.matcher(input);
 
         // If no match found, return empty list
-        if (!matcher.find(tokenizerPosition)) {
+        if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
             return Optional.empty();
         }
 
