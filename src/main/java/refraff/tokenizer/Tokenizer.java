@@ -67,6 +67,9 @@ public class Tokenizer {
     // The whitespace character for Java's Pattern is \s
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s*");
 
+    // The integer literal pattern.This doesn't allow for leading zeros - do we want that?
+    private static final Pattern INT_LITERAL_PATTERN = Pattern.compile("\\b(0|[1-9][0-9]*)\\b");
+
     // A regex pattern that places all valid symbols and operators as distinct choices to be tokenized
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
@@ -127,9 +130,17 @@ public class Tokenizer {
                 continue;
             }
 
+            // Try and tokenize reserved word
             Optional<Token> optionalReservedToken = tryTokenizeReserved();
             if (optionalReservedToken.isPresent()) {
                 tokens.add(optionalReservedToken.get());
+                continue;
+            }
+
+            // Try and tokenize IntLiteral
+            Optional<Token> optionalIntLiteralToken = tryTokenizeIntLiteral();
+            if (optionalIntLiteralToken.isPresent()) {
+                tokens.add(optionalIntLiteralToken.get());
                 continue;
             }
 
@@ -162,48 +173,54 @@ public class Tokenizer {
         return true;
     }
 
-    public Optional<Token> tryTokenizeSymbol() {
+    public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
         // If we are out of bounds, do not attempt to tokenize
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
-        Matcher matcher = SYMBOL_PATTERN.matcher(input);
+        Matcher matcher = pattern.matcher(input);
 
-        // If we didn't find any symbols that match a token exactly, return an empty list
+        // If we didn't find any tokens that match a token exactly, return an empty list
         if (!matcher.find(tokenizerPosition)) {
             return Optional.empty();
         }
 
         // Get the exact token from our map
         String symbol = matcher.group();
-        Token token = SYMBOL_TO_TOKEN.get(symbol);
+        Token token = tokenMap.get(symbol);
 
         // Increment the position and return our found token
         this.tokenizerPosition += symbol.length();
         return Optional.of(token);
     }
 
+    public Optional<Token> tryTokenizeSymbol() {
+        return tryTokenize(SYMBOL_PATTERN, SYMBOL_TO_TOKEN);
+    }
+
     public Optional<Token> tryTokenizeReserved() {
+        return tryTokenize(RESERVED_PATTERN, RESERVED_TO_TOKEN);
+    }
+
+    public Optional<Token> tryTokenizeIntLiteral() {
         // If we are out of bounds, do not attempt to tokenize
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
-        Matcher matcher = RESERVED_PATTERN.matcher(input);
+        Matcher matcher = INT_LITERAL_PATTERN.matcher(input);
 
-        // If we didn't find any reserved words that match a token exactly, return an empty
-        // list
+        // If no int literal found, return empty list
         if (!matcher.find(tokenizerPosition)) {
             return Optional.empty();
         }
 
-        // Get the exact token from our map
-        String reserved = matcher.group();
-        Token token = RESERVED_TO_TOKEN.get(reserved);
+        // Get the Integer literal from input
+        String intLiteral = matcher.group();
 
-        // Increment the position and return our found token
-        this.tokenizerPosition += reserved.length();
-        return Optional.of(token);
+        this.tokenizerPosition += intLiteral.length();
+        return Optional.of(new IntLiteralToken(intLiteral));
     }
+    
 }
