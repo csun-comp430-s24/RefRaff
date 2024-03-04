@@ -94,12 +94,34 @@ program ::= structdef* fdef* stmt*                    // stmt* is the entry poin
 ### AST Definition
 
 interface Type
+ - IntType
+ - BoolType
+ - VoidType
+ - StructType
+ - FuncType
 
 interface Stmt
+
 
 interface Exp
 
 interface Op
+ - DotOp
+ - NotOp
+ - MultiplyOp
+ - DivisionOp
+ - PlusOp
+ - MinusOp
+ - LessThanOp
+ - LessThanOrEqualsOp
+ - GreaterThanOp
+ - GreaterThanOrEqualsOp
+ - DoubleEqualsOp
+ - NotEqualsOp
+ - LogicalOrOp
+ - LogicalAndOp
+
+class Program
 
 ## Example Program
 ```
