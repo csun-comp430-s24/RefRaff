@@ -5,9 +5,9 @@ The programming language RefRaff supports structs and reference counted memory m
 ## Grammar
 
 ```
-type ::= `int` | `bool` |                   // Integers and booleans are types
+type ::= `int` | `bool` |                             // Integers and booleans are types
          `void` |
-         structname |                       // Structures are a type
+         structname |                                 // Structures are a type
 
 param :: = type var
 
@@ -29,11 +29,11 @@ struct_actual_params ::=
 comma_exp ::= [exp (`,` exp)*]
 
 primary_exp ::=
-  i | `true` | `false` | var |              // Integers, booleans, and variables
-  `null` |                                  // Null; assignable to struct types
-  `(` exp `)` |                             // Parenthesized expression
+  i | `true` | `false` | var |                        // Integers, booleans, and variables
+  `null` |                                            // Null; assignable to struct types
+  `(` exp `)` |                                       // Parenthesized expression
   `new` structname `{` struct_actual_params `}` |     // Allocate a new struct
-  funcname `(` comma_exp `)`                // Function calls
+  funcname `(` comma_exp `)`                          // Function calls
 
 // Accessing the field of a struct or calls
 dot_exp ::= primary_exp (`.` var)*
@@ -54,17 +54,17 @@ or_exp ::= and_exp (`||` and_exp)*
 	
 exp ::= or_exp
 
-stmt ::= type var `=` exp `;` |             // Variable declaration
-         var `=` exp `;` |                  // Assignment
+stmt ::= type var `=` exp `;` |                       // Variable declaration
+         var `=` exp `;` |                            // Assignment
          `if` `(` exp `)` stmt [`else` stmt] |        // if
-         `while` `(` exp `)` stmt |         // while
+         `while` `(` exp `)` stmt |                   // while
          `break` `;` | break
-         `println` `(` exp `)` |            // Printing something
-         `{` stmt* `}` |                    // Block
-         `return` [exp] `;` |               // Return
-         exp `;`                            // Expression statements
+         `println` `(` exp `)` |                      // Printing something
+         `{` stmt* `}` |                              // Block
+         `return` [exp] `;` |                         // Return
+         exp `;`                                      // Expression statements
 
-program ::= structdef* fdef* stmt*          // stmt* is the entry point
+program ::= structdef* fdef* stmt*                    // stmt* is the entry point
 ```
 
 ### Valid symbols
@@ -87,6 +87,19 @@ program ::= structdef* fdef* stmt*          // stmt* is the entry point
 2. Followed by zero or more alphanumeric characters (a-zA-Z0-9)*
 
 ### Integer Literal Restrictions
+
+1. Must be a zero or start with a numeric character [1-9]
+2. Followed by any numeric character [0-9]*
+
+### AST Definition
+
+interface Type
+
+interface Stmt
+
+interface Exp
+
+interface Op
 
 ## Example Program
 ```
