@@ -67,6 +67,9 @@ public class Tokenizer {
     // The whitespace character for Java's Pattern is \s
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s*");
 
+    // The integer literal pattern.This doesn't allow for leading zeros - do we want that?
+    private static final Pattern INT_LITERAL_PATTERN = Pattern.compile("\\b(0|[1-9][0-9]*)\\b");
+
     // A regex pattern that places all valid symbols and operators as distinct choices to be tokenized
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
@@ -127,9 +130,17 @@ public class Tokenizer {
                 continue;
             }
 
+            // Try and tokenize reserved word
             Optional<Token> optionalReservedToken = tryTokenizeReserved();
             if (optionalReservedToken.isPresent()) {
                 tokens.add(optionalReservedToken.get());
+                continue;
+            }
+
+            // Try and tokenize IntLiteral
+            Optional<Token> optionalIntLiteralToken = tryTokenizeIntLiteral();
+            if (optionalIntLiteralToken.isPresent()) {
+                tokens.add(optionalIntLiteralToken.get());
                 continue;
             }
 
@@ -191,4 +202,25 @@ public class Tokenizer {
     public Optional<Token> tryTokenizeReserved() {
         return tryTokenize(RESERVED_PATTERN, RESERVED_TO_TOKEN);
     }
+
+    public Optional<Token> tryTokenizeIntLiteral() {
+        // If we are out of bounds, do not attempt to tokenize
+        if (inputOutOfBounds()) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = INT_LITERAL_PATTERN.matcher(input);
+
+        // If no int literal found, return empty list
+        if (!matcher.find(tokenizerPosition)) {
+            return Optional.empty();
+        }
+
+        // Get the Integer literal from input
+        String intLiteral = matcher.group();
+
+        this.tokenizerPosition += intLiteral.length();
+        return Optional.of(new IntLiteralToken(intLiteral));
+    }
+    
 }

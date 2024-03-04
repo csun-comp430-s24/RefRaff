@@ -227,14 +227,13 @@ public class TokenizerTest {
     @Test
     public void testTokenizeIntLiteralTokens() {
         String input = """
-                0 000 1234 010101 100000
+                0 1234 10101 100000
                 """;
         testTokenizerInputMatchesExpectedTokens(
             input,
             new IntLiteralToken("0"),
-            new IntLiteralToken("000"),
             new IntLiteralToken("1234"),
-            new IntLiteralToken("010101"),
+            new IntLiteralToken("10101"),
             new IntLiteralToken("100000")
         );
     }
@@ -288,8 +287,13 @@ public class TokenizerTest {
     }
 
     @Test
-    public void testTokenizerThrowsOnNumbersFirstIdentifierToken() {
+    public void testTokenizerThrowsOnIdentifierTokenWithLeadingInterger() {
         testTokenizerThrowsException("1234r");
+    }
+
+    @Test
+    public void testTokenizerThrowsOnIntLiteralTokenWithLeadingZeros() {
+        testTokenizerThrowsException("0123");
     }
 
 }
