@@ -1,0 +1,27 @@
+struct Node {
+  int value;
+  Node rest;
+}
+
+func length(Node list): int {
+  int retval = 0;
+  while (list != null) {
+     retval = retval + 1;
+     list = list.rest;
+  }
+  return retval;
+}
+
+Node list =
+  new Node {
+    value: 0,
+    rest: new Node {
+      value: 1,
+      rest: new Node {
+        value: 2,
+        rest: null
+      }
+    }
+  };
+
+println(length(list));
