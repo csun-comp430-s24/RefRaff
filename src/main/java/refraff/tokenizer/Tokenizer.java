@@ -1,9 +1,6 @@
 package refraff.tokenizer;
 
-import refraff.tokenizer.reserved.BoolToken;
-import refraff.tokenizer.reserved.FuncToken;
-import refraff.tokenizer.reserved.IntToken;
-import refraff.tokenizer.reserved.StructToken;
+import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.util.Pair;
 
@@ -23,6 +20,7 @@ public class Tokenizer {
             new SemicolonToken(),
             new LeftParenToken(),
             new RightParenToken(),
+            new ColonToken(),
 
             // Operator symbols
             new DotToken(),
@@ -36,12 +34,12 @@ public class Tokenizer {
             // Logical operators
             new AndToken(),
             new OrToken(),
-            // new NotEqualsToken(),
-            // new NotToken(),
+            new NotEqualsToken(),
+            new NotToken(),
             new LessThanEqualsToken(),
             new LessThanToken(),
-            // new GreaterThanEqualsToken(),
-            // new GreaterThanToken(),
+            new GreaterThanEqualsToken(),
+            new GreaterThanToken(),
             new DoubleEqualsToken(),
             new AssignmentToken()
     );
@@ -50,7 +48,17 @@ public class Tokenizer {
             new IntToken(),
             new BoolToken(),
             new StructToken(),
-            new FuncToken()
+            new FuncToken(),
+            new TrueToken(),
+            new FalseToken(),
+            new NullToken(),
+            new NewToken(),
+            new IfToken(),
+            new ElseToken(),
+            new WhileToken(),
+            new BreakToken(),
+            new PrintlnToken(),
+            new ReturnToken()
     );
 
     // Regex patterns

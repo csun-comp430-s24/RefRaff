@@ -7,4 +7,5 @@ public class SemicolonToken extends AbstractSymbolToken {
     public SemicolonToken() {
         super(SEMICOLON_TOKEN);
     }
+    
 }
