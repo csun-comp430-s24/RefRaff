@@ -214,6 +214,26 @@ public class TokenizerTest {
         testTokenizerInputMatchesExpectedTokens("return", new ReturnToken());
     }
 
+    @Test
+    public void testTokenizeIntLiteralTokenOne() {
+        testTokenizerInputMatchesExpectedTokens("1", new IntLiteralToken("1"));
+    }
+
+    @Test
+    public void testTokenizeIntLiteralTokens() {
+        String input = """
+                0 000 1234 010101 100000
+                """;
+        testTokenizerInputMatchesExpectedTokens(
+            input,
+            new IntLiteralToken("0"),
+            new IntLiteralToken("000"),
+            new IntLiteralToken("1234"),
+            new IntLiteralToken("010101"),
+            new IntLiteralToken("100000")
+        );
+    }
+
     // @Test
     // public void testTokenizeIdentifierToken() {
     //     testTokenizerInputMatchesExpectedTokens("variable", new IdentifierToken("variable"));
@@ -260,6 +280,11 @@ public class TokenizerTest {
     @Test
     public void testTokenizerThrowsOnDollarSign() {
         testTokenizerThrowsException("$");
+    }
+
+    @Test
+    public void testTokenizerThrowsOnNumbersFirstIdentifierToken() {
+        testTokenizerThrowsException("1234r");
     }
 
 }
