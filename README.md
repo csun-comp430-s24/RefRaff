@@ -5,19 +5,20 @@ The programming language RefRaff supports structs and reference counted memory m
 ## Grammar
 
 ```
-type ::= `int` | `bool` | Integers and booleans are types
+type ::= `int` | `bool` |                   // Integers and booleans are types
          `void` |
-         structname | Structures are a type
+         structname |                       // Structures are a type
 
 param :: = type var
 
 comma_param ::= [param (`,` param)*]
 
-Structs
-structdef ::= `struct` structname `{` (param `;`)* `}`
+// Structs
+structdef ::= `struct` structname           
+  `{` (param `;`)* `}`
 
-Functions
-fdef ::= `func` funcname `(` comma_param `)` `:` type
+// Functions
+fdef ::= `func` funcname `(` comma_param `)` `:` type    
          `{` stmt* `}`
 
 struct_actual_param ::= var `:` exp
@@ -28,17 +29,13 @@ struct_actual_params ::=
 comma_exp ::= [exp (`,` exp)*]
 
 primary_exp ::=
-  i | `true` | `false` | var | Integers, booleans, and variables
-  `null` | Null; assignable to struct types
-  `(` exp `)` | Parenthesized expressions
+  i | `true` | `false` | var |              // Integers, booleans, and variables
+  `null` |                                  // Null; assignable to struct types
+  `(` exp `)` |                             // Parenthesized expression
+  `new` structname `{` struct_actual_params `}` |     // Allocate a new struct
+  funcname `(` comma_exp `)`                // Function calls
 
-  Allocate a new struct
-  `new` structname `{` struct_actual_params `}` |
-
-  Function calls
-  funcname `(` comma_exp `)`
-
-Accessing the field of a struct or calls
+// Accessing the field of a struct or calls
 dot_exp ::= primary_exp (`.` var)*
 
 not_exp ::= [`!`]dot_exp
@@ -57,17 +54,17 @@ or_exp ::= and_exp (`||` and_exp)*
 	
 exp ::= or_exp
 
-stmt ::= type var `=` exp `;` | Variable declaration
-         var `=` exp `;` | Assignment
-         `if` `(` exp `)` stmt [`else` stmt] | if
-         `while` `(` exp `)` stmt | while
+stmt ::= type var `=` exp `;` |             // Variable declaration
+         var `=` exp `;` |                  // Assignment
+         `if` `(` exp `)` stmt [`else` stmt] |        // if
+         `while` `(` exp `)` stmt |         // while
          `break` `;` | break
-         `println` `(` exp `)` | Printing something
-         `{` stmt* `}` | Block
-         `return` [exp] `;` | Return
-         exp `;` Expression statements
+         `println` `(` exp `)` |            // Printing something
+         `{` stmt* `}` |                    // Block
+         `return` [exp] `;` |               // Return
+         exp `;`                            // Expression statements
 
-program ::= structdef* fdef* stmt* stmt* is the entry point
+program ::= structdef* fdef* stmt*          // stmt* is the entry point
 ```
 
 ### Valid symbols
