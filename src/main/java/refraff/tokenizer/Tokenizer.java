@@ -161,48 +161,33 @@ public class Tokenizer {
         return true;
     }
 
-    public Optional<Token> tryTokenizeSymbol() {
+    public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
         // If we are out of bounds, do not attempt to tokenize
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
-        Matcher matcher = SYMBOL_PATTERN.matcher(input);
+        Matcher matcher = pattern.matcher(input);
 
-        // If we didn't find any symbols that match a token exactly, return an empty list
+        // If we didn't find any tokens that match a token exactly, return an empty list
         if (!matcher.find(tokenizerPosition)) {
             return Optional.empty();
         }
 
         // Get the exact token from our map
         String symbol = matcher.group();
-        Token token = SYMBOL_TO_TOKEN.get(symbol);
+        Token token = tokenMap.get(symbol);
 
         // Increment the position and return our found token
         this.tokenizerPosition += symbol.length();
         return Optional.of(token);
     }
 
+    public Optional<Token> tryTokenizeSymbol() {
+        return tryTokenize(SYMBOL_PATTERN, SYMBOL_TO_TOKEN);
+    }
+
     public Optional<Token> tryTokenizeReserved() {
-        // If we are out of bounds, do not attempt to tokenize
-        if (inputOutOfBounds()) {
-            return Optional.empty();
-        }
-
-        Matcher matcher = RESERVED_PATTERN.matcher(input);
-
-        // If we didn't find any reserved words that match a token exactly, return an empty
-        // list
-        if (!matcher.find(tokenizerPosition)) {
-            return Optional.empty();
-        }
-
-        // Get the exact token from our map
-        String reserved = matcher.group();
-        Token token = RESERVED_TO_TOKEN.get(reserved);
-
-        // Increment the position and return our found token
-        this.tokenizerPosition += reserved.length();
-        return Optional.of(token);
+        return tryTokenize(RESERVED_PATTERN, RESERVED_TO_TOKEN);
     }
 }
