@@ -254,32 +254,48 @@ public class TokenizerTest {
         );
     }
 
-    // @Test
-    // public void testTokenizeIdentifierToken() {
-    //     testTokenizerInputMatchesExpectedTokens("variable", new IdentifierToken("variable"));
-    // }
+    @Test
+    public void testTokenizeIdentifierToken() {
+        testTokenizerInputMatchesExpectedTokens("variable", new IdentifierToken("variable"));
+    }
 
-    // @Test
-    // public void testTokenizeStructDefinition() {
-    //     String input = """
-    //             struct Node {
-    //                 int value;
-    //                 Node rest;
-    //             }
-    //             """;
-    //     testTokenizerInputMatchesExpectedTokens(
-    //             input,
-    //             new StructToken(),
-    //             new IdentifierToken("Node"),
-    //             new LeftBraceToken(),
-    //             new IntToken(),
-    //             new SemicolonToken(),
-    //             new IdentifierToken("Node"),
-    //             new IdentifierToken("rest"),
-    //             new SemicolonToken(),
-    //             new RightBraceToken()
-    //     );
-    // }
+    @Test
+    public void testTokenizeAssignmentStatement() {
+        String input = """
+                int variableName = 6;
+                """;
+        testTokenizerInputMatchesExpectedTokens(
+            input,
+            new IntToken(),
+            new IdentifierToken("variableName"),
+            new AssignmentToken(),
+            new IntLiteralToken("6"),
+            new SemicolonToken()
+        );
+    }
+
+    @Test
+    public void testTokenizeStructDefinition() {
+        String input = """
+                struct Node {
+                    int value;
+                    Node rest;
+                }
+                """;
+        testTokenizerInputMatchesExpectedTokens(
+                input,
+                new StructToken(),
+                new IdentifierToken("Node"),
+                new LeftBraceToken(),
+                new IntToken(),
+                new IdentifierToken("value"),
+                new SemicolonToken(),
+                new IdentifierToken("Node"),
+                new IdentifierToken("rest"),
+                new SemicolonToken(),
+                new RightBraceToken()
+        );
+    }
 
     // Test invalid inputs
 
@@ -398,6 +414,5 @@ public class TokenizerTest {
                 .map(tokenWithBackticks -> tokenWithBackticks.substring(1, tokenWithBackticks.length() - 1))
                 .toList();
     }
-    
 
 }

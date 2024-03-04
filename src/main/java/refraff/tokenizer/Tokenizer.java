@@ -70,6 +70,9 @@ public class Tokenizer {
     // The integer literal pattern.This doesn't allow for leading zeros - do we want that?
     private static final Pattern INT_LITERAL_PATTERN = Pattern.compile("\\b(0|[1-9][0-9]*)\\b");
 
+    // The indentifier regex
+    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("\\b([a-zA-Z_][a-zA-Z_0-9]*)\\b");
+
     // A regex pattern that places all valid symbols and operators as distinct choices to be tokenized
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
@@ -137,6 +140,13 @@ public class Tokenizer {
                 continue;
             }
 
+            // Try to tokenize identifier
+            Optional<Token> optionalIdentifierToken = tryTokenizeIdentifier();
+            if (optionalIdentifierToken.isPresent()) {
+                tokens.add(optionalIdentifierToken.get());
+                continue;
+            }
+
             // Try and tokenize IntLiteral
             Optional<Token> optionalIntLiteralToken = tryTokenizeIntLiteral();
             if (optionalIntLiteralToken.isPresent()) {
@@ -173,20 +183,23 @@ public class Tokenizer {
         return true;
     }
 
+    // Tries to tokenize mapped tokens
     public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
         // If we are out of bounds, do not attempt to tokenize
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
+        // Try to find a symbol
         Matcher matcher = pattern.matcher(input);
-
+        
         // If we didn't find any tokens that match a token exactly, return an empty list
-        if (!matcher.find(tokenizerPosition)) {
+        // Or if the position of the found token isn't our current position
+        if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
             return Optional.empty();
         }
 
-        // Get the exact token from our map
+        // Get the token from input
         String symbol = matcher.group();
         Token token = tokenMap.get(symbol);
 
@@ -203,24 +216,33 @@ public class Tokenizer {
         return tryTokenize(RESERVED_PATTERN, RESERVED_TO_TOKEN);
     }
 
-    public Optional<Token> tryTokenizeIntLiteral() {
+    // Tries to tokenize patterns that don't have maps
+    public Optional<Token> tryTokenize(Pattern pattern, Function<String, Token> tokenGenerator) {
         // If we are out of bounds, do not attempt to tokenize
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
-        Matcher matcher = INT_LITERAL_PATTERN.matcher(input);
+        Matcher matcher = pattern.matcher(input);
 
-        // If no int literal found, return empty list
-        if (!matcher.find(tokenizerPosition)) {
+        // If no match found, return empty list
+        if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
             return Optional.empty();
         }
 
-        // Get the Integer literal from input
-        String intLiteral = matcher.group();
+        // Get the token from input
+        String token = matcher.group();
 
-        this.tokenizerPosition += intLiteral.length();
-        return Optional.of(new IntLiteralToken(intLiteral));
+        this.tokenizerPosition += token.length();
+        return Optional.of(tokenGenerator.apply(token));
+    }
+
+    public Optional<Token> tryTokenizeIdentifier() {
+        return tryTokenize(IDENTIFIER_PATTERN, IdentifierToken::new);
+    }
+
+    public Optional<Token> tryTokenizeIntLiteral() {
+        return tryTokenize(INT_LITERAL_PATTERN, IntLiteralToken::new);
     }
     
 }
