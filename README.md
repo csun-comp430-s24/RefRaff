@@ -70,7 +70,7 @@ program ::= structdef* fdef* stmt*          // stmt* is the entry point
 ### Valid symbols
 
 ```
-`,`, `{`, `}`, `;`, `(`, `)`, `.`, `!`, `*`, `/`, `+`,
+`,`, `{`, `}`, ':', `;`, `(`, `)`, `.`, `!`, `*`, `/`, `+`,
 `-`, `<=`, `>=`, `<`, `>`, `==`, `!=`, `&&`, `||`, `=`
 ```
 
@@ -78,7 +78,7 @@ program ::= structdef* fdef* stmt*          // stmt* is the entry point
 
 ```
 `int`, `bool`, `void`, `struct`, `func`, `true`, `false`, `null`,
-`new`, `if`, `while`, `break`, `println`, `return`
+`new`, `if`, 'else', `while`, `break`, `println`, `return`
 ```
 
 ### Identifier Restrictions

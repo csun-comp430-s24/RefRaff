@@ -14,5 +14,4 @@ public class AbstractReservedToken extends AbstractToken {
     public String getTokenTypeDescriptor() {
         return RESERVED_WORD_DESCRIPTOR;
     }
-
 }

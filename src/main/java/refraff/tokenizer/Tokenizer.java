@@ -1,7 +1,6 @@
 package refraff.tokenizer;
 
-import refraff.tokenizer.reserved.BoolToken;
-import refraff.tokenizer.reserved.IntToken;
+import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.util.Pair;
 
@@ -18,35 +17,49 @@ public class Tokenizer {
             new CommaToken(),
             new LeftBraceToken(),
             new RightBraceToken(),
-            // new SemicolonToken(),
-            // new LeftParenToken(),
-            // new RightParenToken(),
+            new SemicolonToken(),
+            new LeftParenToken(),
+            new RightParenToken(),
+            new ColonToken(),
 
             // Operator symbols
-            // new DotToken(),
+            new DotToken(),
 
             // Arithmetic operators
-            // new MultiplyToken(),
-            // new DivisionToken(),
-            // new PlusToken(),
-            // new MinusToken(),
+            new MultiplyToken(),
+            new DivisionToken(),
+            new PlusToken(),
+            new MinusToken(),
 
             // Logical operators
             new AndToken(),
             new OrToken(),
-            // new NotEqualsToken(),
-            // new NotToken(),
+            new NotEqualsToken(),
+            new NotToken(),
             new LessThanEqualsToken(),
             new LessThanToken(),
-            // new GreaterThanEqualsToken(),
-            // new GreaterThanToken(),
+            new GreaterThanEqualsToken(),
+            new GreaterThanToken(),
             new DoubleEqualsToken(),
             new AssignmentToken()
     );
 
     private static final List<Token> RESERVED_TOKENS = Arrays.asList(
             new IntToken(),
-            new BoolToken()
+            new BoolToken(),
+            new StructToken(),
+            new FuncToken(),
+            new TrueToken(),
+            new FalseToken(),
+            new NullToken(),
+            new NewToken(),
+            new IfToken(),
+            new ElseToken(),
+            new WhileToken(),
+            new BreakToken(),
+            new PrintlnToken(),
+            new ReturnToken(),
+            new VoidToken()
     );
 
     // Regex patterns
@@ -58,6 +71,13 @@ public class Tokenizer {
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
             SYMBOL_TOKENS.stream()
+                    .map(Token::getTokenizedValue)
+                    .map(value -> "(" + Pattern.quote(value) + ")")
+                    .collect(Collectors.joining("|"))
+    );
+
+    private static final Pattern RESERVED_PATTERN = Pattern.compile(
+            RESERVED_TOKENS.stream()
                     .map(Token::getTokenizedValue)
                     .map(value -> "(" + Pattern.quote(value) + ")")
                     .collect(Collectors.joining("|"))
@@ -104,6 +124,12 @@ public class Tokenizer {
             Optional<Token> optionalSymbolToken = tryTokenizeSymbol();
             if (optionalSymbolToken.isPresent()) {
                 tokens.add(optionalSymbolToken.get());
+                continue;
+            }
+
+            Optional<Token> optionalReservedToken = tryTokenizeReserved();
+            if (optionalReservedToken.isPresent()) {
+                tokens.add(optionalReservedToken.get());
                 continue;
             }
 
@@ -158,4 +184,26 @@ public class Tokenizer {
         return Optional.of(token);
     }
 
+    public Optional<Token> tryTokenizeReserved() {
+        // If we are out of bounds, do not attempt to tokenize
+        if (inputOutOfBounds()) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = RESERVED_PATTERN.matcher(input);
+
+        // If we didn't find any reserved words that match a token exactly, return an empty
+        // list
+        if (!matcher.find(tokenizerPosition)) {
+            return Optional.empty();
+        }
+
+        // Get the exact token from our map
+        String reserved = matcher.group();
+        Token token = RESERVED_TO_TOKEN.get(reserved);
+
+        // Increment the position and return our found token
+        this.tokenizerPosition += reserved.length();
+        return Optional.of(token);
+    }
 }
