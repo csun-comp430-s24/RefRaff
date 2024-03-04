@@ -180,6 +180,11 @@ public class TokenizerTest {
     }
 
     @Test
+    public void testTokenizeVoidToken() {
+        testTokenizerInputMatchesExpectedTokens("void", new VoidToken());
+    }
+
+    @Test
     public void testTokenizeNewToken() {
         testTokenizerInputMatchesExpectedTokens("new", new NewToken());
     }

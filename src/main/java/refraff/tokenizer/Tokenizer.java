@@ -58,7 +58,8 @@ public class Tokenizer {
             new WhileToken(),
             new BreakToken(),
             new PrintlnToken(),
-            new ReturnToken()
+            new ReturnToken(),
+            new VoidToken()
     );
 
     // Regex patterns
