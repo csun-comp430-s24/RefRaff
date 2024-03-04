@@ -84,10 +84,12 @@ program ::= structdef* fdef* stmt* stmt* is the entry point
 `new`, `if`, `while`, `break`, `println`, `return`
 ```
 
-### Identifier restrictions
+### Identifier Restrictions
 
 1. Must start with an alphabetic character [a-zA-Z]
 2. Followed by zero or more alphanumeric characters (a-zA-Z0-9)*
+
+### Integer Literal Restrictions
 
 ## Example Program
 ```
