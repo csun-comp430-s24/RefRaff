@@ -7,11 +7,9 @@ import org.junit.jupiter.api.TestFactory;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -20,6 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 public class TokenizerTest {
+
+    private static final String WHITESPACE_CHARACTERS = " \n\r\t";
 
     // Test valid inputs
 
@@ -47,7 +47,7 @@ public class TokenizerTest {
 
     @Test
     public void testTokenizeWhitespaceString() {
-        testTokenizerInputMatchesExpectedTokens("    \t\n\r      ");
+        testTokenizerInputMatchesExpectedTokens("    " + WHITESPACE_CHARACTERS + "      ");
     }
 
     @Test
@@ -297,6 +297,12 @@ public class TokenizerTest {
         );
     }
 
+    @Test
+    public void testTokenizesProgramWithNoExceptions() {
+        String program = ResourceUtil.readProgramInputFile();
+        getTokensWithoutException(program);
+    }
+
     // Test invalid inputs
 
     private void testTokenizerThrowsException(String input) {
@@ -319,7 +325,7 @@ public class TokenizerTest {
     }
 
     @Test
-    public void testTokenizerThrowsOnIdentifierTokenWithLeadingInterger() {
+    public void testTokenizerThrowsOnIdentifierTokenWithLeadingInteger() {
         testTokenizerThrowsException("1234r");
     }
 
@@ -328,17 +334,25 @@ public class TokenizerTest {
         testTokenizerThrowsException("0123");
     }
   
-    // Grammar tests
+    // Dynamic tests
 
-    private static final String TEST_DIRECTORY = "src/test/resources";
     private static final String GRAMMAR_FILE_PATH = "grammar.txt";
 
+    // The tokens in our grammar are expressed as: `<token>`, the character ` does not otherwise appear
     private static final Pattern MATCHES_GRAMMAR_DEFINED_TOKEN = Pattern.compile("`[^`]+`");
 
+    /**
+     * Creates a test factory to check if all tokens defined in the grammar exist and match their expected base class.
+     *
+     * If this test factory fails, then either 1) or 2) occurs for one or more grammar-defined tokens:
+     * 1) A token defined in the grammar is not created
+     * 2) A defined token does not match the expected subclass that it should be in the code
+     *
+     * @return the list of dynamically generated tests
+     */
     @TestFactory
-    public List<DynamicTest> testGrammarDefinedTokensArePresent() {
+    public List<DynamicTest> testGrammarDefinedTokensExistAndInheritFromBaseClass() {
         List<String> grammarDefinedTokens = readGrammarDefinedTokens();
-
         List<DynamicTest> dynamicTests = new ArrayList<>();
 
         // If our character is not an alphabetic character at the start, we are a symbol
@@ -364,7 +378,7 @@ public class TokenizerTest {
 
     private List<DynamicTest> checkTokensExistAndInheritFromBaseClass(List<String> tokens,
                                                                       Class<? extends Token> baseClass) {
-        String baseClassName = baseClass.getName();
+        String baseClassName = baseClass.getSimpleName();
 
         return tokens.stream()
                 .map(token ->
@@ -384,21 +398,7 @@ public class TokenizerTest {
     }
 
     private List<String> readGrammarDefinedTokens() {
-        File file = new File(TEST_DIRECTORY, GRAMMAR_FILE_PATH);
-        assertTrue(GRAMMAR_FILE_PATH + " does not exist to parse grammar defined tokens", file.exists());
-
-
-        StringBuffer stringBuffer = new StringBuffer();
-
-        assertDoesNotThrow(() -> {
-            try (Scanner scanner = new Scanner(file)) {
-                while (scanner.hasNextLine()) {
-                    stringBuffer.append(scanner.nextLine());
-                }
-            }
-        });
-
-        String grammar = stringBuffer.toString();
+        String grammar = ResourceUtil.readInputFile(GRAMMAR_FILE_PATH);
         Matcher definedTokenMatcher = MATCHES_GRAMMAR_DEFINED_TOKEN.matcher(grammar);
 
         List<String> grammarDefinedTokens = new ArrayList<>();

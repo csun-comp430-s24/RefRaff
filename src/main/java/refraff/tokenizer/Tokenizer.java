@@ -2,7 +2,6 @@ package refraff.tokenizer;
 
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
-import refraff.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
@@ -67,23 +66,16 @@ public class Tokenizer {
     // The whitespace character for Java's Pattern is \s
     private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s*");
 
-    // The integer literal pattern.This doesn't allow for leading zeros - do we want that?
+    // The integer literal pattern. This doesn't allow for leading zeros
     private static final Pattern INT_LITERAL_PATTERN = Pattern.compile("\\b(0|[1-9][0-9]*)\\b");
 
-    // The indentifier regex
-    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("\\b([a-zA-Z_][a-zA-Z_0-9]*)\\b");
+    // The identifier regex (underscores should not be allowed in first char for variables according to C standard)
+    private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("\\b([a-zA-Z][a-zA-Z_0-9]*)\\b");
 
     // A regex pattern that places all valid symbols and operators as distinct choices to be tokenized
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
             SYMBOL_TOKENS.stream()
-                    .map(Token::getTokenizedValue)
-                    .map(value -> "(" + Pattern.quote(value) + ")")
-                    .collect(Collectors.joining("|"))
-    );
-
-    private static final Pattern RESERVED_PATTERN = Pattern.compile(
-            RESERVED_TOKENS.stream()
                     .map(Token::getTokenizedValue)
                     .map(value -> "(" + Pattern.quote(value) + ")")
                     .collect(Collectors.joining("|"))
@@ -133,17 +125,10 @@ public class Tokenizer {
                 continue;
             }
 
-            // Try and tokenize reserved word
-            Optional<Token> optionalReservedToken = tryTokenizeReserved();
-            if (optionalReservedToken.isPresent()) {
-                tokens.add(optionalReservedToken.get());
-                continue;
-            }
-
-            // Try to tokenize identifier
-            Optional<Token> optionalIdentifierToken = tryTokenizeIdentifier();
-            if (optionalIdentifierToken.isPresent()) {
-                tokens.add(optionalIdentifierToken.get());
+            // Try to tokenize reserved word or identifier
+            Optional<Token> optionalReservedWordOrIdentifier = tryTokenizeReservedOrIdentifier();
+            if (optionalReservedWordOrIdentifier.isPresent()) {
+                tokens.add(optionalReservedWordOrIdentifier.get());
                 continue;
             }
 
@@ -165,46 +150,51 @@ public class Tokenizer {
         return tokenizerPosition >= inputLength;
     }
 
-    private boolean skipWhitespace() {
-        // If we are out of bounds, do not attempt to tokenize
-        if (inputOutOfBounds()) {
-            return false;
-        }
-
-        Matcher matcher = WHITESPACE_PATTERN.matcher(input);
-
-        // If we didn't find any whitespace, return
-        if (!matcher.find(tokenizerPosition)) {
-            return false;
-        }
-
-        // Set the position to be the next character that is not whitespace
-        this.tokenizerPosition = matcher.end();
-        return true;
-    }
-
-    // Tries to tokenize mapped tokens
-    public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
-        // If we are out of bounds, do not attempt to tokenize
+    private Optional<String> findMatchingPattern(Pattern pattern) {
+        // If we are out of bounds, do not attempt to read pattern match
         if (inputOutOfBounds()) {
             return Optional.empty();
         }
 
-        // Try to find a symbol
+        // Setup the regex matcher for the input
         Matcher matcher = pattern.matcher(input);
-        
-        // If we didn't find any tokens that match a token exactly, return an empty list
-        // Or if the position of the found token isn't our current position
+
+        // If we didn't find any string that matches our pattern
+        // or if the position of the found match isn't our current position, return an empty optional
         if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
             return Optional.empty();
         }
 
-        // Get the token from input
-        String symbol = matcher.group();
-        Token token = tokenMap.get(symbol);
+        // Get the matched string and change our position to immediately after the end of the match
+        String matched = matcher.group();
+        this.tokenizerPosition = matcher.end();
 
-        // Increment the position and return our found token
-        this.tokenizerPosition += symbol.length();
+        // Return our matched string
+        return Optional.of(matched);
+    }
+
+    private boolean skipWhitespace() {
+        // Return whether whitespace was found
+        return findMatchingPattern(WHITESPACE_PATTERN).isPresent();
+    }
+
+    // Tries to tokenize mapped tokens
+    public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
+        return tryTokenize(pattern, tokenMap::get);
+    }
+
+    public Optional<Token> tryTokenize(Pattern pattern, Function<String, Token> stringToTokenFunction) {
+        Optional<String> optionalMatchedString = findMatchingPattern(pattern);
+
+        // If we did not find a match for our token, return an empty optional
+        if (optionalMatchedString.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // Apply our mapping function from string to token and return its value
+        String matchedToken = optionalMatchedString.get();
+        Token token = stringToTokenFunction.apply(matchedToken);
+
         return Optional.of(token);
     }
 
@@ -212,33 +202,11 @@ public class Tokenizer {
         return tryTokenize(SYMBOL_PATTERN, SYMBOL_TO_TOKEN);
     }
 
-    public Optional<Token> tryTokenizeReserved() {
-        return tryTokenize(RESERVED_PATTERN, RESERVED_TO_TOKEN);
-    }
-
-    // Tries to tokenize patterns that don't have maps
-    public Optional<Token> tryTokenize(Pattern pattern, Function<String, Token> tokenGenerator) {
-        // If we are out of bounds, do not attempt to tokenize
-        if (inputOutOfBounds()) {
-            return Optional.empty();
-        }
-
-        Matcher matcher = pattern.matcher(input);
-
-        // If no match found, return empty list
-        if (!matcher.find(tokenizerPosition) || matcher.start() != tokenizerPosition) {
-            return Optional.empty();
-        }
-
-        // Get the token from input
-        String token = matcher.group();
-
-        this.tokenizerPosition += token.length();
-        return Optional.of(tokenGenerator.apply(token));
-    }
-
-    public Optional<Token> tryTokenizeIdentifier() {
-        return tryTokenize(IDENTIFIER_PATTERN, IdentifierToken::new);
+    public Optional<Token> tryTokenizeReservedOrIdentifier() {
+        return tryTokenize(
+                IDENTIFIER_PATTERN,
+                token -> RESERVED_TO_TOKEN.getOrDefault(token, new IdentifierToken(token))
+        );
     }
 
     public Optional<Token> tryTokenizeIntLiteral() {
