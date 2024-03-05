@@ -1,6 +1,6 @@
 package refraff.parser.type;
 
-public class IntType extends AbstractTypeNode {
+public class IntType extends Type {
     
     private static final String INT_TYPE = "int";
 

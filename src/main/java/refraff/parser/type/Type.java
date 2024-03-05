@@ -2,11 +2,11 @@ package refraff.parser.type;
 
 import refraff.parser.AbstractSyntaxTreeNode;
 
-public class AbstractTypeNode extends AbstractSyntaxTreeNode {
+public abstract class Type extends AbstractSyntaxTreeNode {
     
     private static final String TYPE_DESCRIPTOR = "Type";
 
-    public AbstractTypeNode(String parsedValue) {
+    public Type(String parsedValue) {
         super(parsedValue);
     }
 

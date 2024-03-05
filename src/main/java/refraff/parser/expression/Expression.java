@@ -2,11 +2,11 @@ package refraff.parser.expression;
 
 import refraff.parser.AbstractSyntaxTreeNode;
 
-public class AbstractExpressionNode extends AbstractSyntaxTreeNode {
+public abstract class Expression extends AbstractSyntaxTreeNode {
     
     private static final String TYPE_DESCRIPTOR = "Expression";
 
-    public AbstractExpressionNode(String parsedValue) {
+    public Expression(String parsedValue) {
         super(parsedValue);
     }
 
