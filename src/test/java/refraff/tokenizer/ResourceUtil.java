@@ -14,8 +14,7 @@ public class ResourceUtil {
 
     public static String readInputFile(String filePath) {
         File file = new File(TEST_DIRECTORY, filePath);
-        assertTrue("Input file " + filePath + "does not exist in " + TEST_DIRECTORY, file.exists());
-
+        assertTrue("Input file " + filePath + " does not exist in " + TEST_DIRECTORY, file.exists());
 
         StringBuffer stringBuffer = new StringBuffer();
 
