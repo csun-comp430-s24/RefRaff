@@ -77,7 +77,7 @@ public class Tokenizer {
     private static final Pattern SYMBOL_PATTERN = Pattern.compile(
             SYMBOL_TOKENS.stream()
                     .map(Token::getTokenizedValue)
-                    .map(value -> "(" + Pattern.quote(value) + ")")
+                    .map(symbol -> "(" + Pattern.quote(symbol) + ")")
                     .collect(Collectors.joining("|"))
     );
 

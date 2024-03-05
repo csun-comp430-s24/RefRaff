@@ -260,6 +260,17 @@ public class TokenizerTest {
     }
 
     @Test
+    public void testTokenizeIdentifierTokenWithNumbersCapitalsAndUnderscores() {
+        final String input = "vAr_1234_XyZ";
+        testTokenizerInputMatchesExpectedTokens(input, new IdentifierToken(input));
+    }
+
+    @Test
+    public void testTokenizeIdentifiersWithSpacesInBetween() {
+        testTokenizerInputMatchesExpectedTokens("ab cd", new IdentifierToken("ab"), new IdentifierToken("cd"));
+    }
+
+    @Test
     public void testTokenizeAssignmentStatement() {
         String input = """
                 int variableName = 6;
@@ -327,6 +338,11 @@ public class TokenizerTest {
     @Test
     public void testTokenizerThrowsOnIdentifierTokenWithLeadingInteger() {
         testTokenizerThrowsException("1234r");
+    }
+
+    @Test
+    public void testTokenizerThrowsOnIdentifierTokenWithLeadingUnderscore() {
+        testTokenizerThrowsException("_a");
     }
 
     @Test
