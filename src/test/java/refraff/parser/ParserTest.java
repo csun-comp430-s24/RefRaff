@@ -4,8 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
-import java.util.Arrays;
-import java.util.List;
 
 import org.jacoco.agent.rt.internal_4742761.asm.tree.ParameterNode;
 import org.junit.Test;
@@ -17,6 +15,7 @@ import refraff.parser.Parser;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
+import refraff.parser.operator.*;
 
 
 public class ParserTest {
@@ -87,8 +86,10 @@ public class ParserTest {
     @Test
     public void testParseProgramWithStructDef() throws ParserException {
         /*
-         * int variableName = 6;
-         * just a different entry point
+         * struct Node {
+         *    int value;
+         *    Node rest;
+         * }
          */
         final Token[] input = new Token[] {
                 new StructToken(),
@@ -129,4 +130,88 @@ public class ParserTest {
         assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
                 parser.parseProgram(0));
     }
+
+    // @Test
+    // public void testProgramWithPlusOpExpression() throws ParserException {
+    //     // retval = retval + 1;
+    //     final Token[] input = new Token[] {
+    //             new IdentifierToken("retval"),
+    //             new AssignmentToken(),
+    //             new IdentifierToken("retval"),
+    //             new PlusToken(),
+    //             new IntLiteralToken("1"),
+    //             new SemicolonToken()
+    //     };
+    //     final Parser parser = new Parser(input);
+    //     final List<StructDef> structDefs = new ArrayList<>();
+    //     final List<Statement> statements = new ArrayList<>();
+
+    //     BinaryOpExp addExp = new BinaryOpExp(new VariableExp("retval"), new PlusOp(), new IntLiteralExp(1));
+
+    //     statements.add(new AssignStmt(
+    //             new Variable("retval"),
+    //             addExp)
+    //     );
+
+    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 6),
+    //             parser.parseProgram(0));
+    // }
+
+    // @Test
+    // public void testProgramWithDotOpExpression() throws ParserException {
+    //     // list = list.rest;
+    // }
+
+    // @Test
+    // public void testParseProgramWithWhileLoop() throws ParserException {
+    //     /*
+    //      *   while (list != null) {
+    //      *     retval = retval + 1;
+    //      *     list = list.rest;
+    //      *   }
+    //      */
+    //     final Token[] input = new Token[] {
+    //             new WhileToken(),
+    //             new LeftParenToken(),
+    //             new IdentifierToken("list"),
+    //             new NotEqualsToken(),
+    //             new NullToken(),
+    //             new LeftBraceToken(),
+    //             new IdentifierToken("retval"),
+    //             new AssignmentToken(),
+    //             new IdentifierToken("retval"),
+    //             new PlusToken(),
+    //             new IntLiteralToken("1"),
+    //             new SemicolonToken(),
+    //             new IdentifierToken("list"),
+    //             new AssignmentToken(),
+    //             new IdentifierToken("list"),
+    //             new DotToken(),
+    //             new IdentifierToken("rest"),
+    //             new SemicolonToken(),
+    //             new RightBraceToken()
+    //     };
+    //     final Parser parser = new Parser(input);
+
+    //     final List<Param> params = new ArrayList<>();
+
+    //     params.add(new Param(
+    //             new IntType(),
+    //             new Variable("value")));
+
+    //     params.add(new Param(
+    //             new StructName(new Variable("Node")),
+    //             new Variable("rest")));
+
+    //     final List<StructDef> structDefs = new ArrayList<>();
+
+    //     structDefs.add(new StructDef(
+    //             new StructName(new Variable("Node")),
+    //             params));
+
+    //     final List<Statement> statements = new ArrayList<>();
+
+    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
+    //             parser.parseProgram(0));
+    // }
 }
