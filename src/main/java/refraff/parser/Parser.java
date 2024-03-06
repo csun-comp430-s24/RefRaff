@@ -6,7 +6,6 @@ import refraff.parser.ParserException;
 import refraff.parser.statement.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
-import refraff.tokenizer.Token;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.*;
@@ -19,22 +18,18 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    public Token getToken(final int position) throws ParserException {
+    public Optional<Token> getToken(final int position) {
         if (position >= 0 && position < tokens.length) {
-            return tokens[position];
+            return Optional.of(tokens[position]);
         } else {
-            throw new ParserException("Out of tokens");
+            return Optional.empty();
         }
     }
 
     public boolean checkTokenIs(final int position,
                                 final Token expected) throws ParserException {
-        try {
-            final Token received = getToken(position);
-            return expected.equals(received);
-        } catch (ParserException e) {
-            return false;
-        }
+        final Optional<Token> received = getToken(position);
+        return received.isPresent() && expected.equals(received.get());
     }
 
     public static Program parseProgram(Token[] tokens) throws ParserException {
@@ -80,7 +75,7 @@ public class Parser {
     // But for now, it's just stmt ::= var '=' exp ';'
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // Try to parse an assignment statement, return immediately if successful
-        Optional<ParseResult<Vardec>> result = parseVardec(position);
+        Optional<ParseResult<VardecStmt>> result = parseVardec(position);
         if (result.isPresent()) {
             // Map Vardec result to Statement result
             ParseResult<Statement> statementResult = new ParseResult<>(result.get().result,
@@ -92,7 +87,7 @@ public class Parser {
     }
 
     // vardec ::= type var '=' exp ';'
-    public Optional<ParseResult<Vardec>> parseVardec(final int position) throws ParserException {
+    public Optional<ParseResult<VardecStmt>> parseVardec(final int position) throws ParserException {
         int currentPosition = position;
         // This is a weird idea, but can we make a list of the items in a production
         // And loop through them?
@@ -137,8 +132,8 @@ public class Parser {
 
         // Return the variable declaration
         return Optional.of(
-            new ParseResult<Vardec>(
-                new Vardec(type.result, var.result, exp.result),
+            new ParseResult<VardecStmt>(
+                new VardecStmt(type.result, var.result, exp.result),
                 exp.nextPosition + 1
             )
         );
@@ -147,7 +142,12 @@ public class Parser {
     // exp ::= or_exp
     // But for now, exp ::= int literal
     public Optional<ParseResult<Expression>> parseExp(final int position) throws ParserException {
-        final Token token = getToken(position);
+        final Optional<Token> maybeToken = getToken(position);
+        if (!maybeToken.isPresent()) {
+            return Optional.empty();
+        }
+
+        Token token = maybeToken.get();
         // Try to parse int literal
         if (token instanceof IntLiteralToken) {
             // This is just a placeholder because I want to start testing it already
@@ -168,7 +168,12 @@ public class Parser {
 
     // Tries to parse variable
     public Optional<ParseResult<Variable>> parseVar(final int position) throws ParserException {
-        final Token token = getToken(position);
+        final Optional<Token> maybeToken = getToken(position);
+        if (!maybeToken.isPresent()) {
+            return Optional.empty();
+        }
+
+        Token token = maybeToken.get();
         // If this is an identifier
         if (token instanceof IdentifierToken) {
             // Create a new Optional ParseResult for a Variable
@@ -191,8 +196,12 @@ public class Parser {
     // type ::= 'int' | 'bool' | 'void' | structname
     // But right now it's only type ::= 'int'
     public Optional<ParseResult<Type>> parseType(final int position) throws ParserException {
-        final Token token = getToken(position);
-        Optional<ParseResult<Type>> type;
+        final Optional<Token> maybeToken = getToken(position);
+        if (!maybeToken.isPresent()) {
+            return Optional.empty();
+        }
+
+        Token token = maybeToken.get();
         if (token instanceof IntToken) {
             return Optional.of(new ParseResult<Type>(new IntType(), position + 1));
         } else {

@@ -4,13 +4,13 @@ import refraff.parser.type.Type;
 import refraff.parser.Variable;
 import refraff.parser.expression.Expression;
 
-public class Vardec extends Statement {
+public class VardecStmt extends Statement {
     
     private final Type type;
-    private final Variable variable; // I think I may move this into parser...
+    private final Variable variable; 
     private final Expression expression;
 
-    public Vardec(Type type, 
+    public VardecStmt(Type type, 
             Variable variable, Expression expression) {
         super(
             type.getParsedValue()

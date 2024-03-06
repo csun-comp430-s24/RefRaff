@@ -38,7 +38,7 @@ public class ParserTest {
     }
 
     @Test
-    public void testVardec() throws ParserException {
+    public void testParseVardec() throws ParserException {
         final Token[] input = new Token[] {
             new IntToken(),
             new IdentifierToken("variableName"),
@@ -47,7 +47,7 @@ public class ParserTest {
             new SemicolonToken()
         };
         final Parser parser = new Parser(input);
-        assertEquals(Optional.of(new ParseResult<>(new Vardec(
+        assertEquals(Optional.of(new ParseResult<>(new VardecStmt(
                                     new IntType(),
                                     new Variable("variableName"),
                                     new IntLiteralExp(6)
@@ -55,37 +55,30 @@ public class ParserTest {
                     parser.parseVardec(0));
     }
 
-    // private Program getAbstractSyntaxTreeWithoutException(String input) 
-    //         throws TokenizerException {
+    @Test
+    public void testParseProgram() throws ParserException {
+        /*
+         * int variableName = 6;
+         * just a different entry point
+         */
+        final Token[] input = new Token[] {
+            new IntToken(),
+            new IdentifierToken("variableName"),
+            new AssignmentToken(),
+            new IntLiteralToken("6"),
+            new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<Statement> statements = new ArrayList<>();
 
-    //     Tokenizer tokenizer = new Tokenizer(input);
-    //     List<Token> tokenList = tokenizer.tokenize();
-    //     Token[] tokens = new Token[tokenList.size()];
-    //     tokenList.toArray(tokens);
-    //     // Yikes. I made it an array, because that's what it is in github example
-    //     // But this is a mess
-        
-    //     try {
-    //         return Parser.parseProgram(tokens);
-    //     } catch (ParserException ex) {
-    //         fail(ex.getMessage());
-    //     }
+        statements.add(new VardecStmt(
+            new IntType(),
+            new Variable("variableName"),
+            new IntLiteralExp(6)
+            )
+        );
 
-    //     throw new IllegalStateException("This will never be called.");
-    // }
-
-    // private void testParserInputMatchesExpectedTree(String input, Token... expectedTokensArray) 
-    //         throws TokenizerException {
-    //     Program program = getAbstractSyntaxTreeWithoutException(input);
-    //     // Program expectedProgram = Arrays.asList(expectedTokensArray);
-
-    //     // assertEquals(expectedTokens, actualTokens);
-    // }
-
-    // @Test
-    // public void testParserParsesWithoutException() 
-    //         throws TokenizerException {
-    //     String input = "int variableName = 6;";
-    //     testParserInputMatchesExpectedTree(input);
-    // }
+        assertEquals(new ParseResult<>(new Program(statements), 5),
+                    parser.parseProgram(0));
+    }
 }
