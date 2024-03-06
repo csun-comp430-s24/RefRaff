@@ -1,10 +1,10 @@
 package refraff.parser.expression;
 
-public class IntLiteralExpression extends Expression {
+public class IntLiteralExp extends Expression {
     
     private final int num;
 
-    public IntLiteralExpression(int num) {
+    public IntLiteralExp(int num) {
         super(Integer.toString(num));
         this.num = num;
     }

@@ -1,20 +1,20 @@
 package refraff.parser.statement;
 
 import refraff.parser.type.Type;
-import refraff.parser.expression.VariableExpression;
+import refraff.parser.Variable;
 import refraff.parser.expression.Expression;
 
 public class Vardec extends Statement {
     
     private final Type type;
-    private final VariableExpression variable; // I think I may move this into parser...
+    private final Variable variable; // I think I may move this into parser...
     private final Expression expression;
 
     public Vardec(Type type, 
-            VariableExpression variable, Expression expression) {
+            Variable variable, Expression expression) {
         super(
             type.getParsedValue()
-            + variable.getParsedValue()
+            + variable.hashCode()
             + expression.getParsedValue()
         );
         this.type = type;
