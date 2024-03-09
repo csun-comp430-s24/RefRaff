@@ -236,6 +236,21 @@ public class TokenizerTest {
     }
 
     @Test
+    public void testTokenizeIdentifierNotReservedWord1() {
+        testTokenizerInputMatchesExpectedTokens("ret urn", new IdentifierToken("ret"), new IdentifierToken("urn"));
+    }
+
+    @Test
+    public void testTokenizeIdentifierNotReservedWeyword2() {
+        testTokenizerInputMatchesExpectedTokens("returnType", new IdentifierToken("returnType"));
+    }
+
+    @Test
+    public void testTokenizeIdentifierNotReservedWeyword3() {
+        testTokenizerInputMatchesExpectedTokens("return7", new IdentifierToken("return7"));
+    }
+
+    @Test
     public void testTokenizeIntLiteralTokenOne() {
         testTokenizerInputMatchesExpectedTokens("1", new IntLiteralToken("1"));
     }
@@ -310,6 +325,7 @@ public class TokenizerTest {
 
     @Test
     public void testTokenizesProgramWithNoExceptions() {
+        // Reads valid input file with whitespace in between most tokens
         String program = ResourceUtil.readProgramInputFile();
         getTokensWithoutException(program);
     }
