@@ -1,4 +1,4 @@
-package refraff.tokenizer;
+package refraff.util;
 
 import java.io.File;
 import java.util.Scanner;

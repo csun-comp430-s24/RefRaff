@@ -5,20 +5,45 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
 
-import org.jacoco.agent.rt.internal_4742761.asm.tree.ParameterNode;
 import org.junit.Test;
 
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.*;
-import refraff.parser.Parser;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
-import refraff.parser.operator.*;
 
 
 public class ParserTest {
+
+    private Token[] toArray(Token... tokens) {
+        return tokens;
+    }
+
+    private ParseResult<Program> parseProgram(Token... tokens) throws ParserException {
+        final Parser parser = new Parser(tokens);
+        return parser.parseProgram(0);
+    }
+
+    private ParseResult<Program> testProgramParsesWithoutException(Token... tokens) {
+        try {
+            return parseProgram(tokens);
+        } catch (ParserException ex) {
+            fail(ex);
+        }
+
+        throw new IllegalStateException("This will never occur.");
+    }
+
+    private void testProgramParsesWithException(Token... tokens) {
+        try {
+            parseProgram(tokens);
+            fail("Parser exception should have been thrown, but was not.");
+        } catch (ParserException ex) {
+            // ignored, we succeed
+        }
+    }
     
     // Test valid inputs
     @Test
@@ -35,6 +60,76 @@ public class ParserTest {
         final Parser parser = new Parser(input);
         assertEquals(Optional.of(new ParseResult<Type>(new IntType(), 1)),
                      parser.parseType(0));
+    }
+
+    @Test
+    public void testFunctionDefWithNoParams() {
+        // func a(int b) : int {}
+        Token[] input = toArray(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new RightParenToken(), new ColonToken(),
+                new IntToken(), new LeftBraceToken(), new RightBraceToken());
+
+        FunctionDef expectedFunctionDef = new FunctionDef(
+                new FunctionName("a"),
+                List.of(),
+                new IntType(),
+                new StatementBlock(List.of()));
+
+        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
+
+        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
+        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
+
+        assertEquals(expectedParseResult, actualParseResult);
+    }
+
+    @Test
+    public void testFunctionDefWithOneParam() {
+        // func a(int b) : int {}
+        Token[] input = toArray(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
+                new ColonToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken());
+
+        FunctionDef expectedFunctionDef = new FunctionDef(
+                new FunctionName("a"),
+                List.of(
+                    new Param(new IntType(), new Variable("b"))
+                ),
+                new IntType(),
+                new StatementBlock(List.of()));
+
+        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
+
+        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
+        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
+
+        assertEquals(expectedParseResult, actualParseResult);
+    }
+
+    @Test
+    public void testFunctionDefWithMultipleParams() {
+        // func a(int b, custom c) : int {}
+        Token[] input = toArray(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"),
+                new CommaToken(), new IdentifierToken("custom"),
+                new IdentifierToken("c"), new RightParenToken(),
+                new ColonToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken());
+
+        FunctionDef expectedFunctionDef = new FunctionDef(
+                new FunctionName("a"),
+                List.of(
+                        new Param(new IntType(), new Variable("b")),
+                        new Param(new StructName("custom"), new Variable("c"))
+                ),
+                new IntType(),
+                new StatementBlock(List.of()));
+
+        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
+
+        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
+        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
+
+        assertEquals(expectedParseResult, actualParseResult);
     }
 
     @Test
@@ -70,6 +165,7 @@ public class ParserTest {
         };
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
         statements.add(new VardecStmt(
@@ -79,8 +175,45 @@ public class ParserTest {
             )
         );
 
-        assertEquals(new ParseResult<>(new Program(structDefs, statements), 5),
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 5),
                     parser.parseProgram(0));
+    }
+
+
+    @Test
+    public void testParseEmptyStatementBlock() {
+        // {}
+        Token[] input = toArray(new LeftBraceToken(),
+                new IntToken(),
+                new IdentifierToken("variableName"),
+                new AssignmentToken(),
+                new IntLiteralToken("6"),
+                new SemicolonToken(),
+                new RightBraceToken());
+
+        StatementBlock statementBlock = new StatementBlock(List.of(
+                new VardecStmt(new IntType(), new Variable("variableName"), new IntLiteralExp(6)))
+        );
+        Program expectedProgram = new Program(List.of(), List.of(), List.of(statementBlock));
+
+        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
+        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
+
+        assertEquals(expectedParseResult, actualParseResult);
+    }
+
+    @Test
+    public void testParseNonEmptyStatementBlock() {
+        // {}
+        Token[] input = toArray(new LeftBraceToken(), new RightBraceToken());
+
+        StatementBlock statementBlock = new StatementBlock(List.of());
+        Program expectedProgram = new Program(List.of(), List.of(), List.of(statementBlock));
+
+        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
+        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
+
+        assertEquals(expectedParseResult, actualParseResult);
     }
 
     @Test
@@ -113,21 +246,22 @@ public class ParserTest {
         ));
 
         params.add(new Param(
-            new StructName(new Variable("Node")),
+            new StructName("Node"),
             new Variable("rest")
         ));
 
+        final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<StructDef> structDefs = new ArrayList<>();
 
         structDefs.add(new StructDef(
-                new StructName(new Variable("Node")),
+                new StructName("Node"),
                 params
             )
         );
 
         final List<Statement> statements = new ArrayList<>();
 
-        assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 10),
                 parser.parseProgram(0));
     }
 
@@ -214,4 +348,58 @@ public class ParserTest {
     //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
     //             parser.parseProgram(0));
     // }
+
+    // Test invalid inputs
+
+    @Test
+    public void testFunctionDefWithNoFunctionNameThrowsException() {
+        // func
+        testProgramParsesWithException(new FuncToken());
+    }
+
+    @Test
+    public void testFunctionDefWithNoLeftParenThrowsException() {
+        // func a
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"));
+    }
+
+    @Test
+    public void testFunctionDefWithNoParameterAfterCommaThrowsException() {
+        // func a(int b, )
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new CommaToken(), new RightParenToken());
+    }
+
+    @Test
+    public void testFunctionDefWithNoRightParenThrowsException() {
+        // func a(int b :
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new ColonToken());
+    }
+
+
+    @Test
+    public void testFunctionDefWithNoColonThrowsException() {
+        // func a(int b) int
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
+                new IntToken());
+    }
+
+    @Test
+    public void testFunctionDefWithNoReturnTypeThrowsException() {
+        // func a(int b) :
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
+                new ColonToken());
+    }
+
+    @Test
+    public void testFunctionDefWithNoFunctionBodyThrowsException() {
+        // func a(int b) : int
+        testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
+                new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
+                new ColonToken(), new IntToken());
+    }
+
 }

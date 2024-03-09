@@ -4,8 +4,7 @@ import java.util.List;
 import refraff.parser.type.Type;
 
 public class Param extends AbstractSyntaxTreeNode {
-    
-    
+
     private static final String TYPE = "parameter";
     private static final String TYPE_DESCRIPTOR = "Parameter";
 

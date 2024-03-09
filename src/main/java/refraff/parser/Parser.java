@@ -1,8 +1,9 @@
 package refraff.parser;
 
 import java.util.*;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
-import refraff.parser.ParserException;
 import refraff.parser.statement.*;
 import refraff.parser.type.*;
 import refraff.parser.operator.*;
@@ -31,10 +32,31 @@ public class Parser {
 
 
     // Returns true if there are more tokens and they are the same, otherwise empty
-    public boolean checkTokenIs(final int position,
-                                final Token expected) throws ParserException {
+    // Refactor: change expected to the token's class - no longer creating new tokens
+    public boolean isExpectedToken(final int position, final Class<? extends Token> expected) {
         final Optional<Token> received = getToken(position);
-        return received.isPresent() && expected.equals(received.get());
+        return received.isPresent() && received.get().getClass().equals(expected);
+    }
+
+    private void throwParserExceptionOnNoSemicolon(String beingParsed, int position) throws ParserException {
+        throwParserExceptionOnUnexpected(beingParsed, SemicolonToken.class, "terminating `;`", position);
+    }
+
+    private void throwParserExceptionOnUnexpected(String beingParsed, Class<? extends Token> tokenClass,
+                                                  String tokenRepresentation, int position) throws ParserException {
+        if (isExpectedToken(position, tokenClass)) {
+            return;
+        }
+
+        throwParserException(beingParsed, tokenRepresentation, position);
+    }
+
+    private void throwParserException(String beingParsed, String expected, int position) throws ParserException {
+        final String exceptionMessage = "Error parsing %s: expected %s but received: %s";
+        String actualTokenValue = getToken(position).map(Token::toString).orElse("none");
+
+        String formattedExceptionMessage = String.format(exceptionMessage, beingParsed, expected, actualTokenValue);
+        throw new ParserException(formattedExceptionMessage);
     }
 
 
@@ -56,84 +78,124 @@ public class Parser {
     public ParseResult<Program> parseProgram(final int position) throws ParserException {
         int currentPosition = position;
         List<StructDef> structDefs = new ArrayList<>();
+        List<FunctionDef> functionDefs = new ArrayList<>();
         List<Statement> statements = new ArrayList<>();
 
         // Keep trying to parse struct definitions until
+//        while (true) {
+//            Optional<ParseResult<StructDef>> structDefResult = parseStructDef(currentPosition);
+//            if (!structDefResult.isPresent()) break;
+//            ParseResult<StructDef> result = structDefResult.get();
+//            structDefs.add(result.result);
+//            currentPosition = result.nextPosition;
+//        }
+        // Above comments are equivalent to the generified version immediately below
+
+        currentPosition = parseZeroOrMore(this::parseStructDef, structDefs::add, currentPosition);
+        currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
+        currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
+
+        // Below comments are equivalent to the generified version immediately above
+//        // Keep trying to parse statements until none are left
+//        while (true) {
+//            Optional<ParseResult<Statement>> statementResult = parseStatement(currentPosition);
+//            if (!statementResult.isPresent()) break; // Exit if no more statements
+//            ParseResult<Statement> result = statementResult.get();
+//            statements.add(result.result);
+//            currentPosition = result.nextPosition;
+//        }
+
+        return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
+    }
+
+    /**
+     * Note: this is a generic version of code previously written to avoid code duplication.
+     * Parses zero or more of type T. Returns the next position for the parser.
+     *
+     * @param parseFunction the parsing function to parse a T, starting at the specified position
+     * @param parsedValueConsumer what to do with T, if one is parsed
+     * @param position the initial parsing position
+     * @return the next position for the parser to go to
+     * @param <T> a type that can be parsed
+     */
+    private <T> int parseZeroOrMore(ParsingFunction<Integer, Optional<ParseResult<T>>> parseFunction,
+                                    Consumer<T> parsedValueConsumer, int position) throws ParserException {
+        int currentPosition = position;
+
         while (true) {
-            Optional<ParseResult<StructDef>> structDefResult = parseStructDef(currentPosition);
-            if (!structDefResult.isPresent()) break;
-            ParseResult<StructDef> result = structDefResult.get();
-            structDefs.add(result.result);
-            currentPosition = result.nextPosition;
+            Optional<ParseResult<T>> optionalParseResult = parseFunction.apply(currentPosition);
+            if (optionalParseResult.isEmpty()) {
+                break;
+            }
+
+            ParseResult<T> parseResult = optionalParseResult.get();
+
+            parsedValueConsumer.accept(parseResult.result);
+            currentPosition = parseResult.nextPosition;
         }
 
-        // Keep trying to parse statements until none are left
-        while (true) {
-            Optional<ParseResult<Statement>> statementResult = parseStatement(currentPosition);
-            if (!statementResult.isPresent()) break; // Exit if no more statements
-            ParseResult<Statement> result = statementResult.get();
-            statements.add(result.result);
-            currentPosition = result.nextPosition;
-        }
-
-        return new ParseResult<Program>(new Program(structDefs, statements), currentPosition);
+        return currentPosition;
     }
 
 
     // structdef ::= `struct` structname `{` (param `;`)* `}`
     public Optional<ParseResult<StructDef>> parseStructDef(final int position) throws ParserException {
+        final String structDefinition = "struct definition";
         int currentPosition = position;
 
         // Check that there's a struct token here
-        if (!checkTokenIs(currentPosition, new StructToken())) {
+        if (!isExpectedToken(currentPosition, StructToken.class)) {
             return Optional.empty();
-        } else {
-            currentPosition += 1;
         }
+
+        // We are absolutely trying to parse a struct definition now, we should throw exceptions
+        currentPosition += 1;
 
         // Try to parse the struct name
         Optional<ParseResult<Type>> opStructName = parseType(currentPosition);
-        if (!opStructName.isPresent() || !(opStructName.get().result instanceof StructName)) {
-            return Optional.empty();
+        if (opStructName.isEmpty() || !(opStructName.get().result instanceof StructName)) {
+            throwParserException(structDefinition, "struct name", currentPosition);
         }
-        // Cast struct name to StructName object
-        StructName structName = (StructName)opStructName.get().result;
+
+        ParseResult<Type> parsedTypeResult = opStructName.get();
+        StructName structName = (StructName) parsedTypeResult.result;
+        currentPosition = parsedTypeResult.nextPosition;
+
+        // Ensure that there's a left brace here
+        throwParserExceptionOnUnexpected(structDefinition, LeftBraceToken.class, "{", currentPosition);
         currentPosition += 1;
 
-        // Check that there's a left brace here
-        if (!checkTokenIs(currentPosition, new LeftBraceToken())) {
-            return Optional.empty();
-        } else {
-            currentPosition += 1;
-        }
-
         List<Param> params = new ArrayList<>();
-        // Check for params
+
+        // Check for (param `;`)*
         while (true) {
+            // Get the param
             Optional<ParseResult<Param>> paramResult = parseParam(currentPosition);
-            if (!paramResult.isPresent())
+            if (paramResult.isEmpty())
                 break; // Exit if no more statements
+
             ParseResult<Param> param = paramResult.get();
-            params.add(param.result);
             currentPosition = param.nextPosition;
+
+            // Ensure that if we do have a param, we have a semicolon here
+            throwParserExceptionOnNoSemicolon(structDefinition + " variable declaration", currentPosition);
+            currentPosition += 1;
+
+            params.add(param.result);
         }
 
-        // Check that there's a right brace here
-        if (!checkTokenIs(currentPosition, new RightBraceToken())) {
-            return Optional.empty();
-        } else {
-            currentPosition += 1;
-        }
+        // Ensure that there's a right brace here
+        throwParserExceptionOnUnexpected(structDefinition, RightBraceToken.class, "}", currentPosition);
+        currentPosition += 1;
 
         // Return the variable declaration
         return Optional.of(
-            new ParseResult<StructDef>(
+            new ParseResult<>(
                 new StructDef(structName, params),
                 currentPosition
             )
         );
     }
-
 
     // param :: = type var
     public Optional<ParseResult<Param>> parseParam(final int position) throws ParserException {
@@ -141,34 +203,127 @@ public class Parser {
 
         // Try to parse the type
         Optional<ParseResult<Type>> opType = parseType(currentPosition);
-        if (!opType.isPresent()) {
+        if (opType.isEmpty()) {
             return Optional.empty();
         }
+
         ParseResult<Type> type = opType.get();
         currentPosition = type.nextPosition;
 
         // Try to parse the variable
         Optional<ParseResult<Variable>> opVar = parseVar(currentPosition);
-        if (!opVar.isPresent()) {
+        if (opVar.isEmpty()) {
             return Optional.empty();
         }
+
         ParseResult<Variable> var = opVar.get();
         currentPosition = var.nextPosition;
 
-        // Check that there's a semicolon here
-        if (!checkTokenIs(currentPosition, new SemicolonToken())) {
-            return Optional.empty();
-        } else {
-            currentPosition += 1;
-        }
-
         // Return the variable declaration
         return Optional.of(
-            new ParseResult<Param>(
+            new ParseResult<>(
                 new Param(type.result, var.result),
                 currentPosition
             )
         );
+    }
+
+    public Optional<ParseResult<FunctionDef>> parseFunctionDef(final int position) throws ParserException {
+        if (!isExpectedToken(position, FuncToken.class)) {
+            return Optional.empty();
+        }
+
+        int currentPosition = position + 1;
+
+        // We are definitely parsing a function definition now, we must throw moving forward
+        final String functionDefinition = "function definition";
+
+        // Throw an exception if no function name identifier
+        throwParserExceptionOnUnexpected(functionDefinition, IdentifierToken.class, "a function name", currentPosition);
+        FunctionName functionName = new FunctionName(getToken(currentPosition).get().getTokenizedValue());
+
+        currentPosition += 1;
+
+        // Create the function name, update error message for this function
+        final String functionDefinitionWithName = functionDefinition + " for function " + functionName.getParsedValue();
+
+        // Ensure we have a left paren (begin function params)
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, LeftParenToken.class, "(", currentPosition);
+        currentPosition += 1;
+
+        // Ensure we have the comma params (the function params)
+        ParseResult<List<Param>> parsedFunctionParams = parseCommaParam(functionDefinitionWithName, currentPosition);
+        List<Param> functionParams = parsedFunctionParams.result;
+        currentPosition = parsedFunctionParams.nextPosition;
+
+        // Ensure we have a right paren (end function params)
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, RightParenToken.class, ")", currentPosition);
+        currentPosition += 1;
+
+        // Ensure we have the colon separator for the return type of the function
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, ColonToken.class, ":", currentPosition);
+        currentPosition += 1;
+
+        // Ensure we have a valid return type
+        Optional<ParseResult<Type>> optionalReturnType = parseType(currentPosition);
+        if (optionalReturnType.isEmpty()) {
+            throwParserException(functionDefinitionWithName, "a valid return type", currentPosition);
+        }
+
+        ParseResult<Type> parsedTypeResult = optionalReturnType.get();
+
+        Type functionReturnType = parsedTypeResult.result;
+        currentPosition = parsedTypeResult.nextPosition;
+
+        // Ensure we have a statement block at the end
+        Optional<ParseResult<StatementBlock>> optionalStatementBlock = parseStatementBlock(currentPosition);
+        if (optionalStatementBlock.isEmpty()) {
+            throwParserException(functionDefinitionWithName, "a function body", currentPosition);
+        }
+
+        ParseResult<StatementBlock> parsedStatementBlock = optionalStatementBlock.get();
+        StatementBlock functionBody = parsedStatementBlock.result;
+        currentPosition = parsedStatementBlock.nextPosition;
+
+        FunctionDef functionDef = new FunctionDef(functionName, functionParams, functionReturnType, functionBody);
+        return Optional.of(new ParseResult<>(functionDef, currentPosition));
+    }
+
+    // comma_param ::= [param (`,` param)*]
+    private ParseResult<List<Param>> parseCommaParam(String functionDefinitionWithName,
+                                                     final int position) throws ParserException {
+        int currentPosition = position;
+        List<Param> commaParams = new ArrayList<>();
+
+        Optional<ParseResult<Param>> optionalFirstParsedParam = parseParam(currentPosition);
+
+        // If our first param is empty, then we have no parameters
+        if (optionalFirstParsedParam.isEmpty()) {
+            return new ParseResult<>(List.of(), currentPosition);
+        }
+
+        ParseResult<Param> firstParamResult = optionalFirstParsedParam.get();
+
+        commaParams.add(firstParamResult.result);
+        currentPosition = firstParamResult.nextPosition;
+
+        // While we can still parse a comma, try to grab the next parameter
+        while (isExpectedToken(currentPosition, CommaToken.class)) {
+            currentPosition += 1;
+
+            Optional<ParseResult<Param>> optionalParsedParam = parseParam(currentPosition);
+            if (optionalParsedParam.isEmpty()) {
+                throwParserException(functionDefinitionWithName, "an additional function parameter after comma",
+                        currentPosition);
+            }
+
+            ParseResult<Param> paramResult = optionalParsedParam.get();
+
+            commaParams.add(paramResult.result);
+            currentPosition = paramResult.nextPosition;
+        }
+
+        return new ParseResult<>(commaParams, currentPosition);
     }
 
 
@@ -184,54 +339,85 @@ public class Parser {
          exp `;` 
     */
     // But for now, it's just stmt ::= type var '=' exp ';' |
-    //                                 var '=' exp ';'
+    //                                 var '=' exp ';' |
+    //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
-        // Try to parse an assignment statement, return immediately if successful
-        Optional<ParseResult<VardecStmt>> vardec = parseVardec(position);
-        if (vardec.isPresent()) {
-            // Map Vardec result to Statement result
-            ParseResult<Statement> statementResult = new ParseResult<>(vardec.get().result,
-                    vardec.get().nextPosition);
+//        // Try to parse an assignment statement, return immediately if successful
+//        Optional<ParseResult<VardecStmt>> vardec = parseVardec(position);
+//        if (vardec.isPresent()) {
+//            // Map Vardec result to Statement result
+//            ParseResult<Statement> statementResult = new ParseResult<>(vardec.get().result,
+//                    vardec.get().nextPosition);
+//            return Optional.of(statementResult);
+//        }
+//
+//        Optional<ParseResult<AssignStmt>> assign = parseAssign(position);
+//        if (assign.isPresent()) {
+//            // Map Vardec result to Statement result
+//            ParseResult<Statement> statementResult = new ParseResult<>(assign.get().result,
+//                    assign.get().nextPosition);
+//            return Optional.of(statementResult);
+//        }
+
+        // Above commented out in favor of generified version below:
+        // (Makes it easier to add more in the future without code repeat)
+        return parseStatement(List.of(
+                this::parseVardec,
+                this::parseAssign,
+                this::parseStatementBlock
+        ), position);
+    }
+
+    // This method is extremely gross and horrible and I hate it - but what can you do with Java?
+    private Optional<ParseResult<Statement>> parseStatement(List<ParsingFunction<Integer,
+            Optional<? extends ParseResult<? extends Statement>>>> parseResults, int position) throws ParserException {
+        // Iterate over all the parsing functions
+        for (ParsingFunction<Integer, Optional<? extends ParseResult<? extends Statement>>> parseResult : parseResults) {
+            // Try to apply the parsing function the current position
+            Optional<? extends ParseResult<? extends Statement>> optionalParseResult = parseResult.apply(position);
+
+            // If we don't parse with the current function, move to the next
+            if (optionalParseResult.isEmpty()) {
+                continue;
+            }
+
+            // Downcast the parsed statement result to just being a statement
+            ParseResult<? extends Statement> realResult = optionalParseResult.get();
+            ParseResult<Statement> statementResult = new ParseResult<>(realResult.result, realResult.nextPosition);
+
+            // Return the downcasted version
             return Optional.of(statementResult);
         }
 
-        Optional<ParseResult<AssignStmt>> assign = parseAssign(position);
-        if (assign.isPresent()) {
-            // Map Vardec result to Statement result
-            ParseResult<Statement> statementResult = new ParseResult<>(assign.get().result,
-                    assign.get().nextPosition);
-            return Optional.of(statementResult);
-        }
-
-        // Return empty if no statements found
+        // Else return an empty if we found no statements
         return Optional.empty();
     }
 
 
-    // vardec is type var '=' exp ';'
+    // vardec ::= type var '=' exp ';'
     public Optional<ParseResult<VardecStmt>> parseVardec(final int position) throws ParserException {
         int currentPosition = position;
 
         // Try to parse the type
         Optional<ParseResult<Type>> opType = parseType(currentPosition);
-        if (!opType.isPresent()) {
+        if (opType.isEmpty()) {
             return Optional.empty();
         }
+
+        // If we have a type, we must be trying to parse a vardec. Should be throwing errors
         ParseResult<Type> type = opType.get();
         currentPosition = type.nextPosition;
 
-        // Try to parse assignment statement
-        Optional<ParseResult<AssignStmt>> opAssign = parseAssign(currentPosition);
-        if (!opAssign.isPresent()) {
-            return Optional.empty();
-        }
+        // Try to parse assignment statement, throwing if we do not have an identifier or if variable assignment fails
+        Optional<ParseResult<AssignStmt>> opAssign = parseAssign(currentPosition, true);
+
+        // Safe unwrap since we know we throw if we didn't successfully parse a variable assignment
         ParseResult<AssignStmt> assign = opAssign.get();
         currentPosition = assign.nextPosition;
 
-
         // Return the variable declaration
         return Optional.of(
-            new ParseResult<VardecStmt>(
+            new ParseResult<>(
                 new VardecStmt(type.result, assign.result.variable, 
                                 assign.result.expression),
                 currentPosition
@@ -240,47 +426,72 @@ public class Parser {
     }
 
 
-    // assignment is var '=' exp ';'
     public Optional<ParseResult<AssignStmt>> parseAssign(final int position) throws ParserException {
+        return parseAssign(position, false);
+    }
+
+    // assignment is var '=' exp ';'
+    public Optional<ParseResult<AssignStmt>> parseAssign(final int position, final boolean shouldThrowIfNoIdentifier)
+            throws ParserException {
+        final String variableAssignment = "variable assignment";
         int currentPosition = position;
 
         // Try to parse the variable
         Optional<ParseResult<Variable>> opVar = parseVar(currentPosition);
-        if (!opVar.isPresent()) {
+        if (opVar.isEmpty()) {
+            if (shouldThrowIfNoIdentifier) {
+                throwParserException(variableAssignment, "a variable name", currentPosition);
+            }
+
             return Optional.empty();
         }
+
+        // We now know we are parsing an assignment variable, so going further we must throw an exception
         ParseResult<Variable> var = opVar.get();
         currentPosition = var.nextPosition;
 
-        // Check that there's an assignment operator here
-        if (!checkTokenIs(currentPosition, new AssignmentToken())) {
-            return Optional.empty();
-        } else {
-            currentPosition += 1;
+        // Ensure that there's an assignment operator here
+        throwParserExceptionOnUnexpected(variableAssignment, AssignmentToken.class, "assignment operator =",
+                currentPosition);
+        currentPosition += 1;
+
+        // Ensure that there's an expression
+        Optional<ParseResult<Expression>> opExp = parseExp(currentPosition);
+        if (opExp.isEmpty()) {
+            throwParserException(variableAssignment, "an expression", currentPosition);
         }
 
-        // Check that there's an expression
-        Optional<ParseResult<Expression>> opExp = parseExp(currentPosition);
-        if (!opExp.isPresent()) {
-            return Optional.empty();
-        }
         ParseResult<Expression> exp = opExp.get();
         currentPosition = exp.nextPosition;
 
-        // Check that there's a semicolon
-        if (!checkTokenIs(currentPosition, new SemicolonToken())) {
-            return Optional.empty();
-        } else {
-            currentPosition += 1;
-        }
+        // Ensure that there's a semicolon
+        throwParserExceptionOnNoSemicolon(variableAssignment, currentPosition);
+        currentPosition += 1;
 
         // Return the assignment statement
         return Optional.of(
-            new ParseResult<AssignStmt>(
+            new ParseResult<>(
                 new AssignStmt(var.result, exp.result),
                 currentPosition
             )
         );
+    }
+
+    private Optional<ParseResult<StatementBlock>> parseStatementBlock(final int position) throws ParserException {
+        if (!isExpectedToken(position, LeftBraceToken.class)) {
+            return Optional.empty();
+        }
+
+        // We are now definitely parsing a statement block
+        int currentPosition = position + 1;
+
+        List<Statement> blockBody = new ArrayList<>();
+        currentPosition = parseZeroOrMore(this::parseStatement, blockBody::add, currentPosition);
+
+        throwParserExceptionOnUnexpected("statement block", RightBraceToken.class, "}", currentPosition);
+        currentPosition += 1;
+
+        return Optional.of(new ParseResult<>(new StatementBlock(blockBody), currentPosition));
     }
 
     // But for now, exp ::= int literal |
@@ -361,21 +572,25 @@ public class Parser {
     //     );
     // }
 
+    // Maybe worthwhile to have Operator be an enum in this case, instead of a ton of classes
+    // private static final Map<Class<? extends Token>, OpEnum>
+
 
     // Try to parse an operators
     public Optional<ParseResult<Operator>> parseOp(final int position) throws ParserException {
         // Get the token
         final Optional<Token> maybeToken = getToken(position);
-        if (!maybeToken.isPresent()) {
+        if (maybeToken.isEmpty()) {
             return Optional.empty();
         }
 
         Token token = maybeToken.get();
         // Check against operators - there must be a better way!
+        // Suggested way in comments above function definition
         if (token instanceof PlusToken) {
-            return Optional.of(new ParseResult<Operator>(new PlusOp(), position + 1));
+            return Optional.of(new ParseResult<>(new PlusOp(), position + 1));
         } else if (token instanceof MinusToken) {
-            return Optional.of(new ParseResult<Operator>(new PlusOp(), position + 1));
+            return Optional.of(new ParseResult<>(new PlusOp(), position + 1));
         } else {
             return Optional.empty();
         }
@@ -407,7 +622,7 @@ public class Parser {
     // Tries to parse variable
     public Optional<ParseResult<Variable>> parseVar(final int position) throws ParserException {
         final Optional<Token> maybeToken = getToken(position);
-        if (!maybeToken.isPresent()) {
+        if (maybeToken.isEmpty()) {
             return Optional.empty();
         }
 
@@ -418,39 +633,43 @@ public class Parser {
             // Construct the new Variable with the Identifier token's name
             // I know this looks insane
             return Optional.of(
-                new ParseResult<Variable>(
-                    new Variable(
-                        ((IdentifierToken)token).getTokenizedValue()), 
+                new ParseResult<>(
+                    new Variable(token.getTokenizedValue()),
                     position + 1
                 )
             );
-        } else {
-            return Optional.empty();
         }
+
+        return Optional.empty();
     }
 
+    // May be better to have primitive types in an enum, so we're not creating so many instances in big programs
+    // Create a mapping from the token's class to its type
+    private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_TO_TYPE = Map.of(
+            IntToken.class, (token) -> new IntType(),
+            // BoolToken.class, (token) -> new BoolType(),
+            // VoidToken.class, (token) -> new VoidType(),
+            IdentifierToken.class, (token) -> new StructName(token.getTokenizedValue())
+    );
 
     // type ::= 'int' | 'bool' | 'void' | structname
     // But right now it's only type ::= 'int' | structname
     public Optional<ParseResult<Type>> parseType(final int position) throws ParserException {
         final Optional<Token> maybeToken = getToken(position);
-        if (!maybeToken.isPresent()) {
+        if (maybeToken.isEmpty()) {
             return Optional.empty();
         }
 
         Token token = maybeToken.get();
         if (token instanceof IntToken) {
-            return Optional.of(new ParseResult<Type>(new IntType(), position + 1));
+            return Optional.of(new ParseResult<>(new IntType(), position + 1));
         } else if (token instanceof IdentifierToken) {
-            // Make a variable from the identifier
-            Variable var = new Variable(((IdentifierToken)token).getTokenizedValue());
-            return Optional.of(new ParseResult<>(new StructName(var), position + 1));
-        } else {
-            return Optional.empty();
+            return Optional.of(new ParseResult<>(new StructName(token.getTokenizedValue()), position + 1));
         }
+
+        return Optional.empty();
         // else if (token instanceof BoolToken) {
         //     return new ParseResult<Type>(new BoolType(), position + 1);
         // }
-        
     }
 }
