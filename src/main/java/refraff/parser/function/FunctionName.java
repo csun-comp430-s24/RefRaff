@@ -1,4 +1,6 @@
-package refraff.parser.type;
+package refraff.parser.function;
+
+import refraff.parser.type.Type;
 
 public class FunctionName extends Type {
 

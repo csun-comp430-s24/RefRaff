@@ -2,11 +2,11 @@ package refraff.parser.statement;
 
 import java.util.List;
 
-public class StatementBlock extends Statement {
+public class StmtBlock extends Statement {
 
     private final List<Statement> blockBody;
 
-    public StatementBlock(List<Statement> blockBody) {
+    public StmtBlock(List<Statement> blockBody) {
         super(String.valueOf(blockBody.hashCode()));
 
         this.blockBody = blockBody;
@@ -23,7 +23,7 @@ public class StatementBlock extends Statement {
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof StatementBlock otherBlock && blockBody.equals(otherBlock.getBlockBody());
+        return other instanceof StmtBlock otherBlock && blockBody.equals(otherBlock.getBlockBody());
     }
 
 }

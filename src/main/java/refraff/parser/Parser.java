@@ -4,6 +4,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import refraff.parser.function.FunctionDef;
+import refraff.parser.function.FunctionName;
 import refraff.parser.statement.*;
 import refraff.parser.type.*;
 import refraff.parser.operator.*;
@@ -74,7 +76,6 @@ public class Parser {
 
 
     // program ::= structdef* fdef* stmt*
-    // Well, at the moment it's just program ::= structdef* stmt*
     public ParseResult<Program> parseProgram(final int position) throws ParserException {
         int currentPosition = position;
         List<StructDef> structDefs = new ArrayList<>();
@@ -228,6 +229,8 @@ public class Parser {
         );
     }
 
+    // fdef ::= `func` funcname `(` comma_param `)` `:` type
+    //         `{` stmt* `}`
     public Optional<ParseResult<FunctionDef>> parseFunctionDef(final int position) throws ParserException {
         if (!isExpectedToken(position, FuncToken.class)) {
             return Optional.empty();
@@ -276,13 +279,13 @@ public class Parser {
         currentPosition = parsedTypeResult.nextPosition;
 
         // Ensure we have a statement block at the end
-        Optional<ParseResult<StatementBlock>> optionalStatementBlock = parseStatementBlock(currentPosition);
+        Optional<ParseResult<StmtBlock>> optionalStatementBlock = parseStatementBlock(currentPosition);
         if (optionalStatementBlock.isEmpty()) {
             throwParserException(functionDefinitionWithName, "a function body", currentPosition);
         }
 
-        ParseResult<StatementBlock> parsedStatementBlock = optionalStatementBlock.get();
-        StatementBlock functionBody = parsedStatementBlock.result;
+        ParseResult<StmtBlock> parsedStatementBlock = optionalStatementBlock.get();
+        StmtBlock functionBody = parsedStatementBlock.result;
         currentPosition = parsedStatementBlock.nextPosition;
 
         FunctionDef functionDef = new FunctionDef(functionName, functionParams, functionReturnType, functionBody);
@@ -340,6 +343,7 @@ public class Parser {
     */
     // But for now, it's just stmt ::= type var '=' exp ';' |
     //                                 var '=' exp ';' |
+    //                                 `if` `(` exp `)` stmt [`else` stmt] |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
 //        // Try to parse an assignment statement, return immediately if successful
@@ -362,8 +366,10 @@ public class Parser {
         // Above commented out in favor of generified version below:
         // (Makes it easier to add more in the future without code repeat)
         return parseStatement(List.of(
-                this::parseVardec,
+                // We need to parse assignment first, otherwise vardec will eat our assignment and throw an exception
                 this::parseAssign,
+                this::parseVardec,
+                this::parseIfElse,
                 this::parseStatementBlock
         ), position);
     }
@@ -477,7 +483,63 @@ public class Parser {
         );
     }
 
-    private Optional<ParseResult<StatementBlock>> parseStatementBlock(final int position) throws ParserException {
+    private Optional<ParseResult<IfElseStmt>> parseIfElse(final int position) throws ParserException {
+        if (!isExpectedToken(position, IfToken.class)) {
+            return Optional.empty();
+        }
+
+        // We know we're parsing an if/else now
+        final String ifStatement = "if statement";
+        int currentPosition = position + 1;
+
+        throwParserExceptionOnUnexpected(ifStatement, LeftParenToken.class, "(", currentPosition);
+        currentPosition += 1;
+
+        Optional<ParseResult<Expression>> optionalConditionExpression = parseExp(currentPosition);
+        if (optionalConditionExpression.isEmpty()) {
+            throwParserException("if statement condition", "a valid expression", currentPosition);
+        }
+
+        ParseResult<Expression> parsedCondition = optionalConditionExpression.get();
+
+        Expression condition = parsedCondition.result;
+        currentPosition = parsedCondition.nextPosition;
+
+        throwParserExceptionOnUnexpected(ifStatement, RightParenToken.class, ")", currentPosition);
+        currentPosition += 1;
+
+        Optional<ParseResult<Statement>> optionalIfBody = parseStatement(currentPosition);
+        if (optionalIfBody.isEmpty()) {
+            throwParserException("if statement body", "a statement", currentPosition);
+        }
+
+        ParseResult<Statement> parsedIfBody = optionalIfBody.get();
+
+        Statement ifBody = parsedIfBody.result;
+        currentPosition = parsedIfBody.nextPosition;
+
+        // [`else` stmt]: if we don't hit an else, then just return the if statement so far
+        if (!isExpectedToken(currentPosition, ElseToken.class)) {
+            return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody), currentPosition));
+        }
+
+        currentPosition += 1;
+
+        // If we did hit an else, the stmt becomes mandatory
+        Optional<ParseResult<Statement>> optionalElseBody = parseStatement(currentPosition);
+        if (optionalElseBody.isEmpty()) {
+            throwParserException("else statement body", "a statement", currentPosition);
+        }
+
+        ParseResult<Statement> parsedElseBody = optionalElseBody.get();
+
+        Statement elseBody = parsedElseBody.result;
+        currentPosition = parsedElseBody.nextPosition;
+
+        return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
+    }
+
+    private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
         if (!isExpectedToken(position, LeftBraceToken.class)) {
             return Optional.empty();
         }
@@ -491,10 +553,10 @@ public class Parser {
         throwParserExceptionOnUnexpected("statement block", RightBraceToken.class, "}", currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new StatementBlock(blockBody), currentPosition));
+        return Optional.of(new ParseResult<>(new StmtBlock(blockBody), currentPosition));
     }
 
-    // But for now, exp ::= int literal |
+    // But for now, exp ::= int literal | bool literal
     //                      Binary operation
     public Optional<ParseResult<Expression>> parseExp(final int position) throws ParserException {
         // Try to parse binary operation
@@ -525,6 +587,9 @@ public class Parser {
             ParseResult<Expression> expressionResult = new ParseResult<>(result.get().result,
                     result.get().nextPosition);
             return Optional.of(expressionResult);
+        } else if (token instanceof TrueToken || token instanceof FalseToken) {
+            boolean booleanLiteralValue = Boolean.parseBoolean(token.getTokenizedValue());
+            return Optional.of(new ParseResult<>(new BoolLiteralExp(booleanLiteralValue), position + 1));
         }
         // } else if (token instanceof IdentifierToken) {
         //     // If it's an identifier token
@@ -645,15 +710,14 @@ public class Parser {
 
     // May be better to have primitive types in an enum, so we're not creating so many instances in big programs
     // Create a mapping from the token's class to its type
-    private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_TO_TYPE = Map.of(
+    private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_CLASS_TO_TYPE = Map.of(
             IntToken.class, (token) -> new IntType(),
-            // BoolToken.class, (token) -> new BoolType(),
-            // VoidToken.class, (token) -> new VoidType(),
+            BoolToken.class, (token) -> new BoolType(),
+            VoidToken.class, (token) -> new VoidType(),
             IdentifierToken.class, (token) -> new StructName(token.getTokenizedValue())
     );
 
     // type ::= 'int' | 'bool' | 'void' | structname
-    // But right now it's only type ::= 'int' | structname
     public Optional<ParseResult<Type>> parseType(final int position) throws ParserException {
         final Optional<Token> maybeToken = getToken(position);
         if (maybeToken.isEmpty()) {
@@ -661,15 +725,14 @@ public class Parser {
         }
 
         Token token = maybeToken.get();
-        if (token instanceof IntToken) {
-            return Optional.of(new ParseResult<>(new IntType(), position + 1));
-        } else if (token instanceof IdentifierToken) {
-            return Optional.of(new ParseResult<>(new StructName(token.getTokenizedValue()), position + 1));
+        Class<? extends Token> tokenClass = token.getClass();
+
+        if (!TOKEN_CLASS_TO_TYPE.containsKey(tokenClass)) {
+            return Optional.empty();
         }
 
-        return Optional.empty();
-        // else if (token instanceof BoolToken) {
-        //     return new ParseResult<Type>(new BoolType(), position + 1);
-        // }
+        Type type = TOKEN_CLASS_TO_TYPE.get(tokenClass).apply(token);
+        return Optional.of(new ParseResult<>(type, position + 1));
     }
+
 }

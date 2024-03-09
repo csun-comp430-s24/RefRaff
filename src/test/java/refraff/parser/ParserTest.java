@@ -1,5 +1,7 @@
 package refraff.parser;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -7,6 +9,8 @@ import java.util.*;
 
 import org.junit.Test;
 
+import refraff.parser.function.FunctionDef;
+import refraff.parser.function.FunctionName;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.*;
@@ -22,13 +26,14 @@ public class ParserTest {
     }
 
     private ParseResult<Program> parseProgram(Token... tokens) throws ParserException {
-        final Parser parser = new Parser(tokens);
-        return parser.parseProgram(0);
+        return new ParseResult<>(Parser.parseProgram(tokens), tokens.length);
     }
 
-    private ParseResult<Program> testProgramParsesWithoutException(Token... tokens) {
+    private <T extends AbstractSyntaxTreeNode> Optional<ParseResult<T>> testParsesWithoutException(
+            ParsingFunction<Parser, Optional<ParseResult<T>>> parsingFunction, Token... tokens) {
         try {
-            return parseProgram(tokens);
+            final Parser parser = new Parser(tokens);
+            return parsingFunction.apply(parser);
         } catch (ParserException ex) {
             fail(ex);
         }
@@ -36,16 +41,46 @@ public class ParserTest {
         throw new IllegalStateException("This will never occur.");
     }
 
-    private void testProgramParsesWithException(Token... tokens) {
-        try {
-            parseProgram(tokens);
-            fail("Parser exception should have been thrown, but was not.");
-        } catch (ParserException ex) {
-            // ignored, we succeed
-        }
+    private void testProgramMatchesExpectedResult(Program expectedValue, Token... tokens) {
+        testMatchesExpectedResult(parser -> Optional.of(parseProgram(tokens)), expectedValue, tokens);
+    }
+
+    private <T extends AbstractSyntaxTreeNode> void testMatchesExpectedResult(ParsingFunction<Parser,
+            Optional<ParseResult<T>>> parsingFunction, T expectedValue, Token... tokens) {
+        Optional<ParseResult<T>> optionalParseResult = testParsesWithoutException(parsingFunction, tokens);
+        assertFalse("Parse result must contain something", optionalParseResult.isEmpty());
+
+        ParseResult<T> expectedResult = new ParseResult<>(expectedValue, tokens.length);
+        ParseResult<T> actualResult = optionalParseResult.get();
+
+        assertEquals(expectedResult, actualResult);
     }
     
     // Test valid inputs
+
+    private void testExpressionMatchesExpectedResult(Expression expression, Token... inputs) {
+        testMatchesExpectedResult(parser -> parser.parseExp(0), expression, inputs);
+    }
+
+    @Test
+    public void testTrueBoolLiteralExp() {
+        testExpressionMatchesExpectedResult(new BoolLiteralExp(true), new TrueToken());
+    }
+
+    @Test
+    public void testFalseBoolLiteralExp() {
+        testExpressionMatchesExpectedResult(new BoolLiteralExp(false), new FalseToken());
+    }
+
+    @Test
+    public void testIntLiteralExp() {
+        testExpressionMatchesExpectedResult(new IntLiteralExp(7), new IntLiteralToken("7"));
+    }
+
+    private void testTypeMatchesExpectedResult(Type expected, Token input) {
+        testMatchesExpectedResult(parser -> parser.parseType(0), expected, input);
+    }
+
     @Test
     public void testTypeEquals() {
         assertEquals(new IntType(),
@@ -53,13 +88,31 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseIntType() throws ParserException {
-        final Token[] input = new Token[] {
-            new IntToken()
-        };
-        final Parser parser = new Parser(input);
-        assertEquals(Optional.of(new ParseResult<Type>(new IntType(), 1)),
-                     parser.parseType(0));
+    public void testParseIntType() {
+        testTypeMatchesExpectedResult(new IntType(), new IntToken());
+    }
+
+    @Test
+    public void testParseBoolType() {
+        testTypeMatchesExpectedResult(new BoolType(), new BoolToken());
+    }
+
+    @Test
+    public void testParseVoidType() {
+        testTypeMatchesExpectedResult(new VoidType(), new VoidToken());
+    }
+
+    @Test
+    public void testParseStructNameType() {
+        testTypeMatchesExpectedResult(new StructName("a"), new IdentifierToken("a"));
+    }
+
+    private void testFunctionDef(FunctionName functionName, List<Param> params, Type returnType,
+                                 StmtBlock stmtBlock, Token... tokens) {
+        FunctionDef expectedFunctionDef = new FunctionDef(functionName, params, returnType, stmtBlock);
+        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
+
+        testProgramMatchesExpectedResult(expectedProgram, tokens);
     }
 
     @Test
@@ -69,18 +122,7 @@ public class ParserTest {
                 new LeftParenToken(), new RightParenToken(), new ColonToken(),
                 new IntToken(), new LeftBraceToken(), new RightBraceToken());
 
-        FunctionDef expectedFunctionDef = new FunctionDef(
-                new FunctionName("a"),
-                List.of(),
-                new IntType(),
-                new StatementBlock(List.of()));
-
-        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
-
-        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
-        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
-
-        assertEquals(expectedParseResult, actualParseResult);
+        testFunctionDef(new FunctionName("a"), List.of(), new IntType(), new StmtBlock(List.of()), input);
     }
 
     @Test
@@ -90,46 +132,28 @@ public class ParserTest {
                 new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
                 new ColonToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken());
 
-        FunctionDef expectedFunctionDef = new FunctionDef(
-                new FunctionName("a"),
-                List.of(
-                    new Param(new IntType(), new Variable("b"))
-                ),
-                new IntType(),
-                new StatementBlock(List.of()));
-
-        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
-
-        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
-        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
-
-        assertEquals(expectedParseResult, actualParseResult);
+        testFunctionDef(new FunctionName("a"), List.of(
+                new Param(new IntType(), new Variable("b"))
+        ), new IntType(), new StmtBlock(List.of()), input);
     }
 
     @Test
     public void testFunctionDefWithMultipleParams() {
         // func a(int b, custom c) : int {}
-        Token[] input = toArray(new FuncToken(), new IdentifierToken("a"),
-                new LeftParenToken(), new IntToken(), new IdentifierToken("b"),
-                new CommaToken(), new IdentifierToken("custom"),
-                new IdentifierToken("c"), new RightParenToken(),
+        Token[] input = toArray(new FuncToken(), new IdentifierToken("a"), new LeftParenToken(),
+                new IntToken(), new IdentifierToken("b"), new CommaToken(),
+                new IdentifierToken("custom"), new IdentifierToken("c"), new RightParenToken(),
                 new ColonToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken());
 
-        FunctionDef expectedFunctionDef = new FunctionDef(
-                new FunctionName("a"),
-                List.of(
-                        new Param(new IntType(), new Variable("b")),
-                        new Param(new StructName("custom"), new Variable("c"))
-                ),
-                new IntType(),
-                new StatementBlock(List.of()));
+        testFunctionDef(new FunctionName("a"), List.of(
+                new Param(new IntType(), new Variable("b")),
+                new Param(new StructName("custom"), new Variable("c"))
+        ), new IntType(), new StmtBlock(List.of()), input);
+    }
 
-        Program expectedProgram = new Program(List.of(), List.of(expectedFunctionDef), List.of());
-
-        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
-        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
-
-        assertEquals(expectedParseResult, actualParseResult);
+    private void testStatementMatchesExpected(Statement statement, Token... input) {
+        Program expectedProgram = new Program(List.of(), List.of(), List.of(statement));
+        testProgramMatchesExpectedResult(expectedProgram, input);
     }
 
     @Test
@@ -179,9 +203,48 @@ public class ParserTest {
                     parser.parseProgram(0));
     }
 
+    @Test
+    public void testParseIfNoElse() {
+        // if (3)
+        //    x = false;
+        Token[] input = toArray(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
+                new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken());
+
+        AssignStmt ifBody = new AssignStmt(new Variable("x"), new BoolLiteralExp(false));
+        IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(3), ifBody);
+
+        testStatementMatchesExpected(ifElseStmt, input);
+    }
+
+    @Test
+    public void testParseIfElse() {
+        // if (3)
+        //    x = false;
+        // else
+        //    x = true;
+        Token[] input = toArray(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
+                new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken(), new ElseToken(),
+                new IdentifierToken("x"), new AssignmentToken(), new TrueToken(), new SemicolonToken());
+
+
+        AssignStmt ifBody = new AssignStmt(new Variable("x"), new BoolLiteralExp(false));
+        AssignStmt elseBody = new AssignStmt(new Variable("x"), new BoolLiteralExp(true));
+        IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(3), ifBody, elseBody);
+
+        testStatementMatchesExpected(ifElseStmt, input);
+    }
 
     @Test
     public void testParseEmptyStatementBlock() {
+        // {}
+        Token[] input = toArray(new LeftBraceToken(), new RightBraceToken());
+
+        StmtBlock stmtBlock = new StmtBlock(List.of());
+        testStatementMatchesExpected(stmtBlock, input);
+    }
+
+    @Test
+    public void testParseNonEmptyStatementBlock() {
         // { int variableName = 6; }
         Token[] input = toArray(new LeftBraceToken(),
                 new IntToken(),
@@ -191,29 +254,10 @@ public class ParserTest {
                 new SemicolonToken(),
                 new RightBraceToken());
 
-        StatementBlock statementBlock = new StatementBlock(List.of(
+        StmtBlock stmtBlock = new StmtBlock(List.of(
                 new VardecStmt(new IntType(), new Variable("variableName"), new IntLiteralExp(6)))
         );
-        Program expectedProgram = new Program(List.of(), List.of(), List.of(statementBlock));
-
-        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
-        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
-
-        assertEquals(expectedParseResult, actualParseResult);
-    }
-
-    @Test
-    public void testParseNonEmptyStatementBlock() {
-        // {}
-        Token[] input = toArray(new LeftBraceToken(), new RightBraceToken());
-
-        StatementBlock statementBlock = new StatementBlock(List.of());
-        Program expectedProgram = new Program(List.of(), List.of(), List.of(statementBlock));
-
-        ParseResult<Program> expectedParseResult = new ParseResult<>(expectedProgram, input.length);
-        ParseResult<Program> actualParseResult = testProgramParsesWithoutException(input);
-
-        assertEquals(expectedParseResult, actualParseResult);
+        testStatementMatchesExpected(stmtBlock, input);
     }
 
     @Test
@@ -351,6 +395,10 @@ public class ParserTest {
 
     // Test invalid inputs
 
+    private void testProgramParsesWithException(Token... tokens) {
+        assertThrows(ParserException.class, () -> parseProgram(tokens));
+    }
+
     @Test
     public void testFunctionDefWithNoFunctionNameThrowsException() {
         // func
@@ -400,6 +448,40 @@ public class ParserTest {
         testProgramParsesWithException(new FuncToken(), new IdentifierToken("a"),
                 new LeftParenToken(), new IntToken(), new IdentifierToken("b"), new RightParenToken(),
                 new ColonToken(), new IntToken());
+    }
+
+    @Test
+    public void testIfWithNoLeftParenThrowsException() {
+        // if 3
+        testProgramParsesWithException(new IfToken(), new IntLiteralToken("3"));
+    }
+
+    @Test
+    public void testIfWithNoConditionThrowsException() {
+        // if ()
+        testProgramParsesWithException(new IfToken(), new LeftParenToken(), new RightParenToken());
+    }
+
+    @Test
+    public void testIfWithNoRightParenThrowsException() {
+        // if (3
+        testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"));
+    }
+
+    @Test
+    public void testIfWithNoIfStatementBodyThrowsException() {
+        // if (3)
+        testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken());
+    }
+
+    @Test
+    public void testIfWithNoElseStatementBodyThrowsException() {
+        // if (3)
+        //   x = false;
+        // else
+        testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
+                new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken(), new ElseToken());
+
     }
 
 }

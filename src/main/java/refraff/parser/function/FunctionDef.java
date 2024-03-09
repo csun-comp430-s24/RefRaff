@@ -1,8 +1,8 @@
-package refraff.parser;
+package refraff.parser.function;
 
-import refraff.parser.statement.Statement;
-import refraff.parser.statement.StatementBlock;
-import refraff.parser.type.FunctionName;
+import refraff.parser.AbstractSyntaxTreeNode;
+import refraff.parser.Param;
+import refraff.parser.statement.StmtBlock;
 import refraff.parser.type.Type;
 
 import java.util.List;
@@ -18,10 +18,10 @@ public class FunctionDef extends AbstractSyntaxTreeNode {
     private final FunctionName functionName;
     private final Type returnType;
     private final List<Param> params;
-    private final StatementBlock functionBody;
+    private final StmtBlock functionBody;
 
     public FunctionDef(final FunctionName functionName, final List<Param> params,
-                       final Type returnType, final StatementBlock functionBody) {
+                       final Type returnType, final StmtBlock functionBody) {
         super(functionName.getParsedValue());
 
         this.functionName = functionName;
@@ -47,7 +47,7 @@ public class FunctionDef extends AbstractSyntaxTreeNode {
         return params;
     }
 
-    public StatementBlock getFunctionBody() {
+    public StmtBlock getFunctionBody() {
         return functionBody;
     }
 
