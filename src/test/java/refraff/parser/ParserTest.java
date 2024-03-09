@@ -64,7 +64,7 @@ public class ParserTest {
 
     @Test
     public void testFunctionDefWithNoParams() {
-        // func a(int b) : int {}
+        // func a() : int {}
         Token[] input = toArray(new FuncToken(), new IdentifierToken("a"),
                 new LeftParenToken(), new RightParenToken(), new ColonToken(),
                 new IntToken(), new LeftBraceToken(), new RightBraceToken());
@@ -182,7 +182,7 @@ public class ParserTest {
 
     @Test
     public void testParseEmptyStatementBlock() {
-        // {}
+        // { int variableName = 6; }
         Token[] input = toArray(new LeftBraceToken(),
                 new IntToken(),
                 new IdentifierToken("variableName"),
