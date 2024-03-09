@@ -53,6 +53,15 @@ public class Parser {
         throwParserException(beingParsed, tokenRepresentation, position);
     }
 
+    private <T> void throwParserExceptionOnEmptyOptional(String beingParsed, Optional<T> optional,
+                                                         String expected, int position) throws ParserException {
+        if (optional.isPresent()) {
+            return;
+        }
+
+        throwParserException(beingParsed, expected, position);
+    }
+
     private void throwParserException(String beingParsed, String expected, int position) throws ParserException {
         final String exceptionMessage = "Error parsing %s: expected %s but received: %s";
         String actualTokenValue = getToken(position).map(Token::toString).orElse("none");
@@ -269,9 +278,8 @@ public class Parser {
 
         // Ensure we have a valid return type
         Optional<ParseResult<Type>> optionalReturnType = parseType(currentPosition);
-        if (optionalReturnType.isEmpty()) {
-            throwParserException(functionDefinitionWithName, "a valid return type", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalReturnType, "a valid return type",
+                currentPosition);
 
         ParseResult<Type> parsedTypeResult = optionalReturnType.get();
 
@@ -280,9 +288,8 @@ public class Parser {
 
         // Ensure we have a statement block at the end
         Optional<ParseResult<StmtBlock>> optionalStatementBlock = parseStatementBlock(currentPosition);
-        if (optionalStatementBlock.isEmpty()) {
-            throwParserException(functionDefinitionWithName, "a function body", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalStatementBlock, "a function body",
+                currentPosition);
 
         ParseResult<StmtBlock> parsedStatementBlock = optionalStatementBlock.get();
         StmtBlock functionBody = parsedStatementBlock.result;
@@ -315,10 +322,8 @@ public class Parser {
             currentPosition += 1;
 
             Optional<ParseResult<Param>> optionalParsedParam = parseParam(currentPosition);
-            if (optionalParsedParam.isEmpty()) {
-                throwParserException(functionDefinitionWithName, "an additional function parameter after comma",
-                        currentPosition);
-            }
+            throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalParsedParam,
+                    "an additional function parameter after comma", currentPosition);
 
             ParseResult<Param> paramResult = optionalParsedParam.get();
 
@@ -463,9 +468,7 @@ public class Parser {
 
         // Ensure that there's an expression
         Optional<ParseResult<Expression>> opExp = parseExp(currentPosition);
-        if (opExp.isEmpty()) {
-            throwParserException(variableAssignment, "an expression", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional(variableAssignment, opExp, "an expression", currentPosition);
 
         ParseResult<Expression> exp = opExp.get();
         currentPosition = exp.nextPosition;
@@ -496,9 +499,8 @@ public class Parser {
         currentPosition += 1;
 
         Optional<ParseResult<Expression>> optionalConditionExpression = parseExp(currentPosition);
-        if (optionalConditionExpression.isEmpty()) {
-            throwParserException("if statement condition", "a valid expression", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional("if statement condition", optionalConditionExpression, "a valid expression",
+                currentPosition);
 
         ParseResult<Expression> parsedCondition = optionalConditionExpression.get();
 
@@ -509,9 +511,7 @@ public class Parser {
         currentPosition += 1;
 
         Optional<ParseResult<Statement>> optionalIfBody = parseStatement(currentPosition);
-        if (optionalIfBody.isEmpty()) {
-            throwParserException("if statement body", "a statement", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional("if statement body", optionalIfBody, "a statement", currentPosition);
 
         ParseResult<Statement> parsedIfBody = optionalIfBody.get();
 
@@ -527,9 +527,7 @@ public class Parser {
 
         // If we did hit an else, the stmt becomes mandatory
         Optional<ParseResult<Statement>> optionalElseBody = parseStatement(currentPosition);
-        if (optionalElseBody.isEmpty()) {
-            throwParserException("else statement body", "a statement", currentPosition);
-        }
+        throwParserExceptionOnEmptyOptional("else statement body", optionalElseBody, "a statement", currentPosition);
 
         ParseResult<Statement> parsedElseBody = optionalElseBody.get();
 
