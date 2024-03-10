@@ -1,6 +1,5 @@
 package refraff.parser;
 
-import java.beans.Expression;
 import java.util.*;
 import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
@@ -419,8 +418,8 @@ public class Parser {
         int currentPosition = position;
 
         // Try to parse the variable
-        Optional<ParseResult<Variable>> opVar = parseVar(currentPosition);
-        if (opVar.isEmpty()) {
+        Optional<ParseResult<Variable>> optionalVariable = parseVar(currentPosition);
+        if (optionalVariable.isEmpty()) {
             if (shouldThrowIfNoIdentifier) {
                 throwParserException(variableAssignment, "a variable name", currentPosition);
             }
@@ -429,7 +428,7 @@ public class Parser {
         }
 
         // We now know we are parsing an assignment variable, so going further we must throw an exception
-        ParseResult<Variable> var = opVar.get();
+        ParseResult<Variable> var = optionalVariable.get();
         currentPosition = var.nextPosition;
 
         // Ensure that there's an assignment operator here
@@ -732,32 +731,29 @@ public class Parser {
     public Optional<ParseResult<Expression>> parseDotExp(final int position) throws ParserException {
         int currentPosition = position;
         // Make sure there's a primary expression here
-        Optional<ParseResult<PrimaryExpression>> optionalPrimaryExp = parsePrimaryExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("primary expression", optionalPrimaryExp, "an expression", currentPosition);
-        // Cast to Expression for dot operator binary expression
-        Expression expressionResult = (Expression)optionalPrimaryExp.get().result;
-        ParseResult<Expression> returnValue = new ParseResult<>(expressionResult, optionalPrimaryExp.get().nextPosition);
-        currentPosition = returnValue.nextPosition;
+        Optional<ParseResult<Expression>> returnValue = parsePrimaryExp(currentPosition);
+        throwParserExceptionOnEmptyOptional("primary expression", returnValue, "an expression", currentPosition);
+        currentPosition = returnValue.get().nextPosition;
 
         // While there are other variables to parse
         while (isExpectedToken(currentPosition, DotToken.class)) {
             currentPosition += 1;
-            // Try to parse a variable
+            // Try to parse a variable - can I just
             Optional<ParseResult<Variable>> variable = parseVar(currentPosition);
             throwParserExceptionOnEmptyOptional("variable", variable, "a variable", currentPosition);
             // Create dot operator, wrap in expression parse result
-            DotExp dotExp = new DotExp(returnValue.result, variable.get().result);
-            returnValue = Optional.of(new ParseResult<Expression>(dotExp, dotExp.nextPosition));
+            DotExp dotExp = new DotExp(returnValue.get().result, variable.get().result);
+            returnValue = Optional.of(new ParseResult<Expression>(dotExp, variable.get().nextPosition));
             currentPosition = returnValue.get().nextPosition;
         }
-        return Optional.of(returnValue);
+        return returnValue;
     }
 
 
     // May be better to have primitive types in an enum, so we're not creating so
     // many instances in big programs
     // Create a mapping from the token's class to its type
-    private static final Map<Class<? extends Token>, Function<Token, PrimaryExpression>> TOKEN_TO_PRIMITIVE = Map.of(
+    private static final Map<Class<? extends Token>, Function<Token, PrimaryExpression>> TOKEN_TO_PRIMARY = Map.of(
             IntLiteralToken.class, (token) -> new IntLiteralExp(Integer.parseInt(token.getTokenizedValue())),
             TrueToken.class, (token) -> new BoolLiteralExp(true),
             FalseToken.class, (token) -> new BoolLiteralExp(false),
@@ -770,7 +766,7 @@ public class Parser {
      * primary_exp ::= i | `true` | `false` | var | 
      * `null` | `(` exp `)`
      */
-    public Optional<ParseResult<PrimaryExpression>> parsePrimaryExp(final int position) throws ParserException {
+    public Optional<ParseResult<Expression>> parsePrimaryExp(final int position) throws ParserException {
         // Get the token
         final Optional<Token> maybeToken = getToken(position);
         if (maybeToken.isEmpty()) {
@@ -780,7 +776,7 @@ public class Parser {
         Token token = maybeToken.get();
         Class<? extends Token> tokenClass = token.getClass();
 
-        if (!TOKEN_CLASS_TO_TYPE.containsKey(tokenClass)) {
+        if (!TOKEN_TO_PRIMARY.containsKey(tokenClass)) {
             int currentPosition = position;
             // Try to parse parenthesitized expression (this is our only option, now)
             String parenExpString = "primary parenthesitized exression";
@@ -796,18 +792,11 @@ public class Parser {
             throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
             currentPosition += 1;
 
-            // Create new paren expression, downcast the paren expression result to a primary statement, and return
-            // Am I doing extra steps here?
-            ParseResult<? extends PrimaryExpression> parsedExpression = new ParseResult<ParenExp>(
-                    new ParenExp(optionalExpression.get().result), currentPosition);
-            ParseResult<PrimaryExpression> primaryExpressionResult = new ParseResult<>(
-                    parsedExpression.result, currentPosition);
-
-            // Return the downcasted version
-            return Optional.of(primaryExpressionResult);
+            // Return the Expression
+            return Optional.of(new ParseResult<Expression>(optionalExpression.get().result, currentPosition));
         }
 
-        PrimaryExpression exp = TOKEN_TO_PRIMITIVE.get(tokenClass).apply(token);
+        Expression exp = TOKEN_TO_PRIMARY.get(tokenClass).apply(token);
         return Optional.of(new ParseResult<>(exp, position + 1));
     }
 

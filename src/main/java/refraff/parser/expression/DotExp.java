@@ -1,14 +1,14 @@
 package refraff.parser.expression;
 
-import refraff.parser.operator.OperatorEnum;
+import refraff.parser.Variable;
 
 public class DotExp extends Expression {
     
     private final Expression leftExp;
-    private final Expression rightVar;
+    private final Variable rightVar;
 
-    public DotExp(Expression leftExp, Expression rightVar) {
-        super(leftExp.getParsedValue() + rightVar.getParsedValue());
+    public DotExp(Expression leftExp, Variable rightVar) {
+        super(leftExp.getParsedValue() + rightVar.name);
         this.leftExp = leftExp;
         this.rightVar = rightVar;
     }
@@ -17,7 +17,7 @@ public class DotExp extends Expression {
         return leftExp;
     }
 
-    public Expression getRightVar() {
+    public Variable getRightVar() {
         return rightVar;
     }
     

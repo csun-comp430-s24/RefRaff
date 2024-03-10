@@ -1,6 +1,7 @@
 package refraff.parser;
 
 public class Variable {
+    
     public final String name;
 
     public Variable(final String name) {

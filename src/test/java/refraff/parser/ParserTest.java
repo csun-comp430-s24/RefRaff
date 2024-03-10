@@ -329,7 +329,7 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
-        BinaryOpExp dotExp = new BinaryOpExp(new VariableExp("example"), new DotOp(), new VariableExp("result"));
+        DotExp dotExp = new DotExp(new VariableExp("example"), new Variable("result"));
 
         statements.add(new AssignStmt(
                 new Variable("retval"),
