@@ -1,9 +1,8 @@
 package refraff.parser.expression.primaryExpression;
 
-import refraff.parser.AbstractSyntaxTreeNode;
+import refraff.parser.expression.Expression;
 
-
-public class PrimaryExpression extends AbstractSyntaxTreeNode {
+public class PrimaryExpression extends Expression {
     
     private static final String TYPE_DESCRIPTOR = "Primary Expression";
 

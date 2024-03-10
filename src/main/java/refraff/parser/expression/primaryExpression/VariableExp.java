@@ -9,4 +9,8 @@ public class VariableExp extends PrimaryExpression {
         super(name);
         this.name = name;
     }
+
+    public String getName() {
+        return name;
+    }
 }
