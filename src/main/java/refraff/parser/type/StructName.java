@@ -1,6 +1,5 @@
 package refraff.parser.type;
 
-import refraff.parser.Variable;
 
 public class StructName extends Type {
     
@@ -18,5 +17,10 @@ public class StructName extends Type {
     @Override
     public String getParsedValue() {
         return this.structName;
+    }
+
+    // I just want my linter to be quiet
+    public String getStructNameType() {
+        return STRUCT_NAME_TYPE;
     }
 }

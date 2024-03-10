@@ -1,15 +1,16 @@
 package refraff.parser;
 
 import java.util.*;
+import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import refraff.parser.function.FunctionDef;
-import refraff.parser.function.FunctionName;
+import refraff.parser.function.*;
 import refraff.parser.statement.*;
 import refraff.parser.type.*;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
+import refraff.parser.structure.*;
 import refraff.parser.expression.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.reserved.*;
@@ -522,36 +523,119 @@ public class Parser {
     }
 
 
+    private final static Map<Token, OperatorEnum> TOKEN_TO_OP = Map.of(
+        new OrToken(), OperatorEnum.OR,
+        new AndToken(), OperatorEnum.AND,
+        new DoubleEqualsToken(), OperatorEnum.DOUBLE_EQUALS,
+        new NotEqualsToken(), OperatorEnum.NOT_EQUALS
+    );
+    
+
+
     // exp ::= or_exp
     public Optional<ParseResult<Expression>> parseExp(final int position) throws ParserException {
-        // Try to parse an or expression
-        Optional<ParseResult<BinaryOpExp>> optionalOrExpression = parseOrExp(position);
-        throwParserExceptionOnEmptyOptional("if binary operator expression", optionalOrExpression, "an or expression", position);
-        
-        // Downcast the paren expression result result to just being an expression
-        ParseResult<? extends Expression> parsedExpression = optionalOrExpression.get();
-        ParseResult<Expression> expressionResult = new ParseResult<>(parsedExpression.result, position);
-
-        // Return the downcasted version
-        return Optional.of(expressionResult);
+        // Try to parse an or expression - I'm just following the grammar for now, but I dont' think we need this
+        return parseOrExp(position);
     }
 
 
     // or_exp ::= and_exp (`||` and_exp)*
-    public Optional<ParseResult<BinaryOpExp>> parseOrExp(final int position) throws ParserException {
+    public Optional<ParseResult<Expression>> parseOrExp(final int position) throws ParserException {
         int currentPosition = position;
-        // Our only option is an or expression
-        final String orExpression = "or expression";
         // Try to parse an and expression
-        Optional<ParseResult<BinaryOpExp>> optionalAndExpression = parseOrExp(position);
-        throwParserExceptionOnEmptyOptional("if binary operator expression", optionalOrExpression, "an and expression", position);
+        Optional<ParseResult<Expression>> returnValue = parseAndExp(position);
+        throwParserExceptionOnEmptyOptional("and expression", returnValue, "an expression", currentPosition);
+        currentPosition = returnValue.get().nextPosition;
 
-        // If there is not an or operator
-            // return current expression as is
+        // While there are more expressions to parse
+        while (isExpectedToken(currentPosition, OrToken.class)) {
+            // Eat the or token
+            currentPosition += 1;
+            // Try to parse an and expression
+            Optional<ParseResult<Expression>> rightAndExp = parseAndExp(position);
+            throwParserExceptionOnEmptyOptional("and expression", rightAndExp, "an expression", currentPosition);
+            // Create binary operator, downcast to expression
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, OperatorEnum.OR, rightAndExp.get().result);
+            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, currentPosition));
+            currentPosition = returnValue.get().nextPosition;
+        }
+        return returnValue;
+    }
 
-        // Otherwise, find next and expression
 
-        // Construct binary operator expression and return
+    // and_exp ::= equals_exp (`&&` equals_exp)*
+    // Hmmmm... This is starting to look familiar
+    public Optional<ParseResult<Expression>> parseAndExp(final int position) throws ParserException {
+        int currentPosition = position;
+        // Try to parse an equals expression
+        Optional<ParseResult<Expression>> returnValue = parseEqualsExp(position);
+        throwParserExceptionOnEmptyOptional("equals expression", returnValue, "an expression", currentPosition);
+        currentPosition = returnValue.get().nextPosition;
+
+        // While there are more expressions to parse
+        while (isExpectedToken(currentPosition, AndToken.class)) {
+            // Skip and token
+            currentPosition += 1;
+            // Try to parse an equals expression
+            Optional<ParseResult<Expression>> rightEqualsExp = parseEqualsExp(position);
+            throwParserExceptionOnEmptyOptional("equals expression", rightEqualsExp, "an expression", currentPosition);
+            // Create binary operator, downcast to expression
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, OperatorEnum.AND, rightEqualsExp.get().result);
+            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, currentPosition));
+            currentPosition = returnValue.get().nextPosition;
+        }
+        return returnValue;
+    }
+
+    // equals_exp ::= lte_gte_exp ((`==` | `!=`) lte_gte_exp)*
+    public Optional<ParseResult<Expression>> parseEqualsExp(final int position) throws ParserException {
+        int currentPosition = position;
+        // Try to parse an inequality expression
+        Optional<ParseResult<Expression>> returnValue = parseInequalityExp(position);
+        throwParserExceptionOnEmptyOptional("inequality expression", returnValue, "an expression", currentPosition);
+        currentPosition = returnValue.get().nextPosition;
+
+        // While there are more expressions to parse
+        while (isExpectedToken(currentPosition, DoubleEqualsToken.class) 
+                || isExpectedToken(currentPosition, NotEqualsToken.class)) {
+            // Get the operator
+            OperatorEnum op = TOKEN_TO_OP.get(getToken(currentPosition));
+            currentPosition += 1;
+            // Try to parse an inequlality expression
+            Optional<ParseResult<Expression>> rightInequalityExp = parseInequalityExp(position);
+            throwParserExceptionOnEmptyOptional("inequality expression", rightInequalityExp, "an expression", currentPosition);
+            // Create binary operator, downcast to expression
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightInequalityExp.get().result);
+            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, currentPosition));
+            currentPosition = returnValue.get().nextPosition;
+        }
+        return returnValue;
+    }
+
+    // equals_exp ::= lte_gte_exp ((`==` | `!=`) lte_gte_exp)*
+    public Optional<ParseResult<Expression>> parseEqualsExp(final int position) throws ParserException {
+        int currentPosition = position;
+        // Try to parse an inequality expression
+        Optional<ParseResult<Expression>> returnValue = parseInequalityExp(position);
+        throwParserExceptionOnEmptyOptional("inequality expression", returnValue, "an expression", currentPosition);
+        currentPosition = returnValue.get().nextPosition;
+
+        // While there are more expressions to parse
+        while (isExpectedToken(currentPosition, DoubleEqualsToken.class)
+                || isExpectedToken(currentPosition, NotEqualsToken.class)) {
+            // Get the operator
+            OperatorEnum op = TOKEN_TO_OP.get(getToken(currentPosition));
+            currentPosition += 1;
+            // Try to parse an inequlality expression
+            Optional<ParseResult<Expression>> rightInequalityExp = parseInequalityExp(position);
+            throwParserExceptionOnEmptyOptional("inequality expression", rightInequalityExp, "an expression",
+                    currentPosition);
+            // Create binary operator, downcast to expression
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightInequalityExp.get().result);
+            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, currentPosition));
+            currentPosition = returnValue.get().nextPosition;
+        }
+        return returnValue;
     }
 
 
@@ -584,21 +668,23 @@ public class Parser {
         if (!TOKEN_CLASS_TO_TYPE.containsKey(tokenClass)) {
             int currentPosition = position;
             // Try to parse parenthesitized expression (this is our only option, now)
-            String parenExp = "primary parenthesitized exression";
+            String parenExpString = "primary parenthesitized exression";
             // There should be a left paren here
-            throwParserExceptionOnUnexpected(parenExp, LeftParenToken.class, "left paren (", currentPosition);
+            throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
             currentPosition += 1;
 
             // Try to parse expression
-            Optional<ParseResult<PrimaryExpression>> optionalExpression = parseExp(currentPosition);
+            Optional<ParseResult<Expression>> optionalExpression = parseExp(currentPosition);
             throwParserExceptionOnEmptyOptional("if expression", optionalExpression, "an expression", currentPosition);
 
             // Make sure there's a right paren here
-            throwParserExceptionOnUnexpected(parenExp, LeftParenToken.class, "left paren (", currentPosition);
+            throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
             currentPosition += 1;
 
-            // Downcast the paren expression result result to just being a primary statement, and return
-            ParseResult<? extends PrimaryExpression> parsedExpression = optionalExpression.get();
+            // Create new paren expression, downcast the paren expression result to a primary statement, and return
+            // Am I doing extra steps here?
+            ParseResult<? extends PrimaryExpression> parsedExpression = new ParseResult<ParenExp>(
+                    new ParenExp(optionalExpression.get().result), currentPosition);;
             ParseResult<PrimaryExpression> primaryExpressionResult = new ParseResult<>(
                     parsedExpression.result, currentPosition);
 

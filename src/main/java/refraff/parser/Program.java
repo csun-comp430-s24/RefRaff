@@ -2,6 +2,8 @@ package refraff.parser;
 
 import refraff.parser.function.FunctionDef;
 import refraff.parser.statement.Statement;
+import refraff.parser.structure.StructDef;
+
 import java.util.List;
 import java.util.Objects;
 

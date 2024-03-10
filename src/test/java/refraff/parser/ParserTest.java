@@ -17,6 +17,8 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
+import refraff.parser.structure.Param;
+import refraff.parser.structure.StructDef;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
 
