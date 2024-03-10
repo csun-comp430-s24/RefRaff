@@ -17,6 +17,8 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
+import refraff.parser.operator.*;
+import refraff.parser.expression.primaryExpression.*;
 
 
 public class ParserTest {
@@ -166,7 +168,7 @@ public class ParserTest {
             new SemicolonToken()
         };
         final Parser parser = new Parser(input);
-        assertEquals(Optional.of(new ParseResult<>(new VardecStmt(
+        assertEquals(Optional.of(new ParseResult<VardecStmt>(new VardecStmt(
                                     new IntType(),
                                     new Variable("variableName"),
                                     new IntLiteralExp(6)
@@ -309,29 +311,56 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+    @Test
+    public void testProgramWithDotOpExpression() throws ParserException {
+        // retval = example.result;
+        final Token[] input = new Token[] {
+                new IdentifierToken("retval"),
+                new AssignmentToken(),
+                new IdentifierToken("example"),
+                new DotToken(),
+                new IdentifierToken("result"),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+        BinaryOpExp dotExp = new BinaryOpExp(new VariableExp("example"), new DotOp(), new VariableExp("result"));
+
+        statements.add(new AssignStmt(
+                new Variable("retval"),
+                dotExp));
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+                parser.parseProgram(0));
+    }
+
     // @Test
-    // public void testProgramWithPlusOpExpression() throws ParserException {
-    //     // retval = retval + 1;
+    // public void testProgramWithMultOpExpression() throws ParserException {
+    //     // retval = retval * 2;
     //     final Token[] input = new Token[] {
     //             new IdentifierToken("retval"),
     //             new AssignmentToken(),
     //             new IdentifierToken("retval"),
-    //             new PlusToken(),
-    //             new IntLiteralToken("1"),
+    //             new MultiplyToken(),
+    //             new IntLiteralToken("2"),
     //             new SemicolonToken()
     //     };
     //     final Parser parser = new Parser(input);
     //     final List<StructDef> structDefs = new ArrayList<>();
+    //     final List<FunctionDef> functionDefs = new ArrayList<>();
     //     final List<Statement> statements = new ArrayList<>();
 
-    //     BinaryOpExp addExp = new BinaryOpExp(new VariableExp("retval"), new PlusOp(), new IntLiteralExp(1));
+    //     BinaryOpExp multExp = new BinaryOpExp(new VariableExp("retval"), new MultiplyOp(), new IntLiteralExp(1));
 
     //     statements.add(new AssignStmt(
     //             new Variable("retval"),
-    //             addExp)
+    //             multExp)
     //     );
 
-    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 6),
+    //     assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
     //             parser.parseProgram(0));
     // }
 

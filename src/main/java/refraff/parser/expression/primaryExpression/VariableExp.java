@@ -1,6 +1,7 @@
-package refraff.parser.expression;
+package refraff.parser.expression.primaryExpression;
 
-public class VariableExp extends Expression {
+
+public class VariableExp extends PrimaryExpression {
 
     private final String name; // I don't know if we need this
     

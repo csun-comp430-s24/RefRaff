@@ -1,6 +1,7 @@
-package refraff.parser.expression;
+package refraff.parser.expression.primaryExpression;
 
-public class IntLiteralExp extends Expression {
+
+public class IntLiteralExp extends PrimaryExpression {
     
     private final int num;
 
@@ -8,4 +9,5 @@ public class IntLiteralExp extends Expression {
         super(Integer.toString(num));
         this.num = num;
     }
+    
 }

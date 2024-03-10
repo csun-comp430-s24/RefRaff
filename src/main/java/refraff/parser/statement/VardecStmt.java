@@ -2,7 +2,7 @@ package refraff.parser.statement;
 
 import refraff.parser.type.Type;
 import refraff.parser.Variable;
-import refraff.parser.expression.Expression;
+import refraff.parser.expression.primaryExpression.PrimaryExpression;
 
 import java.util.Objects;
 
@@ -10,10 +10,10 @@ public class VardecStmt extends Statement {
     
     private final Type type;
     private final Variable variable; 
-    private final Expression expression;
+    private final PrimaryExpression expression;
 
     public VardecStmt(Type type, 
-            Variable variable, Expression expression) {
+            Variable variable, PrimaryExpression expression) {
         super(
             type.getParsedValue()
             + variable.hashCode()
@@ -32,7 +32,7 @@ public class VardecStmt extends Statement {
         return variable;
     }
 
-    public Expression getExpression() {
+    public PrimaryExpression getExpression() {
         return expression;
     }
 

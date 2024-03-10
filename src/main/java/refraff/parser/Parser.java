@@ -9,6 +9,7 @@ import refraff.parser.function.FunctionName;
 import refraff.parser.statement.*;
 import refraff.parser.type.*;
 import refraff.parser.operator.*;
+import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.expression.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.reserved.*;
@@ -91,29 +92,9 @@ public class Parser {
         List<FunctionDef> functionDefs = new ArrayList<>();
         List<Statement> statements = new ArrayList<>();
 
-        // Keep trying to parse struct definitions until
-//        while (true) {
-//            Optional<ParseResult<StructDef>> structDefResult = parseStructDef(currentPosition);
-//            if (!structDefResult.isPresent()) break;
-//            ParseResult<StructDef> result = structDefResult.get();
-//            structDefs.add(result.result);
-//            currentPosition = result.nextPosition;
-//        }
-        // Above comments are equivalent to the generified version immediately below
-
         currentPosition = parseZeroOrMore(this::parseStructDef, structDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
-
-        // Below comments are equivalent to the generified version immediately above
-//        // Keep trying to parse statements until none are left
-//        while (true) {
-//            Optional<ParseResult<Statement>> statementResult = parseStatement(currentPosition);
-//            if (!statementResult.isPresent()) break; // Exit if no more statements
-//            ParseResult<Statement> result = statementResult.get();
-//            statements.add(result.result);
-//            currentPosition = result.nextPosition;
-//        }
 
         return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
     }
@@ -212,21 +193,21 @@ public class Parser {
         int currentPosition = position;
 
         // Try to parse the type
-        Optional<ParseResult<Type>> opType = parseType(currentPosition);
-        if (opType.isEmpty()) {
+        Optional<ParseResult<Type>> optionalType = parseType(currentPosition);
+        if (optionalType.isEmpty()) {
             return Optional.empty();
         }
 
-        ParseResult<Type> type = opType.get();
+        ParseResult<Type> type = optionalType.get();
         currentPosition = type.nextPosition;
 
         // Try to parse the variable
-        Optional<ParseResult<Variable>> opVar = parseVar(currentPosition);
-        if (opVar.isEmpty()) {
+        Optional<ParseResult<Variable>> optionalVar = parseVar(currentPosition);
+        if (optionalVar.isEmpty()) {
             return Optional.empty();
         }
 
-        ParseResult<Variable> var = opVar.get();
+        ParseResult<Variable> var = optionalVar.get();
         currentPosition = var.nextPosition;
 
         // Return the variable declaration
@@ -299,6 +280,7 @@ public class Parser {
         return Optional.of(new ParseResult<>(functionDef, currentPosition));
     }
 
+
     // comma_param ::= [param (`,` param)*]
     private ParseResult<List<Param>> parseCommaParam(String functionDefinitionWithName,
                                                      final int position) throws ParserException {
@@ -351,24 +333,6 @@ public class Parser {
     //                                 `if` `(` exp `)` stmt [`else` stmt] |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
-//        // Try to parse an assignment statement, return immediately if successful
-//        Optional<ParseResult<VardecStmt>> vardec = parseVardec(position);
-//        if (vardec.isPresent()) {
-//            // Map Vardec result to Statement result
-//            ParseResult<Statement> statementResult = new ParseResult<>(vardec.get().result,
-//                    vardec.get().nextPosition);
-//            return Optional.of(statementResult);
-//        }
-//
-//        Optional<ParseResult<AssignStmt>> assign = parseAssign(position);
-//        if (assign.isPresent()) {
-//            // Map Vardec result to Statement result
-//            ParseResult<Statement> statementResult = new ParseResult<>(assign.get().result,
-//                    assign.get().nextPosition);
-//            return Optional.of(statementResult);
-//        }
-
-        // Above commented out in favor of generified version below:
         // (Makes it easier to add more in the future without code repeat)
         return parseStatement(List.of(
                 // We need to parse assignment first, otherwise vardec will eat our assignment and throw an exception
@@ -441,6 +405,7 @@ public class Parser {
         return parseAssign(position, false);
     }
 
+
     // assignment is var '=' exp ';'
     public Optional<ParseResult<AssignStmt>> parseAssign(final int position, final boolean shouldThrowIfNoIdentifier)
             throws ParserException {
@@ -485,6 +450,7 @@ public class Parser {
             )
         );
     }
+
 
     private Optional<ParseResult<IfElseStmt>> parseIfElse(final int position) throws ParserException {
         if (!isExpectedToken(position, IfToken.class)) {
@@ -537,6 +503,7 @@ public class Parser {
         return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
     }
 
+
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
         if (!isExpectedToken(position, LeftBraceToken.class)) {
             return Optional.empty();
@@ -554,86 +521,95 @@ public class Parser {
         return Optional.of(new ParseResult<>(new StmtBlock(blockBody), currentPosition));
     }
 
-    // But for now, exp ::= int literal | bool literal
-    //                      Binary operation
+
+    // exp ::= or_exp
     public Optional<ParseResult<Expression>> parseExp(final int position) throws ParserException {
-        // Try to parse binary operation
-        // Optional<ParseResult<BinaryOpExp>> opOpExp = parseAddExp(position);
-        // if (!opOpExp.isPresent()) {
-        //     return Optional.empty();
-        // }
-        // ParseResult<Expression> expressionResult = new ParseResult<>(opOpExp.get().result,
-        //         opOpExp.get().nextPosition);
-        // return Optional.of(expressionResult);
+        // Try to parse an or expression
+        Optional<ParseResult<BinaryOpExp>> optionalOrExpression = parseOrExp(position);
+        throwParserExceptionOnEmptyOptional("if binary operator expression", optionalOrExpression, "an or expression", position);
+        
+        // Downcast the paren expression result result to just being an expression
+        ParseResult<? extends Expression> parsedExpression = optionalOrExpression.get();
+        ParseResult<Expression> expressionResult = new ParseResult<>(parsedExpression.result, position);
 
-        // See if it's a primary expression
-        final Optional<Token> maybeToken = getToken(position);
-        if (!maybeToken.isPresent()) {
-            return Optional.empty();
-        }
-        Token token = maybeToken.get();
-
-        // Try to parse int literal
-        if (token instanceof IntLiteralToken) {
-            // This is just a placeholder because I want to start testing it already
-            // Create a new parse result for Int Literal
-            Optional<ParseResult<IntLiteralExp>> result = Optional.of(new ParseResult<IntLiteralExp>(
-                    new IntLiteralExp(Integer.parseInt(((IntLiteralToken) token).getTokenizedValue())),
-                    position + 1));
-            // Wow, that's ugly ^^
-            // Map int literal exp result to exp result
-            ParseResult<Expression> expressionResult = new ParseResult<>(result.get().result,
-                    result.get().nextPosition);
-            return Optional.of(expressionResult);
-        } else if (token instanceof TrueToken || token instanceof FalseToken) {
-            boolean booleanLiteralValue = Boolean.parseBoolean(token.getTokenizedValue());
-            return Optional.of(new ParseResult<>(new BoolLiteralExp(booleanLiteralValue), position + 1));
-        }
-        // } else if (token instanceof IdentifierToken) {
-        //     // If it's an identifier token
-        //     Optional<ParseResult<IntLiteralExp>> result = Optional.of(new ParseResult<IntLiteralExp>(
-        //             new IntLiteralExp(Integer.parseInt(((IntLiteralToken) token).getTokenizedValue())),
-        //             position + 1));
-        // }
-        return Optional.empty();
+        // Return the downcasted version
+        return Optional.of(expressionResult);
     }
 
 
-    // Try to parse binary operator expression
-    // public Optional<ParseResult<BinaryOpExp>> parseBinaryOpExp(final int position) throws ParserException {
-    //     int currentPosition = position;
-    //     // Try to parse expression
-    //     Optional<ParseResult<Expression>> opLeftExp = parseExp(currentPosition);
-    //     if (!opLeftExp.isPresent()) {
-    //         return Optional.empty();
-    //     }
-    //     ParseResult<Expression> leftExp = opLeftExp.get();
-    //     currentPosition = leftExp.nextPosition;
+    // or_exp ::= and_exp (`||` and_exp)*
+    public Optional<ParseResult<BinaryOpExp>> parseOrExp(final int position) throws ParserException {
+        int currentPosition = position;
+        // Our only option is an or expression
+        final String orExpression = "or expression";
+        // Try to parse an and expression
+        Optional<ParseResult<BinaryOpExp>> optionalAndExpression = parseOrExp(position);
+        throwParserExceptionOnEmptyOptional("if binary operator expression", optionalOrExpression, "an and expression", position);
 
-    //     // Try to parse operator
-    //     Optional<ParseResult<Operator>> opOp = parseOp(currentPosition);
-    //     if (!opOp.isPresent()) {
-    //         return Optional.empty();
-    //     }
-    //     ParseResult<Operator> op = opOp.get();
-    //     currentPosition = op.nextPosition;
+        // If there is not an or operator
+            // return current expression as is
 
-    //     // Try to parse expression
-    //     Optional<ParseResult<Expression>> opRightExp = parseExp(currentPosition);
-    //     if (!opRightExp.isPresent()) {
-    //         return Optional.empty();
-    //     }
-    //     ParseResult<Expression> rightExp = opRightExp.get();
-    //     currentPosition = rightExp.nextPosition;
+        // Otherwise, find next and expression
 
-    //     // Return the binary operator expression
-    //     return Optional.of(
-    //         new ParseResult<BinaryOpExp>(
-    //             new BinaryOpExp(leftExp.result, op.result, rightExp.result),
-    //             currentPosition
-    //         )
-    //     );
-    // }
+        // Construct binary operator expression and return
+    }
+
+
+    // May be better to have primitive types in an enum, so we're not creating so
+    // many instances in big programs
+    // Create a mapping from the token's class to its type
+    private static final Map<Class<? extends Token>, Function<Token, PrimaryExpression>> TOKEN_TO_PRIMITIVE = Map.of(
+            IntLiteralToken.class, (token) -> new IntLiteralExp(Integer.parseInt(token.getTokenizedValue())),
+            TrueToken.class, (token) -> new BoolLiteralExp(true),
+            FalseToken.class, (token) -> new BoolLiteralExp(false),
+            IdentifierToken.class, (token) -> new VariableExp(token.getTokenizedValue()),
+            NullToken.class, (token) -> new NullExp()
+    );
+
+    /*
+     * Try to parse primary expression
+     * primary_exp ::= i | `true` | `false` | var | 
+     * `null` | `(` exp `)`
+     */
+    public Optional<ParseResult<PrimaryExpression>> parsePrimaryExp(final int position) throws ParserException {
+        // Get the token
+        final Optional<Token> maybeToken = getToken(position);
+        if (maybeToken.isEmpty()) {
+            return Optional.empty();
+        }
+
+        Token token = maybeToken.get();
+        Class<? extends Token> tokenClass = token.getClass();
+
+        if (!TOKEN_CLASS_TO_TYPE.containsKey(tokenClass)) {
+            int currentPosition = position;
+            // Try to parse parenthesitized expression (this is our only option, now)
+            String parenExp = "primary parenthesitized exression";
+            // There should be a left paren here
+            throwParserExceptionOnUnexpected(parenExp, LeftParenToken.class, "left paren (", currentPosition);
+            currentPosition += 1;
+
+            // Try to parse expression
+            Optional<ParseResult<PrimaryExpression>> optionalExpression = parseExp(currentPosition);
+            throwParserExceptionOnEmptyOptional("if expression", optionalExpression, "an expression", currentPosition);
+
+            // Make sure there's a right paren here
+            throwParserExceptionOnUnexpected(parenExp, LeftParenToken.class, "left paren (", currentPosition);
+            currentPosition += 1;
+
+            // Downcast the paren expression result result to just being a primary statement, and return
+            ParseResult<? extends PrimaryExpression> parsedExpression = optionalExpression.get();
+            ParseResult<PrimaryExpression> primaryExpressionResult = new ParseResult<>(
+                    parsedExpression.result, currentPosition);
+
+            // Return the downcasted version
+            return Optional.of(primaryExpressionResult);
+        }
+
+        PrimaryExpression exp = TOKEN_TO_PRIMITIVE.get(tokenClass).apply(token);
+        return Optional.of(new ParseResult<>(exp, position + 1));
+    }
+
 
     // Maybe worthwhile to have Operator be an enum in this case, instead of a ton of classes
     // private static final Map<Class<? extends Token>, OpEnum>
@@ -659,28 +635,6 @@ public class Parser {
         }
     }
 
-    // public Optional<ParseResult<IntLiteralExp>> parseIntLiteralExp(final int position) throws ParserException {
-    //     final Optional<Token> maybeToken = getToken(position);
-    //     if (!maybeToken.isPresent()) {
-    //         return Optional.empty();
-    //     }
-
-    //     Token token = maybeToken.get();
-    //     // Try to parse int literal
-    //     if (token instanceof IntLiteralToken) {
-    //         // This is just a placeholder because I want to start testing it already
-    //         // Create a new parse result for Int Literal
-    //         Optional<ParseResult<IntLiteralExp>> result = Optional.of(new ParseResult<IntLiteralExp>(
-    //                 new IntLiteralExp(Integer.parseInt(((IntLiteralToken) token).getTokenizedValue())),
-    //                 position + 1));
-    //         // Wow, that's ugly ^^
-    //         // Map int literal exp result to exp result
-    //         ParseResult<Expression> statementResult = new ParseResult<>(result.get().result,
-    //                 result.get().nextPosition);
-    //         return Optional.of(statementResult);
-    //     }
-    // }
-
 
     // Tries to parse variable
     public Optional<ParseResult<Variable>> parseVar(final int position) throws ParserException {
@@ -693,8 +647,6 @@ public class Parser {
         // If this is an identifier
         if (token instanceof IdentifierToken) {
             // Create a new Optional ParseResult for a Variable
-            // Construct the new Variable with the Identifier token's name
-            // I know this looks insane
             return Optional.of(
                 new ParseResult<>(
                     new Variable(token.getTokenizedValue()),
