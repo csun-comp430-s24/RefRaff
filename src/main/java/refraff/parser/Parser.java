@@ -334,6 +334,7 @@ public class Parser {
     // But for now, it's just stmt ::= type var '=' exp ';' |
     //                                 var '=' exp ';' |
     //                                 `if` `(` exp `)` stmt [`else` stmt] |
+    //                                 `while` `(` exp `)` stmt |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
@@ -342,6 +343,7 @@ public class Parser {
                 this::parseAssign,
                 this::parseVardec,
                 this::parseIfElse,
+                this::parseWhile,
                 this::parseStatementBlock
         ), position);
     }
@@ -507,6 +509,42 @@ public class Parser {
         return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
     }
 
+    private Optional<ParseResult<WhileStmt>> parseWhile(final int position) throws ParserException {
+        if (!isExpectedToken(position, WhileToken.class)) {
+            return Optional.empty();
+        }
+
+        // We are now definitely parsing a while block
+        final String whileStatement = "while statement";
+        int currentPosition = position + 1;
+
+        throwParserExceptionOnUnexpected(whileStatement, LeftParenToken.class, "(", currentPosition);
+        currentPosition += 1;
+
+        // Parse the expression
+        Optional<ParseResult<Expression>> optionalParsedCondition = parseExp(currentPosition);
+        throwParserExceptionOnEmptyOptional(whileStatement + " condition", optionalParsedCondition,
+                "an expression", currentPosition);
+
+        ParseResult<Expression> parsedConditionResult = optionalParsedCondition.get();
+
+        Expression condition = parsedConditionResult.result;
+        currentPosition = parsedConditionResult.nextPosition;
+
+        throwParserExceptionOnUnexpected(whileStatement, RightParenToken.class, ")", currentPosition);
+        currentPosition += 1;
+
+        Optional<ParseResult<Statement>> optionalParsedBody = parseStatement(currentPosition);
+        throwParserExceptionOnEmptyOptional(whileStatement + " body", optionalParsedBody, "a statement", currentPosition);
+
+        ParseResult<Statement> parsedBodyResult = optionalParsedBody.get();
+
+        Statement body = parsedBodyResult.result;
+        currentPosition = parsedBodyResult.nextPosition;
+
+        WhileStmt whileStmt = new WhileStmt(condition, body);
+        return Optional.of(new ParseResult<>(whileStmt, currentPosition));
+    }
 
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
         if (!isExpectedToken(position, LeftBraceToken.class)) {

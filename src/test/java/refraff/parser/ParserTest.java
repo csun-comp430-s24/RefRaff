@@ -218,7 +218,7 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseIfNoElse() {
+    public void testParseIfNoElseStatement() {
         // if (3)
         //    x = false;
         Token[] input = toArray(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
@@ -231,7 +231,7 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseIfElse() {
+    public void testParseIfElseStatement() {
         // if (3)
         //    x = false;
         // else
@@ -246,6 +246,16 @@ public class ParserTest {
         IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(3), ifBody, elseBody);
 
         testStatementMatchesExpected(ifElseStmt, input);
+    }
+
+    @Test
+    public void testWhileStatement() {
+        // while (true) {}
+        Token[] input = toArray(new WhileToken(), new LeftParenToken(), new TrueToken(), new RightParenToken(),
+                new LeftBraceToken(), new RightBraceToken());
+
+        WhileStmt whileStmt = new WhileStmt(new BoolLiteralExp(true), new StmtBlock());
+        testStatementMatchesExpected(whileStmt, input);
     }
 
     @Test

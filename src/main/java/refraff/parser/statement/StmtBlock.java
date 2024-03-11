@@ -6,6 +6,10 @@ public class StmtBlock extends Statement {
 
     private final List<Statement> blockBody;
 
+    public StmtBlock() {
+        this(List.of());
+    }
+
     public StmtBlock(List<Statement> blockBody) {
         super(String.valueOf(blockBody.hashCode()));
 
