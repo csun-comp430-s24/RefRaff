@@ -544,6 +544,30 @@ public class ParserTest {
     }
 
     @Test
+    public void testWhileWithNoLeftParenThrowsException() {
+        // while
+        testProgramParsesWithException(new WhileToken());
+    }
+
+    @Test
+    public void testWhileWithNoConditionThrowsException() {
+        // while (
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken());
+    }
+
+    @Test
+    public void testWhileWithNoRightParenThrowsException() {
+        // while (true
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken(), new TrueToken());
+    }
+
+    @Test
+    public void testWhileWithNoBodyThrowsException() {
+        // while (true)
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken(), new TrueToken(), new RightParenToken());
+    }
+
+    @Test
     public void testExtraTokenThrowsException() {
         // var = newVar; int
         testProgramParsesWithException(
