@@ -218,7 +218,7 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseIfNoElse() {
+    public void testParseIfNoElseStatement() {
         // if (3)
         //    x = false;
         Token[] input = toArray(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
@@ -231,7 +231,7 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseIfElse() {
+    public void testParseIfElseStatement() {
         // if (3)
         //    x = false;
         // else
@@ -249,22 +249,42 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseEqualityStatement() {
-        // isTrue = (count == 6);
-        Token[] input = toArray(
-            new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
-            new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
-            new RightParenToken(), new SemicolonToken()
-        );
+    public void testWhileStatement() {
+        // while (true) {}
+        Token[] input = toArray(new WhileToken(), new LeftParenToken(), new TrueToken(), new RightParenToken(),
+                new LeftBraceToken(), new RightBraceToken());
 
-        Expression intLiteral6 = new IntLiteralExp(6);
-        Expression varCount = new VariableExp("count");
-        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
-        Expression parenExp = new ParenExp(binOpDoubleEquals);
-        Variable varIsTrue = new Variable("isTrue");
-        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
+        WhileStmt whileStmt = new WhileStmt(new BoolLiteralExp(true), new StmtBlock());
+        testStatementMatchesExpected(whileStmt, input);
+    }
 
-        testStatementMatchesExpected(assign, input);
+    @Test
+    public void testBreakStatement() {
+        // break;
+        testStatementMatchesExpected(new BreakStmt(), new BreakToken(), new SemicolonToken());
+    }
+
+    @Test
+    public void testPrintlnStatement() {
+        // println(null);
+        Token[] input = toArray(new PrintlnToken(), new LeftParenToken(), new NullToken(), new RightParenToken(),
+                new SemicolonToken());
+
+        PrintlnStmt printlnStmt = new PrintlnStmt(new NullExp());
+        testStatementMatchesExpected(printlnStmt, input);
+    }
+
+    @Test
+    public void testReturnStatementWithoutReturnValue() {
+        // return;
+        testStatementMatchesExpected(new ReturnStmt(), new ReturnToken(), new SemicolonToken());
+    }
+
+    @Test
+    public void testReturnStatementWithReturnValue() {
+        // return false;
+        ReturnStmt returnStmt = new ReturnStmt(new BoolLiteralExp(false));
+        testStatementMatchesExpected(returnStmt, new ReturnToken(), new FalseToken(), new SemicolonToken());
     }
 
     @Test
@@ -291,6 +311,32 @@ public class ParserTest {
                 new VardecStmt(new IntType(), new Variable("variableName"), new IntLiteralExp(6)))
         );
         testStatementMatchesExpected(stmtBlock, input);
+    }
+
+    @Test
+    public void testExpressionStatement() {
+        // 3;
+        ExpressionStmt expressionStmt = new ExpressionStmt(new IntLiteralExp(3));
+        testStatementMatchesExpected(expressionStmt, new IntLiteralToken("3"), new SemicolonToken());
+    }
+
+    @Test
+    public void testParseEqualityStatement() {
+        // isTrue = (count == 6);
+        Token[] input = toArray(
+                new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
+                new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
+                new RightParenToken(), new SemicolonToken()
+        );
+
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression varCount = new VariableExp("count");
+        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
+        Expression parenExp = new ParenExp(binOpDoubleEquals);
+        Variable varIsTrue = new Variable("isTrue");
+        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
+
+        testStatementMatchesExpected(assign, input);
     }
 
     @Test
@@ -531,6 +577,85 @@ public class ParserTest {
         testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
                 new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken(), new ElseToken());
 
+    }
+
+    @Test
+    public void testWhileWithNoLeftParenThrowsException() {
+        // while
+        testProgramParsesWithException(new WhileToken());
+    }
+
+    @Test
+    public void testWhileWithNoConditionThrowsException() {
+        // while (
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken());
+    }
+
+    @Test
+    public void testWhileWithNoRightParenThrowsException() {
+        // while (true
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken(), new TrueToken());
+    }
+
+    @Test
+    public void testWhileWithNoBodyThrowsException() {
+        // while (true)
+        testProgramParsesWithException(new WhileToken(), new LeftParenToken(), new TrueToken(), new RightParenToken());
+    }
+
+    @Test
+    public void testBreakWithNoSemicolonThrowsException() {
+        // break
+        testProgramParsesWithException(new BreakToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoLeftParenThrowsException() {
+        // println
+        testProgramParsesWithException(new PrintlnToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoExpressionThrowsException() {
+        // println(
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoRightParenThrowsException() {
+        // println(x
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken(), new IdentifierToken("x"));
+    }
+
+    @Test
+    public void testPrintlnWithNoSemicolonThrowsException() {
+        // println(x)
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken(), new IdentifierToken("x"),
+                new RightParenToken());
+    }
+
+    @Test
+    public void testReturnNoSemicolonThrowsException() {
+        // return
+        testProgramParsesWithException(new ReturnToken());
+    }
+
+    @Test
+    public void testReturnWithReturnValueNoSemicolonThrowsException() {
+        // return 2
+        testProgramParsesWithException(new ReturnToken(), new IntLiteralToken("2"));
+    }
+
+    @Test
+    public void testStatementBlockWithoutClosingBraceThrowsException() {
+        // {
+        testProgramParsesWithException(new LeftBraceToken());
+    }
+
+    @Test
+    public void testExpressionStatementWithoutSemicolonThrowsException() {
+        // 9
+        testProgramParsesWithException(new IntLiteralToken("9"));
     }
 
     @Test
