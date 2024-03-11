@@ -288,25 +288,6 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseEqualityStatement() {
-        // isTrue = (count == 6);
-        Token[] input = toArray(
-            new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
-            new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
-            new RightParenToken(), new SemicolonToken()
-        );
-
-        Expression intLiteral6 = new IntLiteralExp(6);
-        Expression varCount = new VariableExp("count");
-        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
-        Expression parenExp = new ParenExp(binOpDoubleEquals);
-        Variable varIsTrue = new Variable("isTrue");
-        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
-
-        testStatementMatchesExpected(assign, input);
-    }
-
-    @Test
     public void testParseEmptyStatementBlock() {
         // {}
         Token[] input = toArray(new LeftBraceToken(), new RightBraceToken());
@@ -330,6 +311,32 @@ public class ParserTest {
                 new VardecStmt(new IntType(), new Variable("variableName"), new IntLiteralExp(6)))
         );
         testStatementMatchesExpected(stmtBlock, input);
+    }
+
+    @Test
+    public void testExpressionStatement() {
+        // 3;
+        ExpressionStmt expressionStmt = new ExpressionStmt(new IntLiteralExp(3));
+        testStatementMatchesExpected(expressionStmt, new IntLiteralToken("3"), new SemicolonToken());
+    }
+
+    @Test
+    public void testParseEqualityStatement() {
+        // isTrue = (count == 6);
+        Token[] input = toArray(
+                new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
+                new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
+                new RightParenToken(), new SemicolonToken()
+        );
+
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression varCount = new VariableExp("count");
+        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
+        Expression parenExp = new ParenExp(binOpDoubleEquals);
+        Variable varIsTrue = new Variable("isTrue");
+        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
+
+        testStatementMatchesExpected(assign, input);
     }
 
     @Test
@@ -643,6 +650,12 @@ public class ParserTest {
     public void testStatementBlockWithoutClosingBraceThrowsException() {
         // {
         testProgramParsesWithException(new LeftBraceToken());
+    }
+
+    @Test
+    public void testExpressionStatementWithoutSemicolonThrowsException() {
+        // 9
+        testProgramParsesWithException(new IntLiteralToken("9"));
     }
 
     @Test

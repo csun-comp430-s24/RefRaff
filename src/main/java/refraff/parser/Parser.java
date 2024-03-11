@@ -322,23 +322,15 @@ public class Parser {
 
     /*
     stmt ::= type var `=` exp `;` | 
-         var `=` exp `;` | 
-         `if` `(` exp `)` stmt [`else` stmt] | 
-         `while` `(` exp `)` stmt | 
-         `break` `;` | 
-         `println` `(` exp `)` | 
-         `{` stmt* `}` | 
-         `return` [exp] `;` | 
-         exp `;` 
+             var `=` exp `;` |
+             `if` `(` exp `)` stmt [`else` stmt] |
+             `while` `(` exp `)` stmt |
+             `break` `;` |
+             `println` `(` exp `)` |
+             `{` stmt* `}` |
+             `return` [exp] `;` |
+             exp `;`
     */
-    // But for now, it's just stmt ::= type var '=' exp ';' |
-    //                                 var '=' exp ';' |
-    //                                 `if` `(` exp `)` stmt [`else` stmt] |
-    //                                 `while` `(` exp `)` stmt |
-    //                                 `break` `;` |
-    //                                 `println` `(` exp `)` |
-    //                                 `return` [exp] `;` |
-    //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
         return parseStatement(List.of(
@@ -350,7 +342,8 @@ public class Parser {
                 this::parseBreak,
                 this::parsePrintln,
                 this::parseReturn,
-                this::parseStatementBlock
+                this::parseStatementBlock,
+                this::parseExpressionStatement
         ), position);
     }
 
@@ -463,7 +456,7 @@ public class Parser {
         );
     }
 
-
+    // `if` `(` exp `)` stmt [`else` stmt]
     private Optional<ParseResult<IfElseStmt>> parseIfElse(final int position) throws ParserException {
         if (!isExpectedToken(position, IfToken.class)) {
             return Optional.empty();
@@ -619,6 +612,7 @@ public class Parser {
         return Optional.of(new ParseResult<>(new ReturnStmt(returnValue), currentPosition));
     }
 
+    // `{` stmt* `}`
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
         if (!isExpectedToken(position, LeftBraceToken.class)) {
             return Optional.empty();
@@ -636,6 +630,27 @@ public class Parser {
         return Optional.of(new ParseResult<>(new StmtBlock(blockBody), currentPosition));
     }
 
+    // exp `;`
+    private Optional<ParseResult<ExpressionStmt>> parseExpressionStatement(final int position) throws ParserException {
+        Expression expression;
+        int currentPosition;
+
+        try {
+            Optional<ParseResult<Expression>> optionalParsedExpression = parseExp(position);
+            ParseResult<Expression> parsedExpression = optionalParsedExpression.get();
+
+            expression = parsedExpression.result;
+            currentPosition = parsedExpression.nextPosition;
+        } catch (ParserException ex) {
+            // If we don't have an expression that we parsed, this is okay - we might not need to parse a statement
+            return Optional.empty();
+        }
+
+        throwParserExceptionOnNoSemicolon("expression statement", currentPosition);
+        currentPosition += 1;
+
+        return Optional.of(new ParseResult<>(new ExpressionStmt(expression), currentPosition));
+    }
 
     private final static Map<Token, OperatorEnum> TOKEN_TO_OP = Map.ofEntries(
         new SimpleImmutableEntry<>(new OrToken(), OperatorEnum.OR),
