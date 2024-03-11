@@ -1,7 +1,8 @@
-package refraff.parser;
+package refraff.parser.struct;
 
 import java.util.List;
 
+import refraff.parser.AbstractSyntaxTreeNode;
 import refraff.parser.type.StructName;
 
 public class StructDef extends AbstractSyntaxTreeNode {
@@ -23,6 +24,14 @@ public class StructDef extends AbstractSyntaxTreeNode {
     @Override
     public String getNodeTypeDescriptor() {
         return TYPE_DESCRIPTOR;
+    }
+
+    public StructName getStructName() {
+        return structName;
+    }
+
+    public List<Param> getParams() {
+        return params;
     }
 
 }

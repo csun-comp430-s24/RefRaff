@@ -1,8 +1,8 @@
 package refraff.parser.function;
 
 import refraff.parser.AbstractSyntaxTreeNode;
-import refraff.parser.Param;
 import refraff.parser.statement.StmtBlock;
+import refraff.parser.struct.Param;
 import refraff.parser.type.Type;
 
 import java.util.List;

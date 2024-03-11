@@ -1,6 +1,7 @@
-package refraff.parser.expression;
+package refraff.parser.expression.primaryExpression;
 
-public class BoolLiteralExp extends Expression {
+
+public class BoolLiteralExp extends PrimaryExpression {
 
     private final boolean value;
 

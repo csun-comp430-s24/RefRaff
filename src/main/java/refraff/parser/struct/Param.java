@@ -1,6 +1,7 @@
-package refraff.parser;
+package refraff.parser.struct;
 
-import java.util.List;
+import refraff.parser.AbstractSyntaxTreeNode;
+import refraff.parser.Variable;
 import refraff.parser.type.Type;
 
 public class Param extends AbstractSyntaxTreeNode {

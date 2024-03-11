@@ -3,6 +3,7 @@ package refraff.parser;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
@@ -17,6 +18,10 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
+import refraff.parser.struct.Param;
+import refraff.parser.struct.StructDef;
+import refraff.parser.operator.*;
+import refraff.parser.expression.primaryExpression.*;
 
 
 public class ParserTest {
@@ -83,8 +88,17 @@ public class ParserTest {
 
     @Test
     public void testTypeEquals() {
-        assertEquals(new IntType(),
-                     new IntType());
+        assertEquals(new IntType(), new IntType());
+    }
+
+    @Test // For coverage, honestly
+    public void testVariableEquals() {
+        assertEquals(new Variable("example"), new Variable("example"));
+    }
+
+    @Test // This is also for coverage
+    public void testVariableToStringMatchesExpected() {
+        assertEquals(new Variable("blue").toString(), "Variable(blue)");
     }
 
     @Test
@@ -166,7 +180,7 @@ public class ParserTest {
             new SemicolonToken()
         };
         final Parser parser = new Parser(input);
-        assertEquals(Optional.of(new ParseResult<>(new VardecStmt(
+        assertEquals(Optional.of(new ParseResult<VardecStmt>(new VardecStmt(
                                     new IntType(),
                                     new Variable("variableName"),
                                     new IntLiteralExp(6)
@@ -232,6 +246,25 @@ public class ParserTest {
         IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(3), ifBody, elseBody);
 
         testStatementMatchesExpected(ifElseStmt, input);
+    }
+
+    @Test
+    public void testParseEqualityStatement() {
+        // isTrue = (count == 6);
+        Token[] input = toArray(
+            new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
+            new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
+            new RightParenToken(), new SemicolonToken()
+        );
+
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression varCount = new VariableExp("count");
+        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
+        Expression parenExp = new ParenExp(binOpDoubleEquals);
+        Variable varIsTrue = new Variable("isTrue");
+        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
+
+        testStatementMatchesExpected(assign, input);
     }
 
     @Test
@@ -309,91 +342,107 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
-    // @Test
-    // public void testProgramWithPlusOpExpression() throws ParserException {
-    //     // retval = retval + 1;
-    //     final Token[] input = new Token[] {
-    //             new IdentifierToken("retval"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("retval"),
-    //             new PlusToken(),
-    //             new IntLiteralToken("1"),
-    //             new SemicolonToken()
-    //     };
-    //     final Parser parser = new Parser(input);
-    //     final List<StructDef> structDefs = new ArrayList<>();
-    //     final List<Statement> statements = new ArrayList<>();
+    @Test
+    public void testProgramWithDotOpExpression() throws ParserException {
+        // retval = example.result;
+        final Token[] input = new Token[] {
+                new IdentifierToken("retval"),
+                new AssignmentToken(),
+                new IdentifierToken("example"),
+                new DotToken(),
+                new IdentifierToken("result"),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
 
-    //     BinaryOpExp addExp = new BinaryOpExp(new VariableExp("retval"), new PlusOp(), new IntLiteralExp(1));
+        DotExp dotExp = new DotExp(new VariableExp("example"), new Variable("result"));
 
-    //     statements.add(new AssignStmt(
-    //             new Variable("retval"),
-    //             addExp)
-    //     );
+        statements.add(new AssignStmt(
+                new Variable("retval"),
+                dotExp));
 
-    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 6),
-    //             parser.parseProgram(0));
-    // }
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+                parser.parseProgram(0));
+    }
 
-    // @Test
-    // public void testProgramWithDotOpExpression() throws ParserException {
-    //     // list = list.rest;
-    // }
+    @Test
+    public void testProgramWithMultOpExpression() throws ParserException {
+        // retval = retval * 2;
+        final Token[] input = new Token[] {
+                new IdentifierToken("retval"),
+                new AssignmentToken(),
+                new IdentifierToken("retval"),
+                new MultiplyToken(),
+                new IntLiteralToken("2"),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
 
-    // @Test
-    // public void testParseProgramWithWhileLoop() throws ParserException {
-    //     /*
-    //      *   while (list != null) {
-    //      *     retval = retval + 1;
-    //      *     list = list.rest;
-    //      *   }
-    //      */
-    //     final Token[] input = new Token[] {
-    //             new WhileToken(),
-    //             new LeftParenToken(),
-    //             new IdentifierToken("list"),
-    //             new NotEqualsToken(),
-    //             new NullToken(),
-    //             new LeftBraceToken(),
-    //             new IdentifierToken("retval"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("retval"),
-    //             new PlusToken(),
-    //             new IntLiteralToken("1"),
-    //             new SemicolonToken(),
-    //             new IdentifierToken("list"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("list"),
-    //             new DotToken(),
-    //             new IdentifierToken("rest"),
-    //             new SemicolonToken(),
-    //             new RightBraceToken()
-    //     };
-    //     final Parser parser = new Parser(input);
+        Expression leftExp = new VariableExp("retval");
+        Expression rightExp = new IntLiteralExp(2);
 
-    //     final List<Param> params = new ArrayList<>();
+        BinaryOpExp multExp = new BinaryOpExp(leftExp, OperatorEnum.MULTIPLY, rightExp);
 
-    //     params.add(new Param(
-    //             new IntType(),
-    //             new Variable("value")));
+        statements.add(new AssignStmt(
+                new Variable("retval"),
+                multExp)
+        );
 
-    //     params.add(new Param(
-    //             new StructName(new Variable("Node")),
-    //             new Variable("rest")));
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+                parser.parseProgram(0));
+    }
 
-    //     final List<StructDef> structDefs = new ArrayList<>();
+    @Test
+    public void testParseProgramWithDifferentOperatorPrecedence() {
+        /*
+         * bool result = (!isTrue && (4 + 3 * 7 >= count - otherCount.value / 5)) || false;
+         */
 
-    //     structDefs.add(new StructDef(
-    //             new StructName(new Variable("Node")),
-    //             params));
 
-    //     final List<Statement> statements = new ArrayList<>();
+        Token[] input = toArray(
+            new BoolToken(), new IdentifierToken("result"), new AssignmentToken(),
+            new LeftParenToken(), new NotToken(), new IdentifierToken("isTrue"), new AndToken(), new LeftParenToken(),
+            new IntLiteralToken("4"), new PlusToken(), new IntLiteralToken("3"), new MultiplyToken(), new IntLiteralToken("7"),
+            new GreaterThanEqualsToken(), new IdentifierToken("count"), new MinusToken(), new IdentifierToken("otherCount"),
+            new DotToken(), new IdentifierToken("value"), new DivisionToken(), new IntLiteralToken("5"), new RightParenToken(),
+            new RightParenToken(), new OrToken(), new FalseToken(), new SemicolonToken()
+        );
 
-    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
-    //             parser.parseProgram(0));
-    // }
+        Expression varExpOtherCount = new VariableExp("otherCount");
+        Variable varValue = new Variable("value");
+        DotExp dotExp = new DotExp(varExpOtherCount, varValue);
+        Expression intLiteral5 = new IntLiteralExp(5);
+        Expression binOpDivide = new BinaryOpExp(dotExp, OperatorEnum.DIVISION, intLiteral5);
+        Expression varExpCount = new VariableExp("count");
+        Expression binOpMinus = new BinaryOpExp(varExpCount, OperatorEnum.MINUS, binOpDivide);
 
-    // Test invalid inputs
+        Expression intLiteral3 = new IntLiteralExp(3);
+        Expression intLiteral7 = new IntLiteralExp(7);
+        Expression binOpMult = new BinaryOpExp(intLiteral3, OperatorEnum.MULTIPLY, intLiteral7);
+        Expression intLiteral4 = new IntLiteralExp(4);
+        Expression binOpAdd = new BinaryOpExp(intLiteral4, OperatorEnum.PLUS, binOpMult);
+
+        Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, binOpMinus);
+        Expression parenGteExp = new ParenExp(binOpGte);
+        Expression varIsTrue = new VariableExp("isTrue");
+        Expression notOpExp = new UnaryOpExp(OperatorEnum.NOT, varIsTrue);
+
+        Expression andExp = new BinaryOpExp(notOpExp, OperatorEnum.AND, parenGteExp);
+        Expression falseExp = new BoolLiteralExp(false);
+        Expression parenAndExp = new ParenExp(andExp);
+        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, falseExp);
+
+        Statement statement = new VardecStmt(new BoolType(), new Variable("result"), orExp);
+
+        testStatementMatchesExpected(statement, input);
+    }
+
 
     private void testProgramParsesWithException(Token... tokens) {
         assertThrows(ParserException.class, () -> parseProgram(tokens));
@@ -482,6 +531,53 @@ public class ParserTest {
         testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
                 new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken(), new ElseToken());
 
+    }
+
+    @Test
+    public void testExtraTokenThrowsException() {
+        // var = newVar; int
+        testProgramParsesWithException(
+            new IdentifierToken("var"), new AssignmentToken(), new IdentifierToken("newVar"),
+            new SemicolonToken(), new IntToken()
+        );
+    }
+
+    @Test
+    public void testNoStructNameThrowsException() {
+        // struct = {};
+        testProgramParsesWithException(
+            new StructToken(), new AssignmentToken(), new LeftBraceToken(),
+            new RightBraceToken(), new SemicolonToken()
+        );
+    }
+
+    @Test
+    public void testNoVardecVariableNameThrowsException() {
+        // int = 6;
+        testProgramParsesWithException(
+                new IntToken(), new AssignmentToken(), new IntLiteralToken("6"), new SemicolonToken());
+    }
+
+    @Test // For coverage
+    public void testDifferentParseResultDoesNotEquals() {
+        assertNotEquals(
+            new ParseResult<StructDef>(
+                new StructDef(
+                    new StructName("struct1"),
+                    new ArrayList<Param>() {{
+                        add(new Param(new IntType(), new Variable("var")));
+                    }}
+                ), 7
+            ),
+            new ParseResult<StructDef>(
+                new StructDef(
+                    new StructName("struct2"),
+                    new ArrayList<>() {{
+                        add(new Param(new IntType(), new Variable("var")));
+                    }}
+                ), 7
+            )
+        );
     }
 
 }
