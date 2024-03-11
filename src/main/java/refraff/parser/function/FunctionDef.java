@@ -2,7 +2,7 @@ package refraff.parser.function;
 
 import refraff.parser.AbstractSyntaxTreeNode;
 import refraff.parser.statement.StmtBlock;
-import refraff.parser.structure.Param;
+import refraff.parser.struct.Param;
 import refraff.parser.type.Type;
 
 import java.util.List;

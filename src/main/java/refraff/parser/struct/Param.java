@@ -1,4 +1,4 @@
-package refraff.parser.structure;
+package refraff.parser.struct;
 
 import refraff.parser.AbstractSyntaxTreeNode;
 import refraff.parser.Variable;

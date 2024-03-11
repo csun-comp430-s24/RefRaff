@@ -7,10 +7,10 @@ import java.util.AbstractMap.SimpleImmutableEntry;
 
 import refraff.parser.function.*;
 import refraff.parser.statement.*;
+import refraff.parser.struct.*;
 import refraff.parser.type.*;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
-import refraff.parser.structure.*;
 import refraff.parser.expression.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.reserved.*;
@@ -96,7 +96,7 @@ public class Parser {
         currentPosition = parseZeroOrMore(this::parseStructDef, structDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
-        System.out.println("pause here, look at statements");
+        
         return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
     }
 

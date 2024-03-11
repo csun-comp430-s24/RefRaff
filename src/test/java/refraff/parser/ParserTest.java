@@ -3,6 +3,7 @@ package refraff.parser;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
@@ -17,8 +18,8 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
-import refraff.parser.structure.Param;
-import refraff.parser.structure.StructDef;
+import refraff.parser.struct.Param;
+import refraff.parser.struct.StructDef;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
 
@@ -87,8 +88,17 @@ public class ParserTest {
 
     @Test
     public void testTypeEquals() {
-        assertEquals(new IntType(),
-                     new IntType());
+        assertEquals(new IntType(), new IntType());
+    }
+
+    @Test // For coverage, honestly
+    public void testVariableEquals() {
+        assertEquals(new Variable("example"), new Variable("example"));
+    }
+
+    @Test // This is also for coverage
+    public void testVariableToStringMatchesExpected() {
+        assertEquals(new Variable("blue").toString(), "Variable(blue)");
     }
 
     @Test
@@ -546,6 +556,28 @@ public class ParserTest {
         // int = 6;
         testProgramParsesWithException(
                 new IntToken(), new AssignmentToken(), new IntLiteralToken("6"), new SemicolonToken());
+    }
+
+    @Test // For coverage
+    public void testDifferentParseResultDoesNotEquals() {
+        assertNotEquals(
+            new ParseResult<StructDef>(
+                new StructDef(
+                    new StructName("struct1"),
+                    new ArrayList<Param>() {{
+                        add(new Param(new IntType(), new Variable("var")));
+                    }}
+                ), 7
+            ),
+            new ParseResult<StructDef>(
+                new StructDef(
+                    new StructName("struct2"),
+                    new ArrayList<>() {{
+                        add(new Param(new IntType(), new Variable("var")));
+                    }}
+                ), 7
+            )
+        );
     }
 
 }
