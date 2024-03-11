@@ -339,37 +339,80 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
-    // @Test
-    // public void testProgramWithMultOpExpression() throws ParserException {
-    //     // retval = retval * 2;
-    //     final Token[] input = new Token[] {
-    //             new IdentifierToken("retval"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("retval"),
-    //             new MultiplyToken(),
-    //             new IntLiteralToken("2"),
-    //             new SemicolonToken()
-    //     };
-    //     final Parser parser = new Parser(input);
-    //     final List<StructDef> structDefs = new ArrayList<>();
-    //     final List<FunctionDef> functionDefs = new ArrayList<>();
-    //     final List<Statement> statements = new ArrayList<>();
+    @Test
+    public void testProgramWithMultOpExpression() throws ParserException {
+        // retval = retval * 2;
+        final Token[] input = new Token[] {
+                new IdentifierToken("retval"),
+                new AssignmentToken(),
+                new IdentifierToken("retval"),
+                new MultiplyToken(),
+                new IntLiteralToken("2"),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
 
-    //     BinaryOpExp multExp = new BinaryOpExp(new VariableExp("retval"), new MultiplyOp(), new IntLiteralExp(1));
+        Expression leftExp = new VariableExp("retval");
+        Expression rightExp = new IntLiteralExp(2);
 
-    //     statements.add(new AssignStmt(
-    //             new Variable("retval"),
-    //             multExp)
-    //     );
+        BinaryOpExp multExp = new BinaryOpExp(leftExp, OperatorEnum.MULTIPLY, rightExp);
 
-    //     assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
-    //             parser.parseProgram(0));
-    // }
+        statements.add(new AssignStmt(
+                new Variable("retval"),
+                multExp)
+        );
 
-    // @Test
-    // public void testProgramWithDotOpExpression() throws ParserException {
-    //     // list = list.rest;
-    // }
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+                parser.parseProgram(0));
+    }
+
+    @Test
+    public void testParseProgramWithDifferentOperatorPrecedence() {
+        /*
+         * bool result = (!isTrue && (4 + 3 * 7 >= count - otherCount.value / 5)) || false;
+         */
+
+
+        Token[] input = toArray(
+            new BoolToken(), new IdentifierToken("result"), new AssignmentToken(),
+            new LeftParenToken(), new NotToken(), new IdentifierToken("isTrue"), new AndToken(), new LeftParenToken(),
+            new IntLiteralToken("4"), new PlusToken(), new IntLiteralToken("3"), new MultiplyToken(), new IntLiteralToken("7"),
+            new GreaterThanEqualsToken(), new IdentifierToken("count"), new MinusToken(), new IdentifierToken("otherCount"),
+            new DotToken(), new IdentifierToken("value"), new DivisionToken(), new IntLiteralToken("5"), new RightParenToken(),
+            new RightParenToken(), new OrToken(), new FalseToken(), new SemicolonToken()
+        );
+
+        Expression varExpOtherCount = new VariableExp("otherCount");
+        Variable varValue = new Variable("value");
+        DotExp dotExp = new DotExp(varExpOtherCount, varValue);
+        Expression intLiteral5 = new IntLiteralExp(5);
+        Expression binOpDivide = new BinaryOpExp(dotExp, OperatorEnum.DIVISION, intLiteral5);
+        Expression varExpCount = new VariableExp("count");
+        Expression binOpMinus = new BinaryOpExp(varExpCount, OperatorEnum.MINUS, binOpDivide);
+
+        Expression intLiteral3 = new IntLiteralExp(3);
+        Expression intLiteral7 = new IntLiteralExp(7);
+        Expression binOpMult = new BinaryOpExp(intLiteral3, OperatorEnum.MULTIPLY, intLiteral7);
+        Expression intLiteral4 = new IntLiteralExp(4);
+        Expression binOpAdd = new BinaryOpExp(intLiteral4, OperatorEnum.PLUS, binOpMult);
+
+        Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, binOpMinus);
+        Expression parenGteExp = new ParenExp(binOpGte);
+        Expression varIsTrue = new VariableExp("isTrue");
+        Expression notOpExp = new UnaryOpExp(OperatorEnum.NOT, varIsTrue);
+
+        Expression andExp = new BinaryOpExp(notOpExp, OperatorEnum.AND, parenGteExp);
+        Expression falseExp = new BoolLiteralExp(false);
+        Expression parenAndExp = new ParenExp(andExp);
+        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, falseExp);
+
+        Statement statement = new VardecStmt(new BoolType(), new Variable("result"), orExp);
+
+        testStatementMatchesExpected(statement, input);
+    }
 
     // @Test
     // public void testParseProgramWithWhileLoop() throws ParserException {

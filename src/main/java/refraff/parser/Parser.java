@@ -584,14 +584,16 @@ public class Parser {
         currentPosition = returnValue.get().nextPosition;
 
         // While there are more expressions to parse
-        while (isExpectedToken(currentPosition, AndToken.class)) {
-            // Skip and token
+        while (isExpectedToken(currentPosition, AndToken.class)
+               || isExpectedToken(currentPosition, OrToken.class)) {
+            // Get the operator
+            OperatorEnum op = TOKEN_TO_OP.get(getToken(currentPosition).get());
             currentPosition += 1;
             // Try to parse an equals expression
             Optional<ParseResult<Expression>> rightEqualsExp = parseEqualsExp(currentPosition);
             throwParserExceptionOnEmptyOptional("equals expression", rightEqualsExp, "an expression", currentPosition);
             // Create binary operator, wrap in expression parse result
-            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, OperatorEnum.AND, rightEqualsExp.get().result);
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightEqualsExp.get().result);
             returnValue = Optional.of(new ParseResult<Expression>(binOpExp, rightEqualsExp.get().nextPosition));
             currentPosition = returnValue.get().nextPosition;
         }
@@ -779,7 +781,7 @@ public class Parser {
         if (!TOKEN_TO_PRIMARY.containsKey(tokenClass)) {
             int currentPosition = position;
             // Try to parse parenthesitized expression (this is our only option, now)
-            String parenExpString = "primary parenthesitized exression";
+            String parenExpString = "primary parenthesitized expression";
             // There should be a left paren here
             throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
             currentPosition += 1;
@@ -787,9 +789,10 @@ public class Parser {
             // Try to parse expression
             Optional<ParseResult<Expression>> optionalExpression = parseExp(currentPosition);
             throwParserExceptionOnEmptyOptional("if expression", optionalExpression, "an expression", currentPosition);
+            currentPosition = optionalExpression.get().nextPosition;
 
             // Make sure there's a right paren here
-            throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
+            throwParserExceptionOnUnexpected(parenExpString, RightParenToken.class, "right paren )", currentPosition);
             currentPosition += 1;
 
             // Return the Expression
