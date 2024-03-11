@@ -275,6 +275,19 @@ public class ParserTest {
     }
 
     @Test
+    public void testReturnStatementWithoutReturnValue() {
+        // return;
+        testStatementMatchesExpected(new ReturnStmt(), new ReturnToken(), new SemicolonToken());
+    }
+
+    @Test
+    public void testReturnStatementWithReturnValue() {
+        // return false;
+        ReturnStmt returnStmt = new ReturnStmt(new BoolLiteralExp(false));
+        testStatementMatchesExpected(returnStmt, new ReturnToken(), new FalseToken(), new SemicolonToken());
+    }
+
+    @Test
     public void testParseEqualityStatement() {
         // isTrue = (count == 6);
         Token[] input = toArray(
@@ -612,6 +625,24 @@ public class ParserTest {
         // println(x)
         testProgramParsesWithException(new PrintlnToken(), new LeftParenToken(), new IdentifierToken("x"),
                 new RightParenToken());
+    }
+
+    @Test
+    public void testReturnNoSemicolonThrowsException() {
+        // return
+        testProgramParsesWithException(new ReturnToken());
+    }
+
+    @Test
+    public void testReturnWithReturnValueNoSemicolonThrowsException() {
+        // return 2
+        testProgramParsesWithException(new ReturnToken(), new IntLiteralToken("2"));
+    }
+
+    @Test
+    public void testStatementBlockWithoutClosingBraceThrowsException() {
+        // {
+        testProgramParsesWithException(new LeftBraceToken());
     }
 
     @Test

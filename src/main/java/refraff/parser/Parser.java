@@ -337,6 +337,7 @@ public class Parser {
     //                                 `while` `(` exp `)` stmt |
     //                                 `break` `;` |
     //                                 `println` `(` exp `)` |
+    //                                 `return` [exp] `;` |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
@@ -348,6 +349,7 @@ public class Parser {
                 this::parseWhile,
                 this::parseBreak,
                 this::parsePrintln,
+                this::parseReturn,
                 this::parseStatementBlock
         ), position);
     }
@@ -525,6 +527,7 @@ public class Parser {
         return new ParseResult<>(expression, currentPosition);
     }
 
+    // `while` `(` exp `)` stmt
     private Optional<ParseResult<WhileStmt>> parseWhile(final int position) throws ParserException {
         if (!isExpectedToken(position, WhileToken.class)) {
             return Optional.empty();
@@ -553,6 +556,7 @@ public class Parser {
         return Optional.of(new ParseResult<>(whileStmt, currentPosition));
     }
 
+    // `break` `;`
     private Optional<ParseResult<BreakStmt>> parseBreak(final int position) throws ParserException {
         if (!isExpectedToken(position, BreakToken.class)) {
             return Optional.empty();
@@ -587,6 +591,32 @@ public class Parser {
         currentPosition += 1;
 
         return Optional.of(new ParseResult<>(new PrintlnStmt(expression), currentPosition));
+    }
+
+    // `return` [exp] `;`
+    private Optional<ParseResult<ReturnStmt>> parseReturn(final int position) throws ParserException {
+        if (!isExpectedToken(position, ReturnToken.class)) {
+            return Optional.empty();
+        }
+
+        // We are now definitely parsing a return statement
+        int currentPosition = position + 1;
+        Expression returnValue = null;
+
+        try {
+            Optional<ParseResult<Expression>> optionalParsedReturnValue = parseExp(currentPosition);
+            ParseResult<Expression> parsedReturnValue = optionalParsedReturnValue.get();
+
+            returnValue = parsedReturnValue.result;
+            currentPosition = parsedReturnValue.nextPosition;
+        } catch (ParserException ex) {
+            // If we have a parser exception, we couldn't parse the exp that was optional (this is okay)
+        }
+
+        throwParserExceptionOnNoSemicolon("return statement", currentPosition);
+        currentPosition += 1;
+
+        return Optional.of(new ParseResult<>(new ReturnStmt(returnValue), currentPosition));
     }
 
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
@@ -859,6 +889,8 @@ public class Parser {
         Class<? extends Token> tokenClass = token.getClass();
 
         if (!TOKEN_TO_PRIMARY.containsKey(tokenClass)) {
+            // Missing function calls, allocating new struct
+
             int currentPosition = position;
             // Try to parse parenthesitized expression (this is our only option, now)
             String parenExpString = "primary parenthesitized expression";
