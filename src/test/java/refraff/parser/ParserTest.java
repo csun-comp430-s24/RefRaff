@@ -259,6 +259,12 @@ public class ParserTest {
     }
 
     @Test
+    public void testBreakStatement() {
+        // break;
+        testStatementMatchesExpected(new BreakStmt(), new BreakToken(), new SemicolonToken());
+    }
+
+    @Test
     public void testParseEqualityStatement() {
         // isTrue = (count == 6);
         Token[] input = toArray(
@@ -565,6 +571,12 @@ public class ParserTest {
     public void testWhileWithNoBodyThrowsException() {
         // while (true)
         testProgramParsesWithException(new WhileToken(), new LeftParenToken(), new TrueToken(), new RightParenToken());
+    }
+
+    @Test
+    public void testBreakWithNoSemicolonThrowsException() {
+        // break
+        testProgramParsesWithException(new BreakToken());
     }
 
     @Test

@@ -335,6 +335,7 @@ public class Parser {
     //                                 var '=' exp ';' |
     //                                 `if` `(` exp `)` stmt [`else` stmt] |
     //                                 `while` `(` exp `)` stmt |
+    //                                 `break` `;` |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
@@ -344,6 +345,7 @@ public class Parser {
                 this::parseVardec,
                 this::parseIfElse,
                 this::parseWhile,
+                this::parseBreak,
                 this::parseStatementBlock
         ), position);
     }
@@ -544,6 +546,20 @@ public class Parser {
 
         WhileStmt whileStmt = new WhileStmt(condition, body);
         return Optional.of(new ParseResult<>(whileStmt, currentPosition));
+    }
+
+    private Optional<ParseResult<BreakStmt>> parseBreak(final int position) throws ParserException {
+        if (!isExpectedToken(position, BreakToken.class)) {
+            return Optional.empty();
+        }
+
+        // We are definitely parsing a break statement
+        int currentPosition = position + 1;
+
+        throwParserExceptionOnNoSemicolon("break statement", currentPosition);
+        currentPosition += 1;
+
+        return Optional.of(new ParseResult<>(new BreakStmt(), currentPosition));
     }
 
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
