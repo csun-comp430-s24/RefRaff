@@ -239,6 +239,25 @@ public class ParserTest {
     }
 
     @Test
+    public void testParseEqualityStatement() {
+        // isTrue = (count == 6);
+        Token[] input = toArray(
+            new IdentifierToken("isTrue"), new AssignmentToken(), new LeftParenToken(),
+            new IdentifierToken("count"), new DoubleEqualsToken(), new IntLiteralToken("6"),
+            new RightParenToken(), new SemicolonToken()
+        );
+
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression varCount = new VariableExp("count");
+        Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
+        Expression parenExp = new ParenExp(binOpDoubleEquals);
+        Variable varIsTrue = new Variable("isTrue");
+        AssignStmt assign = new AssignStmt(varIsTrue, parenExp);
+
+        testStatementMatchesExpected(assign, input);
+    }
+
+    @Test
     public void testParseEmptyStatementBlock() {
         // {}
         Token[] input = toArray(new LeftBraceToken(), new RightBraceToken());
@@ -414,60 +433,6 @@ public class ParserTest {
         testStatementMatchesExpected(statement, input);
     }
 
-    // @Test
-    // public void testParseProgramWithWhileLoop() throws ParserException {
-    //     /*
-    //      *   while (list != null) {
-    //      *     retval = retval + 1;
-    //      *     list = list.rest;
-    //      *   }
-    //      */
-    //     final Token[] input = new Token[] {
-    //             new WhileToken(),
-    //             new LeftParenToken(),
-    //             new IdentifierToken("list"),
-    //             new NotEqualsToken(),
-    //             new NullToken(),
-    //             new LeftBraceToken(),
-    //             new IdentifierToken("retval"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("retval"),
-    //             new PlusToken(),
-    //             new IntLiteralToken("1"),
-    //             new SemicolonToken(),
-    //             new IdentifierToken("list"),
-    //             new AssignmentToken(),
-    //             new IdentifierToken("list"),
-    //             new DotToken(),
-    //             new IdentifierToken("rest"),
-    //             new SemicolonToken(),
-    //             new RightBraceToken()
-    //     };
-    //     final Parser parser = new Parser(input);
-
-    //     final List<Param> params = new ArrayList<>();
-
-    //     params.add(new Param(
-    //             new IntType(),
-    //             new Variable("value")));
-
-    //     params.add(new Param(
-    //             new StructName(new Variable("Node")),
-    //             new Variable("rest")));
-
-    //     final List<StructDef> structDefs = new ArrayList<>();
-
-    //     structDefs.add(new StructDef(
-    //             new StructName(new Variable("Node")),
-    //             params));
-
-    //     final List<Statement> statements = new ArrayList<>();
-
-    //     assertEquals(new ParseResult<>(new Program(structDefs, statements), 10),
-    //             parser.parseProgram(0));
-    // }
-
-    // Test invalid inputs
 
     private void testProgramParsesWithException(Token... tokens) {
         assertThrows(ParserException.class, () -> parseProgram(tokens));
@@ -556,6 +521,31 @@ public class ParserTest {
         testProgramParsesWithException(new IfToken(), new LeftParenToken(), new IntLiteralToken("3"), new RightParenToken(),
                 new IdentifierToken("x"), new AssignmentToken(), new FalseToken(), new SemicolonToken(), new ElseToken());
 
+    }
+
+    @Test
+    public void testExtraTokenThrowsException() {
+        // var = newVar; int
+        testProgramParsesWithException(
+            new IdentifierToken("var"), new AssignmentToken(), new IdentifierToken("newVar"),
+            new SemicolonToken(), new IntToken()
+        );
+    }
+
+    @Test
+    public void testNoStructNameThrowsException() {
+        // struct = {};
+        testProgramParsesWithException(
+            new StructToken(), new AssignmentToken(), new LeftBraceToken(),
+            new RightBraceToken(), new SemicolonToken()
+        );
+    }
+
+    @Test
+    public void testNoVardecVariableNameThrowsException() {
+        // int = 6;
+        testProgramParsesWithException(
+                new IntToken(), new AssignmentToken(), new IntLiteralToken("6"), new SemicolonToken());
     }
 
 }

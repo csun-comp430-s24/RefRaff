@@ -1,7 +1,6 @@
 package refraff.parser;
 
 import java.util.*;
-import java.util.function.BinaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.AbstractMap.SimpleImmutableEntry;
@@ -97,7 +96,7 @@ public class Parser {
         currentPosition = parseZeroOrMore(this::parseStructDef, structDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
-
+        System.out.println("pause here, look at statements");
         return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
     }
 
@@ -796,36 +795,12 @@ public class Parser {
             currentPosition += 1;
 
             // Return the Expression
-            return Optional.of(new ParseResult<Expression>(optionalExpression.get().result, currentPosition));
+            Expression parenExp = new ParenExp(optionalExpression.get().result);
+            return Optional.of(new ParseResult<Expression>(parenExp, currentPosition));
         }
 
         Expression exp = TOKEN_TO_PRIMARY.get(tokenClass).apply(token);
         return Optional.of(new ParseResult<>(exp, position + 1));
-    }
-
-
-    // Maybe worthwhile to have Operator be an enum in this case, instead of a ton of classes
-    // private static final Map<Class<? extends Token>, OpEnum>
-
-
-    // Try to parse an operators
-    public Optional<ParseResult<Operator>> parseOp(final int position) throws ParserException {
-        // Get the token
-        final Optional<Token> maybeToken = getToken(position);
-        if (maybeToken.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Token token = maybeToken.get();
-        // Check against operators - there must be a better way!
-        // Suggested way in comments above function definition
-        if (token instanceof PlusToken) {
-            return Optional.of(new ParseResult<>(new PlusOp(), position + 1));
-        } else if (token instanceof MinusToken) {
-            return Optional.of(new ParseResult<>(new PlusOp(), position + 1));
-        } else {
-            return Optional.empty();
-        }
     }
 
 
