@@ -6,6 +6,7 @@ import org.junit.jupiter.api.TestFactory;
 
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
+import refraff.util.ResourceUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
