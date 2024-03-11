@@ -336,6 +336,7 @@ public class Parser {
     //                                 `if` `(` exp `)` stmt [`else` stmt] |
     //                                 `while` `(` exp `)` stmt |
     //                                 `break` `;` |
+    //                                 `println` `(` exp `)` |
     //                                 `{` stmt* `}`
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
@@ -346,6 +347,7 @@ public class Parser {
                 this::parseIfElse,
                 this::parseWhile,
                 this::parseBreak,
+                this::parsePrintln,
                 this::parseStatementBlock
         ), position);
     }
@@ -469,20 +471,12 @@ public class Parser {
         final String ifStatement = "if statement";
         int currentPosition = position + 1;
 
-        throwParserExceptionOnUnexpected(ifStatement, LeftParenToken.class, "(", currentPosition);
-        currentPosition += 1;
-
-        Optional<ParseResult<Expression>> optionalConditionExpression = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("if statement condition", optionalConditionExpression, "a valid expression",
+        // Parse the if statement condition
+        ParseResult<Expression> parsedCondition = parseExpWithParensAroundItOrThrow(ifStatement + " condition",
                 currentPosition);
-
-        ParseResult<Expression> parsedCondition = optionalConditionExpression.get();
 
         Expression condition = parsedCondition.result;
         currentPosition = parsedCondition.nextPosition;
-
-        throwParserExceptionOnUnexpected(ifStatement, RightParenToken.class, ")", currentPosition);
-        currentPosition += 1;
 
         Optional<ParseResult<Statement>> optionalIfBody = parseStatement(currentPosition);
         throwParserExceptionOnEmptyOptional("if statement body", optionalIfBody, "a statement", currentPosition);
@@ -511,6 +505,26 @@ public class Parser {
         return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
     }
 
+    // Parses `(` exp `)` in the context of a statement: so this is NOT a paren expression
+    private ParseResult<Expression> parseExpWithParensAroundItOrThrow(final String where,
+                                                                      final int position) throws ParserException {
+        throwParserExceptionOnUnexpected(where, LeftParenToken.class, "(", position);
+        int currentPosition = position + 1;
+
+        Optional<ParseResult<Expression>> optionalParsedExpression = parseExp(currentPosition);
+        throwParserExceptionOnEmptyOptional(where, optionalParsedExpression, "an expression", currentPosition);
+
+        ParseResult<Expression> parsedExpressionResult = optionalParsedExpression.get();
+
+        Expression expression = parsedExpressionResult.result;
+        currentPosition = parsedExpressionResult.nextPosition;
+
+        throwParserExceptionOnUnexpected(where, RightParenToken.class, ")", currentPosition);
+        currentPosition += 1;
+
+        return new ParseResult<>(expression, currentPosition);
+    }
+
     private Optional<ParseResult<WhileStmt>> parseWhile(final int position) throws ParserException {
         if (!isExpectedToken(position, WhileToken.class)) {
             return Optional.empty();
@@ -520,21 +534,12 @@ public class Parser {
         final String whileStatement = "while statement";
         int currentPosition = position + 1;
 
-        throwParserExceptionOnUnexpected(whileStatement, LeftParenToken.class, "(", currentPosition);
-        currentPosition += 1;
-
-        // Parse the expression
-        Optional<ParseResult<Expression>> optionalParsedCondition = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional(whileStatement + " condition", optionalParsedCondition,
-                "an expression", currentPosition);
-
-        ParseResult<Expression> parsedConditionResult = optionalParsedCondition.get();
+        // Parse the while condition
+        ParseResult<Expression> parsedConditionResult = parseExpWithParensAroundItOrThrow(whileStatement + " condition",
+                currentPosition);
 
         Expression condition = parsedConditionResult.result;
         currentPosition = parsedConditionResult.nextPosition;
-
-        throwParserExceptionOnUnexpected(whileStatement, RightParenToken.class, ")", currentPosition);
-        currentPosition += 1;
 
         Optional<ParseResult<Statement>> optionalParsedBody = parseStatement(currentPosition);
         throwParserExceptionOnEmptyOptional(whileStatement + " body", optionalParsedBody, "a statement", currentPosition);
@@ -560,6 +565,28 @@ public class Parser {
         currentPosition += 1;
 
         return Optional.of(new ParseResult<>(new BreakStmt(), currentPosition));
+    }
+
+    // `println` `(` exp `)` `;`
+    // Grammar was missing semicolon token originally, I think this needs to be added to the grammar
+    private Optional<ParseResult<PrintlnStmt>> parsePrintln(final int position) throws ParserException {
+        if (!isExpectedToken(position, PrintlnToken.class)) {
+            return Optional.empty();
+        }
+
+        int currentPosition = position + 1;
+
+        final String printlnStatement = "println statement";
+        ParseResult<Expression> parsedPrintlnExpression = parseExpWithParensAroundItOrThrow(printlnStatement,
+                currentPosition);
+
+        Expression expression = parsedPrintlnExpression.result;
+        currentPosition = parsedPrintlnExpression.nextPosition;
+
+        throwParserExceptionOnNoSemicolon(printlnStatement, currentPosition);
+        currentPosition += 1;
+
+        return Optional.of(new ParseResult<>(new PrintlnStmt(expression), currentPosition));
     }
 
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
@@ -856,7 +883,6 @@ public class Parser {
         Expression exp = TOKEN_TO_PRIMARY.get(tokenClass).apply(token);
         return Optional.of(new ParseResult<>(exp, position + 1));
     }
-
 
     // Tries to parse variable
     public Optional<ParseResult<Variable>> parseVar(final int position) throws ParserException {

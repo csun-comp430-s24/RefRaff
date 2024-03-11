@@ -265,6 +265,16 @@ public class ParserTest {
     }
 
     @Test
+    public void testPrintlnStatement() {
+        // println(null);
+        Token[] input = toArray(new PrintlnToken(), new LeftParenToken(), new NullToken(), new RightParenToken(),
+                new SemicolonToken());
+
+        PrintlnStmt printlnStmt = new PrintlnStmt(new NullExp());
+        testStatementMatchesExpected(printlnStmt, input);
+    }
+
+    @Test
     public void testParseEqualityStatement() {
         // isTrue = (count == 6);
         Token[] input = toArray(
@@ -577,6 +587,31 @@ public class ParserTest {
     public void testBreakWithNoSemicolonThrowsException() {
         // break
         testProgramParsesWithException(new BreakToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoLeftParenThrowsException() {
+        // println
+        testProgramParsesWithException(new PrintlnToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoExpressionThrowsException() {
+        // println(
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken());
+    }
+
+    @Test
+    public void testPrintlnWithNoRightParenThrowsException() {
+        // println(x
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken(), new IdentifierToken("x"));
+    }
+
+    @Test
+    public void testPrintlnWithNoSemicolonThrowsException() {
+        // println(x)
+        testProgramParsesWithException(new PrintlnToken(), new LeftParenToken(), new IdentifierToken("x"),
+                new RightParenToken());
     }
 
     @Test
