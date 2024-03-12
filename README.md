@@ -93,36 +93,56 @@ program ::= structdef* fdef* stmt*                    // stmt* is the entry poin
 
 ### AST Definition
 
-interface Type
- - IntType
- - BoolType
- - VoidType
- - StructType
- - FuncType
+Node Interface
+- AbstactSyntaxTreeNode Abstract Class
+  - Program Class<br>
 
-interface Stmt
+  *Expressions:*
+  - Expression Abstract Class
+    - BinaryOpExp Class
+    - DotExp Class
+    - UnaryOpExp Class<br>
 
+    *Primary Expressions:*
+      - PrimaryExpression Class
+        - BoolLiteralExp Class
+        - IntLiteralExp Class
+        - NullExp Class
+        - ParenExp Class
+        - VariableExp Class<br>
 
-interface Exp
-  
+  *Functions:*
+  - FuntionDef Class
+  - FunctionName Class (extends Type)<br>
 
-interface Op
- - DotOp
- - NotOp
- - MultiplyOp
- - DivisionOp
- - PlusOp
- - MinusOp
- - LessThanOp
- - LessThanOrEqualsOp
- - GreaterThanOp
- - GreaterThanOrEqualsOp
- - DoubleEqualsOp
- - NotEqualsOp
- - LogicalOrOp
- - LogicalAndOp
+  *Operators:*
+  - OperatorEnum Enum<br>
 
-class Program
+  *Statements:*
+  - Statement Abstract Class
+    - AssignStmt Class
+    - BreakStmt Class
+    - ExpressionStmt Class
+    - IfElseStmt Class
+    - PrintlnStmt Class
+    - ReturnStmt Class
+    - StmtBlock Class
+    - VardecStmt Class
+    - WhileStmt Class<br>
+
+  *Structs:*
+  - Param Class
+  - StructDef Class<br>
+
+  *Types:*
+  - Type Abstract Class
+    - BoolType Class
+    - IntType Class
+    - StructName Class
+    - VoidType Class
+
+Variable Class
+
 
 ## Example Program
 ```
