@@ -709,16 +709,14 @@ public class Parser {
         currentPosition = returnValue.get().nextPosition;
 
         // While there are more expressions to parse
-        while (isExpectedToken(currentPosition, AndToken.class)
-               || isExpectedToken(currentPosition, OrToken.class)) {
+        while (isExpectedToken(currentPosition, AndToken.class)) {
             // Get the operator
-            OperatorEnum op = TOKEN_TO_OP.get(getToken(currentPosition).get());
             currentPosition += 1;
             // Try to parse an equals expression
             Optional<ParseResult<Expression>> rightEqualsExp = parseEqualsExp(currentPosition);
             throwParserExceptionOnEmptyOptional("equals expression", rightEqualsExp, "an expression", currentPosition);
             // Create binary operator, wrap in expression parse result
-            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightEqualsExp.get().result);
+            BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, OperatorEnum.AND, rightEqualsExp.get().result);
             returnValue = Optional.of(new ParseResult<Expression>(binOpExp, rightEqualsExp.get().nextPosition));
             currentPosition = returnValue.get().nextPosition;
         }
@@ -865,7 +863,7 @@ public class Parser {
         // While there are other variables to parse
         while (isExpectedToken(currentPosition, DotToken.class)) {
             currentPosition += 1;
-            // Try to parse a variable - can I just
+            // Try to parse a variable
             Optional<ParseResult<Variable>> variable = parseVar(currentPosition);
             throwParserExceptionOnEmptyOptional("variable", variable, "a variable", currentPosition);
             // Create dot operator, wrap in expression parse result
