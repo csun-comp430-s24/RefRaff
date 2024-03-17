@@ -23,6 +23,11 @@ public class StructType extends Type {
     }
 
     @Override
+    public boolean shouldThrowOnAssignment() {
+        return false;
+    }
+
+    @Override
     public int hashCode() {
         return optionalStructName.hashCode();
     }

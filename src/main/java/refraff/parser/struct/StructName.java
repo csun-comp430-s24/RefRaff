@@ -1,6 +1,5 @@
 package refraff.parser.struct;
 
-
 import refraff.parser.AbstractSyntaxTreeNode;
 
 public class StructName extends AbstractSyntaxTreeNode {
@@ -14,11 +13,6 @@ public class StructName extends AbstractSyntaxTreeNode {
         super(structName);
 
         this.structName = structName;
-    }
-
-    @Override
-    public boolean shouldThrowOnAssignment() {
-        return false;
     }
 
     @Override

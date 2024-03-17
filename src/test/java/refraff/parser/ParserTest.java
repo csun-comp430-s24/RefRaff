@@ -562,7 +562,8 @@ public class ParserTest {
                 paramValue3,
                 paramRest3);
         StructActualParams structActParams3 = new StructActualParams(paramList3);
-        StructAllocExp structAlloc3 = new StructAllocExp(new StructName("Node"), structActParams3);
+        StructType structType3 = new StructType(new StructName("Node"));
+        StructAllocExp structAlloc3 = new StructAllocExp(structType3, structActParams3);
 
         StructActualParam paramRest2 = new StructActualParam(new Variable("rest"), structAlloc3);
         StructActualParam paramValue2 = new StructActualParam(new Variable("value"), new IntLiteralExp(1));
@@ -570,7 +571,8 @@ public class ParserTest {
                 paramValue2,
                 paramRest2);
         StructActualParams structActParams2 = new StructActualParams(paramList2);
-        StructAllocExp structAlloc2 = new StructAllocExp(new StructName("Node"), structActParams2);
+        StructType structType2 = new StructType(new StructName("Node"));
+        StructAllocExp structAlloc2 = new StructAllocExp(structType2, structActParams2);
 
         StructActualParam paramRest1 = new StructActualParam(new Variable("rest"), structAlloc2);
         StructActualParam paramValue1 = new StructActualParam(new Variable("value"), new IntLiteralExp(0));
@@ -579,9 +581,11 @@ public class ParserTest {
             paramRest1
         );
         StructActualParams structActParams1 = new StructActualParams(paramList1);
-        Expression expStructAlloc1 = new StructAllocExp(new StructName("Node"), structActParams1);
+        StructType structType1 = new StructType(new StructName("Node"));
+        Expression expStructAlloc1 = new StructAllocExp(structType1, structActParams1);
 
-        Statement vardecStmt = new VardecStmt(new StructName("Node"), new Variable("list"), expStructAlloc1);
+        StructType structType0 = new StructType(new StructName("Node"));
+        Statement vardecStmt = new VardecStmt(structType0, new Variable("list"), expStructAlloc1);
 
         statements.add(vardecStmt);
 
