@@ -445,11 +445,10 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseProgramWithDifferentOperatorPrecedence() {
+    public void testParseStatementWithDifferentOperatorPrecedence() {
         /*
          * bool result = (!isTrue && (4 + 3 * 7 >= count - otherCount.value / 5)) || false;
          */
-
 
         Token[] input = toArray(
             new BoolToken(), new IdentifierToken("result"), new AssignmentToken(),
@@ -487,6 +486,59 @@ public class ParserTest {
         Statement statement = new VardecStmt(new BoolType(), new Variable("result"), orExp);
 
         testStatementMatchesExpected(statement, input);
+    }
+
+
+    @Test
+    private void testParseProgramWithStructAllocation() throws ParserException {
+        /*
+         * Node list =
+         *   new Node {
+         *     value: 0,
+         *     rest: new Node {
+         *       value: 1,
+         *       rest: new Node {
+         *         value: 2,
+         *         rest: null
+         *       }
+         *     }
+         *   };
+         */
+
+        final Token[] input = new Token[] {
+                new IdentifierToken("Node"), new IdentifierToken("list"), new AssignmentToken(),
+                new NewToken(), new IdentifierToken("Node"), new LeftBraceToken(),
+                new IdentifierToken("value"), new ColonToken(), new IntLiteralToken("0"),
+                new CommaToken(), new IdentifierToken("rest"), new ColonToken(), new NewToken(),
+                new IdentifierToken("Node"), new LeftBraceToken(), new IdentifierToken("value"),
+                new ColonToken(), new IntLiteralToken("1"), new CommaToken(), new IdentifierToken("rest"),
+                new ColonToken(), new NewToken(), new IdentifierToken("Node"), new LeftBraceToken(),
+                new IdentifierToken("value"), new ColonToken(), new IntLiteralToken("2"),
+                new CommaToken(), new IdentifierToken("rest"), new ColonToken(), new NullToken(),
+                new RightBraceToken(), new RightBraceToken(), new RightBraceToken(),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+
+
+
+
+
+        
+
+        Expression expStructAlloc1 = new StructAllocExp(structNameNode2, structActParams1);
+        Variable variableList = new Variable("list");
+        Type structNameNode1 = new StructName("Node");
+        Statement vardecStmt = new VardecStmt(structNameNode1, variableList, expStructAlloc1);
+
+        statements.add(vardecStmt);
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+                parser.parseProgram(0));
     }
 
 

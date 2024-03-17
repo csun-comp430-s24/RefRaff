@@ -7,7 +7,7 @@ import refraff.parser.type.Type;
 public class Param extends AbstractSyntaxTreeNode {
 
     private static final String TYPE = "parameter";
-    private static final String TYPE_DESCRIPTOR = "Parameter";
+    private static final String TYPE_DESCRIPTOR = "parameter";
 
     public final Type type;
     public final Variable variable;

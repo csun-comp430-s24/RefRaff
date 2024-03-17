@@ -58,7 +58,7 @@ stmt ::= type var `=` exp `;` |                       // Variable declaration
          var `=` exp `;` |                            // Assignment
          `if` `(` exp `)` stmt [`else` stmt] |        // if
          `while` `(` exp `)` stmt |                   // while
-         `break` `;` | break
+         `break` `;` |                                // break
          `println` `(` exp `)` `;` |                  // Printing something
          `{` stmt* `}` |                              // Block
          `return` [exp] `;` |                         // Return
