@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import refraff.parser.function.FunctionDef;
 import refraff.parser.function.FunctionName;
+import refraff.parser.struct.StructName;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.*;
@@ -118,7 +119,7 @@ public class ParserTest {
 
     @Test
     public void testParseStructNameType() {
-        testTypeMatchesExpectedResult(new StructName("a"), new IdentifierToken("a"));
+        testTypeMatchesExpectedResult(new StructType(new StructName("a")), new IdentifierToken("a"));
     }
 
     private void testFunctionDef(FunctionName functionName, List<Param> params, Type returnType,
@@ -161,7 +162,7 @@ public class ParserTest {
 
         testFunctionDef(new FunctionName("a"), List.of(
                 new Param(new IntType(), new Variable("b")),
-                new Param(new StructName("custom"), new Variable("c"))
+                new Param(new StructType(new StructName("custom")), new Variable("c"))
         ), new IntType(), new StmtBlock(List.of()), input);
     }
 
@@ -369,7 +370,7 @@ public class ParserTest {
         ));
 
         params.add(new Param(
-            new StructName("Node"),
+            new StructType(new StructName("Node")),
             new Variable("rest")
         ));
 
