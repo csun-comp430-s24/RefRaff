@@ -618,6 +618,42 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+
+    @Test
+    public void testParseProgramWithMultipleArgsFunctionCall() throws ParserException {
+        /*
+         * length(node.next, index, true);
+         */
+
+        final Token[] input = new Token[] {
+                new IdentifierToken("length"), new LeftParenToken(), new IdentifierToken("node"),
+                new DotToken(), new IdentifierToken("next"), new CommaToken(), 
+                new IdentifierToken("index"), new CommaToken(), new TrueToken(), 
+                new RightParenToken(), new SemicolonToken() 
+        };
+
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+
+        BoolLiteralExp boolLitTrue = new BoolLiteralExp(true);
+        VariableExp varExpIndex = new VariableExp("index");
+        DotExp dotExp = new DotExp(new VariableExp("node"), new Variable("next"));
+        List<Expression> argsList = Arrays.asList(dotExp, varExpIndex, boolLitTrue);
+        CommaExp commaExp = new CommaExp(argsList);
+        FunctionName funcNameLength = new FunctionName("length");
+        FuncCallExp funcCallExp = new FuncCallExp(funcNameLength, commaExp);
+        ExpressionStmt expStmt = new ExpressionStmt(funcCallExp);
+
+        statements.add(expStmt);
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.length),
+                parser.parseProgram(0));
+    }
+
+
     private void testProgramParsesWithException(Token... tokens) {
         assertThrows(ParserException.class, () -> parseProgram(tokens));
     }
