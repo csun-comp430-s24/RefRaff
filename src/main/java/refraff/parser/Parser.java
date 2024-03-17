@@ -332,32 +332,54 @@ public class Parser {
         if (optionalVar.isEmpty()) {
             return Optional.empty();
         }
-        ParseResult<Variable> variable = optionalVar.get(); // Should I just get this at the end?
-        currentPosition = variable.nextPosition;
+        currentPosition = optionalVar.get().nextPosition;
 
         // Make sure there's a colon here - throw exceptions from this point?
         throwParserExceptionOnUnexpected("struct actual param", ColonToken.class, "a colon :", currentPosition);
         currentPosition += 1;
 
         // parse expression
-        Optional<ParseResult<Expression>> optionalExpression = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("struct actual param", optionalExpression, "an expression", currentPosition);
+        Optional<ParseResult<Expression>> optionalExp = parseExp(currentPosition);
+        throwParserExceptionOnEmptyOptional("struct actual param", optionalExp, "an expression", currentPosition);
 
         // Create struct actual param and return
-        
+        return Optional.of(
+            new ParseResult<>(
+                new StructActualParam(optionalVar.get().result, optionalExp.get().result), 
+                optionalExp.get().nextPosition
+            )
+        );
     }
 
 
     // struct_actual_params ::= [struct_actual_param (`,` struct_actual_param)*]
-    public <ParseResult<StructActualParams>> parseStructActualParams(final int position) throws ParserException {
+    public ParseResult<StructActualParams> parseStructActualParams(final int position) throws ParserException {
+        final String structParamString = "struct actual params";
+        int currentPosition = position;
         // Create a Struct Actual Param list
-        // Try to parse an actual param
-        // If there is one, add it to the list
-        // While there's a comma next
-            // Parse another param, add it to the param list
-        // Create struct actual params with list and return
-    }
+        List<StructActualParam> listOfActualParams = new ArrayList<>();
 
+        // Try to parse an actual param - there doesn't have to be one, I think
+        Optional<ParseResult<StructActualParam>> optionalStructActParam = parseStructActualParam(currentPosition);
+        if (!optionalStructActParam.isEmpty()) {
+            // If there is one, add it to the list
+            currentPosition = optionalStructActParam.get().nextPosition;
+            listOfActualParams.add(optionalStructActParam.get().result);
+            // While there's a comma next
+            while (isExpectedToken(currentPosition, CommaToken.class)) {
+                // Parse another param, add it to the param list - there has to be one now
+                optionalStructActParam = parseStructActualParam(currentPosition);
+                throwParserExceptionOnEmptyOptional(structParamString, optionalStructActParam, 
+                    "struct actual param", currentPosition);
+                listOfActualParams.add(optionalStructActParam.get().result);
+            }
+        }
+        
+        // Create struct actual params with list and return
+        return new ParseResult<StructActualParams>(
+            new StructActualParams(listOfActualParams), currentPosition
+        );
+    }
 
 
     /*

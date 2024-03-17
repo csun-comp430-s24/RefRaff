@@ -489,7 +489,7 @@ public class ParserTest {
 
 
     @Test
-    private void testParseProgramWithStructAllocation() throws ParserException {
+    public void testParseProgramWithStructAllocation() throws ParserException {
         /*
          * Node list =
          *   new Node {
