@@ -17,6 +17,11 @@ public class StructName extends AbstractSyntaxTreeNode {
     }
 
     @Override
+    public boolean shouldThrowOnAssignment() {
+        return false;
+    }
+
+    @Override
     public String getParsedValue() {
         return this.structName;
     }
