@@ -942,31 +942,53 @@ public class Parser {
         if (!TOKEN_TO_PRIMARY.containsKey(tokenClass)) {
             // Then try to parse struct allocation
             optionalPrimaryExp = parseStructAlloc(position);
+            if (!optionalPrimaryExp.isEmpty()) {
+                return optionalPrimaryExp;
+            }
             // Else it must be a parenthesitized expression
-
-            int currentPosition = position;
-            // Try to parse parenthesitized expression (this is our only option, now)
-            String parenExpString = "primary parenthesitized expression";
-            // There should be a left paren here
-            throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
-            currentPosition += 1;
-
-            // Try to parse expression
-            Optional<ParseResult<Expression>> optionalExpression = parseExp(currentPosition);
-            throwParserExceptionOnEmptyOptional("if expression", optionalExpression, "an expression", currentPosition);
-            currentPosition = optionalExpression.get().nextPosition;
-
-            // Make sure there's a right paren here
-            throwParserExceptionOnUnexpected(parenExpString, RightParenToken.class, "right paren )", currentPosition);
-            currentPosition += 1;
-
-            // Return the Expression
-            Expression parenExp = new ParenExp(optionalExpression.get().result);
-            return Optional.of(new ParseResult<Expression>(parenExp, currentPosition));
+            return parseParenExp(position);
         }
 
         Expression exp = TOKEN_TO_PRIMARY.get(tokenClass).apply(token);
         return Optional.of(new ParseResult<>(exp, position + 1));
+    }
+
+
+    // `new` structname `{` struct_actual_params `}`
+    public Optional<ParseResult<Expression>> parseStructAlloc(final int position) throws ParserException {
+        final String structAllocString = "struct allocation";
+        int currentPosition = position;
+
+        // Try to parse a new token
+        if (isExpectedToken(currentPosition, NewToken.class)) {
+            currentPosition += 1;
+            // Get the structName - hrow exceptions after this point
+            Optional<ParseResult<Type>> optionalStructName = parseType(currentPosition);
+            throwParserExceptionOnEmptyOptional(structAllocString, optionalStructName, "struct name", currentPosition);
+            currentPosition = optionalStructName.get().nextPosition;
+
+            // Skip the left brace
+            throwParserExceptionOnUnexpected(structAllocString, LeftBraceToken.class, "left brace {", currentPosition);
+            currentPosition += 1;
+
+            // Parse struct actual params
+            ParseResult<StructActualParams> structActParams = parseStructActualParams(currentPosition);
+            currentPosition = structActParams.nextPosition;
+
+            // Skip right brace
+            throwParserExceptionOnUnexpected(structAllocString, RightBraceToken.class, "right brace }", currentPosition);
+            currentPosition += 1;
+
+            // Create and return struct alloc
+            return Optional.of(
+                new ParseResult<Expression>(
+                    new StructAllocExp(optionalStructName.get().result, structActParams.result),
+                    currentPosition
+                )
+            );
+        }
+        // Otherwise, return empty to try something else
+        return Optional.empty();
     }
 
 
@@ -1034,10 +1056,10 @@ public class Parser {
     }
 
 
+    // `(` exp `)`
     public Optional<ParseResult<Expression>> parseParenExp(final int position) throws ParserException {
-        int currentPosition = position;
-        // Try to parse parenthesitized expression
         String parenExpString = "primary parenthesitized expression";
+        int currentPosition = position;
         // There should be a left paren here
         throwParserExceptionOnUnexpected(parenExpString, LeftParenToken.class, "left paren (", currentPosition);
         currentPosition += 1;
