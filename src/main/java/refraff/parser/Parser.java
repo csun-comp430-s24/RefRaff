@@ -482,8 +482,6 @@ public class Parser {
 
 
     // assignment is var '=' exp ';'
-    // The previous version would throw errors for vardecs since the struct type will be parsed as a
-    // variable. So this one won't throw until we get to the assignment op
     public Optional<ParseResult<AssignStmt>> parseAssign(final int position, final boolean shouldThrowIfNoIdentifier)
             throws ParserException {
         final String variableAssignment = "variable assignment";
@@ -507,7 +505,7 @@ public class Parser {
         }
         currentPosition += 1;
 
-        // No this is definitely an assignment. Ensure that there's an expression
+        // Ensure that there's an expression
         Optional<ParseResult<Expression>> opExp = parseExp(currentPosition);
         throwParserExceptionOnEmptyOptional(variableAssignment, opExp, "an expression", currentPosition);
 
