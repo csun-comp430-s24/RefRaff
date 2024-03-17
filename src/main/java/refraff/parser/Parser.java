@@ -398,8 +398,6 @@ public class Parser {
     public Optional<ParseResult<Statement>> parseStatement(final int position) throws ParserException {
         // (Makes it easier to add more in the future without code repeat)
         return parseStatement(List.of(
-                // Parse assign was throwing an exception when trying to parse struct vardec
-                // So we need to try to interpret an identifier as a type first, I think
                 this::parseAssign,
                 this::parseVardec,
                 this::parseIfElse,
@@ -449,13 +447,27 @@ public class Parser {
             return Optional.empty();
         }
 
-        // If we have a type, we must be trying to parse a vardec. Should be throwing errors
+        // If we have a type, we must be trying to parse a vardec
         ParseResult<Type> type = optionalType.get();
         currentPosition = type.nextPosition;
 
         // Try to parse assignment statement, throwing if we do not have an identifier or if variable assignment fails
-        Optional<ParseResult<AssignStmt>> optionalAssign = parseAssign(currentPosition, true);
+        // This may look bad, but we can only throw an exception if it's an int, bool, or void
+        // If we got an identifier, it may be a type or variable (which is a legal expression by itself), 
+        // so we can't throw an exception on that. I may be misunderstanding something here, though.
+        Optional<ParseResult<AssignStmt>> optionalAssign;
+        if (type.result instanceof BoolType ||
+                type.result instanceof IntType ||
+                type.result instanceof VoidType) {
+            optionalAssign = parseAssign(currentPosition, true);
+        } else {
+            optionalAssign = parseAssign(currentPosition, false);
+        }
 
+        // We still have to check if this was a vardec
+        if (optionalAssign.isEmpty()) {
+            return Optional.empty();
+        }
         // Safe unwrap since we know we throw if we didn't successfully parse a variable assignment
         ParseResult<AssignStmt> assign = optionalAssign.get();
         currentPosition = assign.nextPosition;
@@ -496,9 +508,8 @@ public class Parser {
         ParseResult<Variable> var = optionalVariable.get();
         currentPosition = var.nextPosition;
 
-        // Check if there's an assignment operator, returning empty to try vardec if not
-        final Optional<Token> maybeToken = getToken(position);
-        if (maybeToken.isEmpty()) {
+        // If there's not an assignment operator, return empty (this may be struct vardec or exp)
+        if (!isExpectedToken(currentPosition, AssignmentToken.class)) {
             return Optional.empty();
         }
         currentPosition += 1;
