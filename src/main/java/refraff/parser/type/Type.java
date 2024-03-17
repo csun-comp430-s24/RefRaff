@@ -10,6 +10,10 @@ public abstract class Type extends AbstractSyntaxTreeNode {
         super(parsedValue);
     }
 
+    public boolean shouldThrowOnAssignment() {
+        return true;
+    }
+
     @Override
     public String getNodeTypeDescriptor() {
         return TYPE_DESCRIPTOR;

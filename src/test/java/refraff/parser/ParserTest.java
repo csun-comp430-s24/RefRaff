@@ -18,8 +18,7 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
-import refraff.parser.struct.Param;
-import refraff.parser.struct.StructDef;
+import refraff.parser.struct.*;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
 
@@ -445,11 +444,10 @@ public class ParserTest {
     }
 
     @Test
-    public void testParseProgramWithDifferentOperatorPrecedence() {
+    public void testParseStatementWithDifferentOperatorPrecedence() {
         /*
          * bool result = (!isTrue && (4 + 3 * 7 >= count - otherCount.value / 5)) || false;
          */
-
 
         Token[] input = toArray(
             new BoolToken(), new IdentifierToken("result"), new AssignmentToken(),
@@ -487,6 +485,74 @@ public class ParserTest {
         Statement statement = new VardecStmt(new BoolType(), new Variable("result"), orExp);
 
         testStatementMatchesExpected(statement, input);
+    }
+
+
+    @Test
+    public void testParseProgramWithStructAllocation() throws ParserException {
+        /*
+         * Node list =
+         *   new Node {
+         *     value: 0,
+         *     rest: new Node {
+         *       value: 1,
+         *       rest: new Node {
+         *         value: 2,
+         *         rest: null
+         *       }
+         *     }
+         *   };
+         */
+
+        final Token[] input = new Token[] {
+                new IdentifierToken("Node"), new IdentifierToken("list"), new AssignmentToken(),
+                new NewToken(), new IdentifierToken("Node"), new LeftBraceToken(),
+                new IdentifierToken("value"), new ColonToken(), new IntLiteralToken("0"),
+                new CommaToken(), new IdentifierToken("rest"), new ColonToken(), new NewToken(),
+                new IdentifierToken("Node"), new LeftBraceToken(), new IdentifierToken("value"),
+                new ColonToken(), new IntLiteralToken("1"), new CommaToken(), new IdentifierToken("rest"),
+                new ColonToken(), new NewToken(), new IdentifierToken("Node"), new LeftBraceToken(),
+                new IdentifierToken("value"), new ColonToken(), new IntLiteralToken("2"),
+                new CommaToken(), new IdentifierToken("rest"), new ColonToken(), new NullToken(),
+                new RightBraceToken(), new RightBraceToken(), new RightBraceToken(),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+        StructActualParam paramRest3 = new StructActualParam(new Variable("rest"), new NullExp());
+        StructActualParam paramValue3 = new StructActualParam(new Variable("value"), new IntLiteralExp(2));
+        List<StructActualParam> paramList3 = Arrays.asList(
+                paramValue3,
+                paramRest3);
+        StructActualParams structActParams3 = new StructActualParams(paramList3);
+        StructAllocExp structAlloc3 = new StructAllocExp(new StructName("Node"), structActParams3);
+
+        StructActualParam paramRest2 = new StructActualParam(new Variable("rest"), structAlloc3);
+        StructActualParam paramValue2 = new StructActualParam(new Variable("value"), new IntLiteralExp(1));
+        List<StructActualParam> paramList2 = Arrays.asList(
+                paramValue2,
+                paramRest2);
+        StructActualParams structActParams2 = new StructActualParams(paramList2);
+        StructAllocExp structAlloc2 = new StructAllocExp(new StructName("Node"), structActParams2);
+
+        StructActualParam paramRest1 = new StructActualParam(new Variable("rest"), structAlloc2);
+        StructActualParam paramValue1 = new StructActualParam(new Variable("value"), new IntLiteralExp(0));
+        List<StructActualParam> paramList1 = Arrays.asList(
+            paramValue1,
+            paramRest1
+        );
+        StructActualParams structActParams1 = new StructActualParams(paramList1);
+        Expression expStructAlloc1 = new StructAllocExp(new StructName("Node"), structActParams1);
+
+        Statement vardecStmt = new VardecStmt(new StructName("Node"), new Variable("list"), expStructAlloc1);
+
+        statements.add(vardecStmt);
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 35),
+                parser.parseProgram(0));
     }
 
 
