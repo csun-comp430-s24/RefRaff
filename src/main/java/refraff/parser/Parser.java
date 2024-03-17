@@ -24,7 +24,6 @@ public class Parser {
         this.tokens = tokens;
     }
 
-
     // Returns an optional token or emtpy if we've reached the end of tokens
     public Optional<Token> getToken(final int position) {
         if (position >= 0 && position < tokens.length) {
@@ -34,7 +33,6 @@ public class Parser {
         }
     }
 
-
     // Returns true if there are more tokens and they are the same, otherwise empty
     // Refactor: change expected to the token's class - no longer creating new tokens
     public boolean isExpectedToken(final int position, final Class<? extends Token> expected) {
@@ -42,11 +40,9 @@ public class Parser {
         return received.isPresent() && received.get().getClass().equals(expected);
     }
 
-
     private void throwParserExceptionOnNoSemicolon(String beingParsed, int position) throws ParserException {
         throwParserExceptionOnUnexpected(beingParsed, SemicolonToken.class, "terminating `;`", position);
     }
-
 
     private void throwParserExceptionOnUnexpected(String beingParsed, Class<? extends Token> tokenClass,
                                                   String tokenRepresentation, int position) throws ParserException {
@@ -57,7 +53,6 @@ public class Parser {
         throwParserException(beingParsed, tokenRepresentation, position);
     }
 
-
     private <T> void throwParserExceptionOnEmptyOptional(String beingParsed, Optional<T> optional,
                                                          String expected, int position) throws ParserException {
         if (optional.isPresent()) {
@@ -67,7 +62,6 @@ public class Parser {
         throwParserException(beingParsed, expected, position);
     }
 
-
     private void throwParserException(String beingParsed, String expected, int position) throws ParserException {
         final String exceptionMessage = "Error parsing %s: expected %s but received: %s";
         String actualTokenValue = getToken(position).map(Token::toString).orElse("none");
@@ -75,7 +69,6 @@ public class Parser {
         String formattedExceptionMessage = String.format(exceptionMessage, beingParsed, expected, actualTokenValue);
         throw new ParserException(formattedExceptionMessage);
     }
-
 
     // Attempts to parse token array
     public static Program parseProgram(Token[] tokens) throws ParserException {
@@ -88,7 +81,6 @@ public class Parser {
                                       parser.getToken(program.nextPosition).toString());
         }
     }
-
 
     // program ::= structdef* fdef* stmt*
     public ParseResult<Program> parseProgram(final int position) throws ParserException {
@@ -103,7 +95,6 @@ public class Parser {
         
         return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
     }
-
 
     /**
      * Parses zero or more of type T. Returns the next position for the parser.
@@ -132,7 +123,6 @@ public class Parser {
 
         return currentPosition;
     }
-
 
     // structdef ::= `struct` structname `{` (param `;`)* `}`
     public Optional<ParseResult<StructDef>> parseStructDef(final int position) throws ParserException {
@@ -193,7 +183,6 @@ public class Parser {
         );
     }
 
-
     // param :: = type var
     public Optional<ParseResult<Param>> parseParam(final int position) throws ParserException {
         int currentPosition = position;
@@ -224,7 +213,6 @@ public class Parser {
             )
         );
     }
-
 
     // fdef ::= `func` funcname `(` comma_param `)` `:` type
     //         `{` stmt* `}`
@@ -287,7 +275,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(functionDef, currentPosition));
     }
 
-
     // comma_param ::= [param (`,` param)*]
     private ParseResult<List<Param>> parseCommaParam(String functionDefinitionWithName,
                                                      final int position) throws ParserException {
@@ -323,7 +310,6 @@ public class Parser {
         return new ParseResult<>(commaParams, currentPosition);
     }
 
-
     // struct_actual_param ::= var `:` exp
     public Optional<ParseResult<StructActualParam>> parseStructActualParam(final int position) throws ParserException {
         int currentPosition = position;
@@ -350,7 +336,6 @@ public class Parser {
             )
         );
     }
-
 
     // struct_actual_params ::= [struct_actual_param (`,` struct_actual_param)*]
     public ParseResult<StructActualParams> parseStructActualParams(final int position) throws ParserException {
@@ -383,7 +368,6 @@ public class Parser {
         );
     }
 
-
     /*
     stmt ::= type var `=` exp `;` | 
              var `=` exp `;` |
@@ -410,7 +394,6 @@ public class Parser {
         ), position);
     }
 
-
     // This method is extremely gross and horrible and I hate it - but what can you do with Java?
     private Optional<ParseResult<Statement>> parseStatement(List<ParsingFunction<Integer,
             Optional<? extends ParseResult<? extends Statement>>>> parseResults, int position) throws ParserException {
@@ -435,7 +418,6 @@ public class Parser {
         // Else return an empty if we found no statements
         return Optional.empty();
     }
-
 
     // vardec ::= type var '=' exp ';'
     public Optional<ParseResult<VardecStmt>> parseVardec(final int position) throws ParserException {
@@ -475,11 +457,9 @@ public class Parser {
         );
     }
 
-
     public Optional<ParseResult<AssignStmt>> parseAssign(final int position) throws ParserException {
         return parseAssign(position, false);
     }
-
 
     // assignment is var '=' exp ';'
     public Optional<ParseResult<AssignStmt>> parseAssign(final int position, final boolean shouldThrowIfNoIdentifier)
@@ -525,7 +505,6 @@ public class Parser {
         );
     }
 
-
     // `if` `(` exp `)` stmt [`else` stmt]
     private Optional<ParseResult<IfElseStmt>> parseIfElse(final int position) throws ParserException {
         if (!isExpectedToken(position, IfToken.class)) {
@@ -570,7 +549,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
     }
 
-
     // Parses `(` exp `)` in the context of a statement: so this is NOT a paren expression
     private ParseResult<Expression> parseExpWithParensAroundItOrThrow(final String where,
                                                                       final int position) throws ParserException {
@@ -590,7 +568,6 @@ public class Parser {
 
         return new ParseResult<>(expression, currentPosition);
     }
-
 
     // `while` `(` exp `)` stmt
     private Optional<ParseResult<WhileStmt>> parseWhile(final int position) throws ParserException {
@@ -621,7 +598,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(whileStmt, currentPosition));
     }
 
-
     // `break` `;`
     private Optional<ParseResult<BreakStmt>> parseBreak(final int position) throws ParserException {
         if (!isExpectedToken(position, BreakToken.class)) {
@@ -636,7 +612,6 @@ public class Parser {
 
         return Optional.of(new ParseResult<>(new BreakStmt(), currentPosition));
     }
-
 
     // `println` `(` exp `)` `;`
     private Optional<ParseResult<PrintlnStmt>> parsePrintln(final int position) throws ParserException {
@@ -658,7 +633,6 @@ public class Parser {
 
         return Optional.of(new ParseResult<>(new PrintlnStmt(expression), currentPosition));
     }
-
 
     // `return` [exp] `;`
     private Optional<ParseResult<ReturnStmt>> parseReturn(final int position) throws ParserException {
@@ -686,7 +660,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(new ReturnStmt(returnValue), currentPosition));
     }
 
-
     // `{` stmt* `}`
     private Optional<ParseResult<StmtBlock>> parseStatementBlock(final int position) throws ParserException {
         if (!isExpectedToken(position, LeftBraceToken.class)) {
@@ -704,7 +677,6 @@ public class Parser {
 
         return Optional.of(new ParseResult<>(new StmtBlock(blockBody), currentPosition));
     }
-
 
     // exp `;`
     private Optional<ParseResult<ExpressionStmt>> parseExpressionStatement(final int position) throws ParserException {
@@ -728,7 +700,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(new ExpressionStmt(expression), currentPosition));
     }
 
-
     private final static Map<Token, OperatorEnum> TOKEN_TO_OP = Map.ofEntries(
         new SimpleImmutableEntry<>(new OrToken(), OperatorEnum.OR),
         new SimpleImmutableEntry<>(new AndToken(), OperatorEnum.AND),
@@ -744,13 +715,11 @@ public class Parser {
         new SimpleImmutableEntry<>(new DotToken(), OperatorEnum.DOT)
     );    
 
-
     // exp ::= or_exp
     public Optional<ParseResult<Expression>> parseExp(final int position) throws ParserException {
         // Try to parse an or expression - I'm just following the grammar for now, but I dont' think we need this
         return parseOrExp(position);
     }
-
 
     // Genericized parser binary operator function (does not work for dot op)
     public Optional<ParseResult<Expression>> parseBinaryOpExpression(
@@ -783,7 +752,6 @@ public class Parser {
         return returnValue;
     }
 
-
     // Returns true if token is in list - Putting a lambda in the while guard wasn't working :(
     public boolean isValidOperatorToken(final int position, List<Class<? extends Token>> operatorClasses) {
         for (Class<? extends Token> tokenClass : operatorClasses) {
@@ -794,18 +762,15 @@ public class Parser {
         return false;
     }
 
-
     // or_exp ::= and_exp (`||` and_exp)*
     public Optional<ParseResult<Expression>> parseOrExp(final int position) throws ParserException {
         return parseBinaryOpExpression(position, this::parseAndExp, "and expression", Arrays.asList(OrToken.class));
     }
 
-
     // and_exp ::= equals_exp (`&&` equals_exp)*
     public Optional<ParseResult<Expression>> parseAndExp(final int position) throws ParserException {
         return parseBinaryOpExpression(position, this::parseEqualsExp, "equals expression", Arrays.asList(AndToken.class));
     }
-
 
     // equals_exp ::= lte_gte_exp ((`==` | `!=`) lte_gte_exp)*
     public Optional<ParseResult<Expression>> parseEqualsExp(final int position) throws ParserException {
@@ -813,7 +778,6 @@ public class Parser {
             position, this::parseInequalityExp, "inequality expression",
             Arrays.asList(DoubleEqualsToken.class, NotEqualsToken.class));
     }
-
 
     // lte_gte_exp ::= add_exp [(`<=` | `>=` | `<` | `>`) add_exp]
     // Because the inequalities, I didn't try to genericize it, but maybe it can be done?
@@ -843,7 +807,6 @@ public class Parser {
         return returnValue;
     }
 
-
     // add_exp ::= mult_exp ((`+` | `-`) mult_exp)*
     public Optional<ParseResult<Expression>> parseAddExp(final int position) throws ParserException {
         return parseBinaryOpExpression(
@@ -851,14 +814,12 @@ public class Parser {
             Arrays.asList(PlusToken.class, MinusToken.class));
     }
 
-
     // mult_exp ::= not_exp ((`*` | `/`) not_exp)*
     public Optional<ParseResult<Expression>> parseMultExp(final int position) throws ParserException {
         return parseBinaryOpExpression(
             position, this::parseNotExp, "not expression",
             Arrays.asList(MultiplyToken.class, DivisionToken.class));
     }
-
 
     // not_exp ::= [`!`]dot_exp
     public Optional<ParseResult<Expression>> parseNotExp(final int position) throws ParserException {
@@ -882,15 +843,15 @@ public class Parser {
         return returnValue;
     }
 
-
     // dot_exp ::= primary_exp (`.` var)*
     // I restricted the right hand side to variables, but if we want to use parseBinaryOpExpression,
     // We can use expression instead of variable on the right
     public Optional<ParseResult<Expression>> parseDotExp(final int position) throws ParserException {
+        final String dotExpString = "dot expression";
         int currentPosition = position;
         // Make sure there's a primary expression here
         Optional<ParseResult<Expression>> returnValue = parsePrimaryExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("primary expression", returnValue, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional(dotExpString, returnValue, "an expression", currentPosition);
         currentPosition = returnValue.get().nextPosition;
 
         // While there are other variables to parse
@@ -898,7 +859,7 @@ public class Parser {
             currentPosition += 1;
             // Try to parse a variable
             Optional<ParseResult<Variable>> variable = parseVar(currentPosition);
-            throwParserExceptionOnEmptyOptional("variable", variable, "a variable", currentPosition);
+            throwParserExceptionOnEmptyOptional(dotExpString, variable, "a variable", currentPosition);
             // Create dot operator, wrap in expression parse result
             DotExp dotExp = new DotExp(returnValue.get().result, variable.get().result);
             returnValue = Optional.of(new ParseResult<Expression>(dotExp, variable.get().nextPosition));
@@ -906,7 +867,6 @@ public class Parser {
         }
         return returnValue;
     }
-
 
     // Create a mapping from the token's class to its type
     private static final Map<Class<? extends Token>, Function<Token, PrimaryExpression>> TOKEN_TO_PRIMARY = Map.of(
@@ -955,7 +915,6 @@ public class Parser {
         return Optional.of(new ParseResult<>(exp, position + 1));
     }
 
-
     // `new` structname `{` struct_actual_params `}`
     public Optional<ParseResult<Expression>> parseStructAlloc(final int position) throws ParserException {
         final String structAllocString = "struct allocation";
@@ -993,7 +952,6 @@ public class Parser {
         return Optional.empty();
     }
 
-
     // funcname `(` comma_exp `)
     public Optional<ParseResult<Expression>> parseFuncCall(final int position) throws ParserException {
         final String funcCallString = "function call";
@@ -1018,14 +976,13 @@ public class Parser {
             return Optional.of(
                 new ParseResult<Expression>(
                     new FuncCallExp(optionalFuncName.get().result, commaExp.result),
-                    commaExp.nextPosition
+                    currentPosition
                 )
             );
         }
         // return empty if not function call
         return Optional.empty();
     }
-
 
     // comma_exp ::= [exp (`,` exp)*]
     // Consider genericizing comma_exp, comma_param, struct_actual_params
@@ -1057,7 +1014,6 @@ public class Parser {
         return new ParseResult<CommaExp>(new CommaExp(listOfExp), currentPosition);
     }
 
-
     // `(` exp `)`
     public Optional<ParseResult<Expression>> parseParenExp(final int position) throws ParserException {
         String parenExpString = "primary parenthesitized expression";
@@ -1080,7 +1036,6 @@ public class Parser {
         return Optional.of(new ParseResult<Expression>(parenExp, currentPosition));
     }
 
-
     // Try to parse a function name
     public Optional<ParseResult<FunctionName>> parseFuncName(final int position) throws ParserException {
         final Optional<Token> maybeToken = getToken(position);
@@ -1100,7 +1055,6 @@ public class Parser {
 
         return Optional.empty();
     }
-
 
     // Tries to parse variable
     public Optional<ParseResult<Variable>> parseVar(final int position) throws ParserException {
@@ -1124,7 +1078,6 @@ public class Parser {
         return Optional.empty();
     }
 
-
     // Create a mapping from the token's class to its type
     private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_CLASS_TO_TYPE = Map.of(
             IntToken.class, (token) -> new IntType(),
@@ -1132,7 +1085,6 @@ public class Parser {
             VoidToken.class, (token) -> new VoidType(),
             IdentifierToken.class, (token) -> new StructName(token.getTokenizedValue())
     );
-
 
     // type ::= 'int' | 'bool' | 'void' | structname
     public Optional<ParseResult<Type>> parseType(final int position) throws ParserException {
