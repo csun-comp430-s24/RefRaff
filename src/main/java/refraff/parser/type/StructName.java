@@ -15,6 +15,11 @@ public class StructName extends Type {
     }
 
     @Override
+    public boolean shouldThrowOnAssignment() {
+        return false;
+    }
+
+    @Override
     public String getParsedValue() {
         return this.structName;
     }

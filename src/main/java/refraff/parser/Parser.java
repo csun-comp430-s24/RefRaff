@@ -452,17 +452,10 @@ public class Parser {
         currentPosition = type.nextPosition;
 
         // Try to parse assignment statement, throwing if we do not have an identifier or if variable assignment fails
-        // This may look bad, but we can only throw an exception if it's an int, bool, or void
+        // We can only throw an exception if it's an int, bool, or void
         // If we got an identifier, it may be a type or variable (which is a legal expression by itself), 
         // so we can't throw an exception on that. I may be misunderstanding something here, though.
-        Optional<ParseResult<AssignStmt>> optionalAssign;
-        if (type.result instanceof BoolType ||
-                type.result instanceof IntType ||
-                type.result instanceof VoidType) {
-            optionalAssign = parseAssign(currentPosition, true);
-        } else {
-            optionalAssign = parseAssign(currentPosition, false);
-        }
+        Optional<ParseResult<AssignStmt>> optionalAssign = parseAssign(currentPosition, type.result.shouldThrowOnAssignment());
 
         // We still have to check if this was a vardec
         if (optionalAssign.isEmpty()) {
