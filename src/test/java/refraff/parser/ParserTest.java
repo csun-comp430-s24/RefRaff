@@ -10,8 +10,7 @@ import java.util.*;
 
 import org.junit.Test;
 
-import refraff.parser.function.FunctionDef;
-import refraff.parser.function.FunctionName;
+import refraff.parser.function.*;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.*;
@@ -414,6 +413,41 @@ public class ParserTest {
     }
 
     @Test
+    public void testProgramWithSequentialDotOpExpression() throws ParserException {
+        // retval = example.result.value.rest.next;
+        final Token[] input = new Token[] {
+                new IdentifierToken("retval"),
+                new AssignmentToken(),
+                new IdentifierToken("example"),
+                new DotToken(),
+                new IdentifierToken("result"),
+                new DotToken(),
+                new IdentifierToken("value"),
+                new DotToken(),
+                new IdentifierToken("rest"),
+                new DotToken(),
+                new IdentifierToken("next"),
+                new SemicolonToken()
+        };
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+        DotExp dotExp0 = new DotExp(new VariableExp("example"), new Variable("result"));
+        DotExp dotExp1 = new DotExp(dotExp0, new Variable("value"));
+        DotExp dotExp2 = new DotExp(dotExp1, new Variable("rest"));
+        DotExp dotExp3 = new DotExp(dotExp2, new Variable("next"));
+
+        statements.add(new AssignStmt(
+                new Variable("retval"),
+                dotExp3));
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 12),
+                parser.parseProgram(0));
+    }
+
+    @Test
     public void testProgramWithMultOpExpression() throws ParserException {
         // retval = retval * 2;
         final Token[] input = new Token[] {
@@ -555,6 +589,34 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+    @Test
+    public void testParseProgramWithFunctionCall() throws ParserException {
+        /*
+         * println(length(list));
+         */
+
+        final Token[] input = new Token[] {
+                new PrintlnToken(), new LeftParenToken(), new IdentifierToken("length"),
+                new LeftParenToken(), new IdentifierToken("list"), new RightParenToken(),
+                new RightParenToken(), new SemicolonToken()
+        };
+
+        final Parser parser = new Parser(input);
+        final List<StructDef> structDefs = new ArrayList<>();
+        final List<FunctionDef> functionDefs = new ArrayList<>();
+        final List<Statement> statements = new ArrayList<>();
+
+        VariableExp variableList = new VariableExp("list");
+        CommaExp commaExp = new CommaExp(Arrays.asList(variableList));
+        FunctionName funcNameLength = new FunctionName("length"); 
+        FuncCallExp funcCallExp = new FuncCallExp(funcNameLength, commaExp);
+        PrintlnStmt printlnStmt = new PrintlnStmt(funcCallExp);
+
+        statements.add(printlnStmt);
+
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.length),
+                parser.parseProgram(0));
+    }
 
     private void testProgramParsesWithException(Token... tokens) {
         assertThrows(ParserException.class, () -> parseProgram(tokens));
