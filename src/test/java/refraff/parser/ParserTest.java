@@ -18,8 +18,7 @@ import refraff.tokenizer.*;
 import refraff.parser.type.*;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
-import refraff.parser.struct.Param;
-import refraff.parser.struct.StructDef;
+import refraff.parser.struct.*;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
 
@@ -523,21 +522,36 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
+        StructActualParam paramRest3 = new StructActualParam(new Variable("rest"), new NullExp());
+        StructActualParam paramValue3 = new StructActualParam(new Variable("value"), new IntLiteralExp(2));
+        List<StructActualParam> paramList3 = Arrays.asList(
+                paramValue3,
+                paramRest3);
+        StructActualParams structActParams3 = new StructActualParams(paramList3);
+        StructAllocExp structAlloc3 = new StructAllocExp(new StructName("Node"), structActParams3);
 
+        StructActualParam paramRest2 = new StructActualParam(new Variable("rest"), structAlloc3);
+        StructActualParam paramValue2 = new StructActualParam(new Variable("value"), new IntLiteralExp(1));
+        List<StructActualParam> paramList2 = Arrays.asList(
+                paramValue2,
+                paramRest2);
+        StructActualParams structActParams2 = new StructActualParams(paramList2);
+        StructAllocExp structAlloc2 = new StructAllocExp(new StructName("Node"), structActParams2);
 
+        StructActualParam paramRest1 = new StructActualParam(new Variable("rest"), structAlloc2);
+        StructActualParam paramValue1 = new StructActualParam(new Variable("value"), new IntLiteralExp(0));
+        List<StructActualParam> paramList1 = Arrays.asList(
+            paramValue1,
+            paramRest1
+        );
+        StructActualParams structActParams1 = new StructActualParams(paramList1);
+        Expression expStructAlloc1 = new StructAllocExp(new StructName("Node"), structActParams1);
 
-
-
-        
-
-        Expression expStructAlloc1 = new StructAllocExp(structNameNode2, structActParams1);
-        Variable variableList = new Variable("list");
-        Type structNameNode1 = new StructName("Node");
-        Statement vardecStmt = new VardecStmt(structNameNode1, variableList, expStructAlloc1);
+        Statement vardecStmt = new VardecStmt(new StructName("Node"), new Variable("list"), expStructAlloc1);
 
         statements.add(vardecStmt);
 
-        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 35),
                 parser.parseProgram(0));
     }
 

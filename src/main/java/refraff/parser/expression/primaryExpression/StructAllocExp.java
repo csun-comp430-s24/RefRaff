@@ -1,6 +1,5 @@
 package refraff.parser.expression.primaryExpression;
 
-
 import refraff.parser.type.StructName;
 import refraff.parser.struct.StructActualParams;
 
