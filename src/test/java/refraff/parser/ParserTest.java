@@ -477,6 +477,36 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+    private void testCompareExpWithOperator(OperatorEnum operator, Token tokenOperator) {
+        // 3 <op> 4;
+        Token[] input = toArray(new IntLiteralToken("3"), tokenOperator, new IntLiteralToken("4"), new SemicolonToken());
+
+        BinaryOpExp binaryOpExp = new BinaryOpExp(new IntLiteralExp(3), operator, new IntLiteralExp(4));
+        ExpressionStmt expressionStmt = new ExpressionStmt(binaryOpExp);
+
+        testStatementMatchesExpected(expressionStmt, input);
+    }
+
+    @Test
+    public void testCompareExpWithLessThanEquals() {
+        testCompareExpWithOperator(OperatorEnum.LESS_THAN_EQUALS, new LessThanEqualsToken());
+    }
+
+    @Test
+    public void testCompareExpWithGreaterThanEquals() {
+        testCompareExpWithOperator(OperatorEnum.GREATER_THAN_EQUALS, new GreaterThanEqualsToken());
+    }
+
+    @Test
+    public void testCompareExpWithLessThan() {
+        testCompareExpWithOperator(OperatorEnum.LESS_THAN, new LessThanToken());
+    }
+
+    @Test
+    public void testCompareExpWithGreaterThan() {
+        testCompareExpWithOperator(OperatorEnum.GREATER_THAN, new GreaterThanToken());
+    }
+
     @Test
     public void testParseStatementWithDifferentOperatorPrecedence() {
         /*
@@ -521,6 +551,28 @@ public class ParserTest {
         testStatementMatchesExpected(statement, input);
     }
 
+    @Test
+    public void testStructDefWithNoParams() {
+        // struct A {}
+        Token[] input = toArray(new StructToken(), new IdentifierToken("a"), new LeftBraceToken(), new RightBraceToken());
+        StructDef structDef = new StructDef(new StructName("a"), List.of());
+        Program program = new Program(List.of(structDef), List.of(), List.of());
+
+        testProgramMatchesExpectedResult(program, input);
+    }
+
+    @Test
+    public void testStructAllocationWithNoParams() {
+        // new A {};
+        Token[] input = toArray(new NewToken(), new IdentifierToken("A"), new LeftBraceToken(), new RightBraceToken(),
+                new SemicolonToken());
+
+        StructAllocExp structAllocExp = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of()));
+        ExpressionStmt expressionStmt = new ExpressionStmt(structAllocExp);
+
+        testStatementMatchesExpected(expressionStmt, input);
+    }
 
     @Test
     public void testParseProgramWithStructAllocation() throws ParserException {
@@ -657,11 +709,19 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+    // Invalid tests
 
     // Test invalid inputs
 
     private void testProgramParsesWithException(Token... tokens) {
-        assertThrows(ParserException.class, () -> parseProgram(tokens));
+        assertThrows(ParserMalformedException.class, () -> parseProgram(tokens));
+    }
+
+    @Test
+    public void testStructDefWithNoParamNameThrowsException() {
+        // struct A { int; }
+        testProgramParsesWithException(new StructToken(), new IdentifierToken("A"), new LeftBraceToken(),
+                new IntToken(), new SemicolonToken(), new RightBraceToken());
     }
 
     @Test
@@ -844,6 +904,13 @@ public class ParserTest {
             new StructToken(), new AssignmentToken(), new LeftBraceToken(),
             new RightBraceToken(), new SemicolonToken()
         );
+    }
+
+    @Test
+    public void testStructAllocationWithIntTokenInsteadOfStructNameThrowsException() {
+        // new int {};
+        testProgramParsesWithException(new NewToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken(),
+                new SemicolonToken());
     }
 
     @Test
