@@ -29,12 +29,18 @@ public class Typechecker {
 
     private final Map<StructName, StructDef> structNameToDef;
 
-    private Typechecker(Program program) {
+    private Typechecker(Program program) throws TypecheckerException {
         this.program = program;
 
         // Map all the struct definitions names to their AST definitions
-        this.structNameToDef = program.getStructDefs().stream()
+        // This throws an IllegalStateException if two structs share a name
+        // Should we catch it and throw a TypecheckerException?
+        try {
+            this.structNameToDef = program.getStructDefs().stream()
                 .collect(Collectors.toMap(StructDef::getStructName, structDef -> structDef));
+        } catch (IllegalStateException e) {
+            throw new TypecheckerException("Struct declarations share a name");
+        }
     }
 
     public static void typecheckProgram(Program program) throws TypecheckerException {

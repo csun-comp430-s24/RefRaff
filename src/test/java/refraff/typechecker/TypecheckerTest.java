@@ -142,6 +142,51 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
+    @Test
+    public void testBinOpExpressionsWithVariables() {
+        /*
+         * int foo = 6
+         * bool isBar = true;
+         * isBar = (false && (4 + 3 * 7 >= 4 - foo / 5)) || isBar;
+         */
+
+        Statement declareFoo = new VardecStmt(
+            new IntType(),
+            new Variable("foo"),
+            new IntLiteralExp(6));
+        
+        Statement declareIsBar = new VardecStmt(
+            new BoolType(),
+            new Variable("isBar"),
+            new BoolLiteralExp(true));
+
+        Expression varExpFoo = new VariableExp(new Variable("foo"));
+        Expression intLiteral5 = new IntLiteralExp(5);
+        Expression binOpDivide = new BinaryOpExp(varExpFoo, OperatorEnum.DIVISION, intLiteral5);
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression binOpMinus = new BinaryOpExp(intLiteral6, OperatorEnum.MINUS, binOpDivide);//
+
+        Expression intLiteral3 = new IntLiteralExp(3);
+        Expression intLiteral7 = new IntLiteralExp(7);
+        Expression binOpMult = new BinaryOpExp(intLiteral3, OperatorEnum.MULTIPLY, intLiteral7);
+        Expression intLiteral4 = new IntLiteralExp(4);
+        Expression binOpAdd = new BinaryOpExp(intLiteral4, OperatorEnum.PLUS, binOpMult);
+
+        Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, binOpMinus);
+        Expression parenGteExp = new ParenExp(binOpGte);
+        Expression falseExp = new BoolLiteralExp(false);
+
+        Expression andExp = new BinaryOpExp(falseExp, OperatorEnum.AND, parenGteExp);
+        Expression varExpIsBar = new VariableExp(new Variable("isBar"));
+        Expression parenAndExp = new ParenExp(andExp);
+        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, varExpIsBar);
+
+        Statement assignIsBar = new ExpressionStmt(orExp);
+
+        Program program = new Program(List.of(), List.of(), List.of(declareFoo, declareIsBar, assignIsBar));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
     
 
     // Test invalid inputs
@@ -162,6 +207,34 @@ public class TypecheckerTest {
         ));
 
         Program invalidProgram = new Program(List.of(invalidStructDef), List.of(), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructDefReusesNameThrowsException() {
+        /*
+         * struct A {
+         *   int b;
+         * }
+         * 
+         * struct A {
+         *   int c;
+         * }
+         */
+        StructDef structA = new StructDef(
+            new StructName("A"),
+            List.of(
+                new Param(new IntType(), new Variable("b"))
+            )
+        );
+        StructDef structB = new StructDef(
+            new StructName("A"),
+            List.of(
+                new Param(new IntType(), new Variable("c"))
+            )
+        );
+
+        Program invalidProgram = new Program(List.of(structA, structB), List.of(), List.of());
         testThrowsTypecheckerException(invalidProgram);
     }
 
@@ -237,7 +310,7 @@ public class TypecheckerTest {
     }
 
     @Test
-    public void testStructNameIsReusedInVardec() {
+    public void testStructNameIsReusedInVardecThrowsException() {
         /*
          * struct foo = {};
          * int foo = 6;
@@ -249,6 +322,48 @@ public class TypecheckerTest {
                 new Variable("foo"),
                 new IntLiteralExp(6));
         Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testIntVarAssignedBoolThrowsException() {
+        /*
+         * int foo = 6;
+         * bool bar = true;
+         * foo = bar;
+         * 
+         * What is this Python? I think not!
+         */
+
+        Statement intVardecStmt = new VardecStmt(
+                new IntType(),
+                new Variable("foo"),
+                new IntLiteralExp(6));
+        Statement boolVardecStmt = new VardecStmt(
+                new IntType(),
+                new Variable("bar"),
+                new BoolLiteralExp(true));
+        Statement assignStmt = new AssignStmt(
+                new Variable("foo"),
+                new VariableExp(new Variable("bar")));
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(intVardecStmt, boolVardecStmt, assignStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testBinExpWithInvalidTypes() {
+        /*
+         * (6 || 9);
+         */
+
+        Statement orExpStmt = new ExpressionStmt(
+            new BinaryOpExp(
+                new IntLiteralExp(6),
+                OperatorEnum.OR,
+                new IntLiteralExp(9)
+            )
+        );
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(orExpStmt));
         testThrowsTypecheckerException(invalidProgram);
     }
 }
