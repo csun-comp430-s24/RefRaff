@@ -13,6 +13,7 @@ public class StructAllocExp extends PrimaryExpression {
 
     public StructAllocExp(StructType structType, StructActualParams params) {
         super(STRUCT_ALLOC_EXP);
+
         this.structType = structType;
         this.params = params;
     }

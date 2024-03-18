@@ -1,9 +1,9 @@
 package refraff.typechecker;
 
 @FunctionalInterface
-public interface TypecheckingFunction<T, U, R> {
+public interface TypecheckingFunction<T, U, V, R> {
     
-    R apply(T t, U u) throws TypecheckerException;
+    R apply(T t, U u, V v) throws TypecheckerException;
 
 }
 

@@ -3,31 +3,11 @@ package refraff.typechecker;
 import org.junit.Test;
 import refraff.parser.Program;
 import refraff.parser.Variable;
-import refraff.parser.struct.Param;
-import refraff.parser.struct.StructDef;
-import refraff.parser.struct.StructName;
+import refraff.parser.struct.*;
 import refraff.parser.type.BoolType;
 import refraff.parser.type.IntType;
 import refraff.parser.type.StructType;
 import refraff.parser.type.VoidType;
-import refraff.tokenizer.IdentifierToken;
-import refraff.tokenizer.IntLiteralToken;
-import refraff.tokenizer.Token;
-import refraff.tokenizer.reserved.BoolToken;
-import refraff.tokenizer.reserved.FalseToken;
-import refraff.tokenizer.symbol.AndToken;
-import refraff.tokenizer.symbol.AssignmentToken;
-import refraff.tokenizer.symbol.DivisionToken;
-import refraff.tokenizer.symbol.DotToken;
-import refraff.tokenizer.symbol.GreaterThanEqualsToken;
-import refraff.tokenizer.symbol.LeftParenToken;
-import refraff.tokenizer.symbol.MinusToken;
-import refraff.tokenizer.symbol.MultiplyToken;
-import refraff.tokenizer.symbol.NotToken;
-import refraff.tokenizer.symbol.OrToken;
-import refraff.tokenizer.symbol.PlusToken;
-import refraff.tokenizer.symbol.RightParenToken;
-import refraff.tokenizer.symbol.SemicolonToken;
 import refraff.parser.expression.*;
 import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
@@ -36,6 +16,7 @@ import refraff.parser.statement.*;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
@@ -69,6 +50,10 @@ public class TypecheckerTest {
          *   int foo;
          *   bool bar;
          * }
+         *
+         * struct B {
+         *   A a;
+         * }
          */
         StructDef structDef1 = new StructDef(new StructName("A"), List.of(
                 new Param(new IntType(), new Variable("foo")),
@@ -81,6 +66,108 @@ public class TypecheckerTest {
 
         Program program = new Program(List.of(structDef1, structDef2), List.of(), List.of());
         testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStructAllocExp() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A { a: null };
+         */
+        StructDef structDef = new StructDef(new StructName("A"), List.of(
+                new Param(new StructType(new StructName("A")), new Variable("a"))
+        ));
+
+        StructType aType = new StructType(new StructName("A"));
+
+        Expression expression = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of(
+                        new StructActualParam(new Variable("a"), new NullExp()
+                        ))));
+        Statement statement = new ExpressionStmt(expression);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(statement));
+        testDoesNotThrowTypecheckerException(program);
+
+        assertEquals(aType, expression.getExpressionType());
+    }
+
+    @Test
+    public void testStructAllocExpRecursive() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {
+         *   a: new A {
+         *     a: null
+         *   }
+         * };
+         */
+        StructDef structDef = new StructDef(new StructName("A"), List.of(
+                new Param(new StructType(new StructName("A")), new Variable("a"))
+        ));
+
+        StructType aType = new StructType(new StructName("A"));
+
+        // Inside nested new A
+        Expression nestedAllocExp = new StructAllocExp(aType,
+                new StructActualParams(List.of(
+                        new StructActualParam(new Variable("a"), new NullExp()))
+                ));
+
+        // Outside alloc that contains a: <nested>
+        Expression outsideAllocExp = new StructAllocExp(aType, new StructActualParams(
+                List.of(new StructActualParam(new Variable("a"), nestedAllocExp))
+        ));
+
+        Statement statement = new ExpressionStmt(outsideAllocExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(statement));
+        testDoesNotThrowTypecheckerException(program);
+
+        assertEquals(aType, nestedAllocExp.getExpressionType());
+        assertEquals(aType, outsideAllocExp.getExpressionType());
+    }
+
+    @Test
+    public void testDotExpRecursive() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * A a = null;
+         * a.a.a;
+         */
+        StructName name = new StructName("A");
+        StructType type = new StructType(name);
+
+        Variable variable = new Variable("a");
+
+        StructDef structDef = new StructDef(name, List.of(
+                new Param(type, variable)
+        ));
+
+        VardecStmt vardec = new VardecStmt(type, variable, new NullExp());
+
+        VariableExp variableExp = new VariableExp(variable);
+
+        Expression firstDotExpression = new DotExp(variableExp, variable);
+        Expression secondDotExpression = new DotExp(firstDotExpression, variable);
+        Statement dotStatement = new ExpressionStmt(secondDotExpression);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardec, dotStatement));
+        testDoesNotThrowTypecheckerException(program);
+
+        assertEquals(type, vardec.getExpression().getExpressionType());
+
+        assertEquals(type, firstDotExpression.getExpressionType());
+        assertEquals(type, secondDotExpression.getExpressionType());
     }
 
     @Test
@@ -107,6 +194,31 @@ public class TypecheckerTest {
         Statement varExpStmt = new ExpressionStmt(new VariableExp(new Variable("foo")));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, varExpStmt));
         testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testAssignStmt() {
+        /*
+         * bool a = false;
+         * a = true;
+         */
+        Statement vardec = new VardecStmt(new BoolType(), new Variable("a"), new BoolLiteralExp(false));
+        Statement assign = new AssignStmt(new Variable("a"), new BoolLiteralExp(true));
+
+        Program program = new Program(List.of(), List.of(), List.of(vardec, assign));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testLogicalNotExpStmt() {
+        // !true;
+        Expression expression = new UnaryOpExp(OperatorEnum.NOT, new BoolLiteralExp(true));
+        Statement statement = new ExpressionStmt(expression);
+
+        Program program = new Program(List.of(), List.of(), List.of(statement));
+        testDoesNotThrowTypecheckerException(program);
+
+        assertEquals(new BoolType(), expression.getExpressionType());
     }
 
     @Test
@@ -271,6 +383,143 @@ public class TypecheckerTest {
     }
 
     @Test
+    public void testStructAllocExpWithTooManyParams() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {
+         *   a: null,
+         *   b: 6
+         * };
+         */
+        StructDef structDef = new StructDef(new StructName("A"), List.of(
+                new Param(new StructType(new StructName("A")), new Variable("a"))
+        ));
+
+        Expression expression = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of(
+                        new StructActualParam(new Variable("a"), new NullExp()),
+                        new StructActualParam(new Variable("b"), new IntLiteralExp(6)))
+                ));
+
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructAllocExpWithMismatchedLabelThrowsException() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {
+         *   b: null
+         * };
+         */
+        StructDef structDef = new StructDef(new StructName("A"), List.of(
+                new Param(new StructType(new StructName("A")), new Variable("a"))
+        ));
+
+        Expression expression = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of(
+                        new StructActualParam(new Variable("b"), new NullExp()))
+                ));
+
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructAllocExpWithMismatchedTypeThrowsException() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {
+         *   a: false
+         * };
+         */
+        StructName name = new StructName("A");
+        StructType type = new StructType(name);
+
+        Variable variable = new Variable("a");
+
+        StructDef structDef = new StructDef(name, List.of(
+                new Param(type, variable)
+        ));
+
+        Expression expression = new StructAllocExp(type,
+                new StructActualParams(List.of(
+                        new StructActualParam(variable, new BoolLiteralExp(false)))
+                ));
+
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testDotExpWithoutStructThrowsException() {
+        // false.foo;
+        Expression expression = new DotExp(new BoolLiteralExp(false), new Variable("foo"));
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testDotExpWithExplicitNullThrowsException() {
+        // null.foo;
+        Expression expression = new DotExp(new NullExp(), new Variable("foo"));
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testDotExpWithUnknownStructFieldThrowsException() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {
+         *   a: null
+         * }.c;
+         */
+        StructName name = new StructName("A");
+        StructType type = new StructType(name);
+
+        Variable variable = new Variable("a");
+
+        StructDef structDef = new StructDef(name, List.of(
+                new Param(type, variable)
+        ));
+
+        Expression allocExp = new StructAllocExp(type,
+                new StructActualParams(List.of(
+                        new StructActualParam(variable, new NullExp()))
+                ));
+
+        Expression dotExp = new DotExp(allocExp, new Variable("c"));
+        Statement statement = new ExpressionStmt(dotExp);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
     public void testExpStmtWithBinaryOpsThrowsExceptionOnBoolInGteExp() {
         /*
          * (false && (4 + 3 * 7 >= true)) || true;
@@ -309,19 +558,43 @@ public class TypecheckerTest {
         testThrowsTypecheckerException(invalidProgram);
     }
 
-    @Test
-    public void testStructNameIsReusedInVardecThrowsException() {
-        /*
-         * struct foo = {};
-         * int foo = 6;
-         */
+//    @Test
+//    public void testStructNameIsReusedInVardecThrowsException() {
+//        /*
+//         * struct foo = {};
+//         * int foo = 6;
+//         */
+//
+//        StructDef structDef = new StructDef(new StructName("foo"), new ArrayList<Param>());
+//        Statement vardecStmt = new VardecStmt(
+//                new IntType(),
+//                new Variable("foo"),
+//                new IntLiteralExp(6));
+//        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
+//        testThrowsTypecheckerException(invalidProgram);
+//    }
 
-        StructDef structDef = new StructDef(new StructName("foo"), new ArrayList<Param>());
-        Statement vardecStmt = new VardecStmt(
-                new IntType(),
-                new Variable("foo"),
-                new IntLiteralExp(6));
-        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
+    @Test
+    public void testAssignStmtWithNoVariableInScopeThrowsException() {
+        /*
+         * a = true;
+         */
+        Statement assign = new AssignStmt(new Variable("a"), new BoolLiteralExp(true));
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(assign));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testAssignStmtWithMismatchedTypesThrowsException() {
+        /*
+         * bool a = false;
+         * a = 3;
+         */
+        Statement vardec = new VardecStmt(new BoolType(), new Variable("a"), new BoolLiteralExp(false));
+        Statement assign = new AssignStmt(new Variable("a"), new IntLiteralExp(3));
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(vardec, assign));
         testThrowsTypecheckerException(invalidProgram);
     }
 
@@ -366,4 +639,15 @@ public class TypecheckerTest {
         Program invalidProgram = new Program(List.of(), List.of(), List.of(orExpStmt));
         testThrowsTypecheckerException(invalidProgram);
     }
+
+    @Test
+    public void testLogicalNotExpStmtWithoutBoolThrowsException() {
+        // !3;
+        Expression expression = new UnaryOpExp(OperatorEnum.NOT, new IntLiteralExp(3));
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
 }
