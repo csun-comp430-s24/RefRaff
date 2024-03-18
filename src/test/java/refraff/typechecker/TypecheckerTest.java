@@ -33,6 +33,7 @@ import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
 import refraff.parser.statement.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertThrows;
@@ -89,6 +90,22 @@ public class TypecheckerTest {
          */
         Statement boolLitExpStmtTrue = new ExpressionStmt(new BoolLiteralExp(true));
         Program program = new Program(List.of(), List.of(), List.of(boolLitExpStmtTrue));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testVardecExpAndVarExp() {
+        /*
+         * int foo = 6;
+         * foo;
+         */
+        Statement vardecStmt = new VardecStmt(
+            new IntType(), 
+            new Variable("foo"),
+            new IntLiteralExp(6)
+        );
+        Statement varExpStmt = new ExpressionStmt(new VariableExp(new Variable("foo")));
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, varExpStmt));
         testDoesNotThrowTypecheckerException(program);
     }
 
@@ -205,6 +222,33 @@ public class TypecheckerTest {
         Statement statement = new ExpressionStmt(orExp);
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testExpStmtWithoutVardecThrowsException() {
+        /*
+         * foo;
+         */
+
+        Statement varExpStmt = new ExpressionStmt(new VariableExp(new Variable("foo")));
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(varExpStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructNameIsReusedInVardec() {
+        /*
+         * struct foo = {};
+         * int foo = 6;
+         */
+
+        StructDef structDef = new StructDef(new StructName("foo"), new ArrayList<Param>());
+        Statement vardecStmt = new VardecStmt(
+                new IntType(),
+                new Variable("foo"),
+                new IntLiteralExp(6));
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
         testThrowsTypecheckerException(invalidProgram);
     }
 }

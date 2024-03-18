@@ -18,6 +18,10 @@ public class Param extends AbstractSyntaxTreeNode {
         this.variable = variable;
     }
 
+    public Type getType() {
+        return type;
+    }
+
     @Override
     public String getNodeTypeDescriptor() {
         return TYPE_DESCRIPTOR;

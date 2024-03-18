@@ -42,20 +42,25 @@ public class Typechecker {
     }
 
     private void typecheckProgram() throws TypecheckerException {
-        typecheckStructDefs();
-        typecheckStatements();
+        // Create an environment map
+        Map<Variable, Type> typeEnv = new HashMap<>();
+        typecheckStructDefs(typeEnv);
+        typecheckStatements(typeEnv);
     }
 
-    private void typecheckStructDefs() throws TypecheckerException {
+    private void typecheckStructDefs(Map<Variable, Type> typeEnv) throws TypecheckerException {
         for (StructDef structDef : program.getStructDefs()) {
             final String typeErrorInStructMessage = "Type error in struct definition for "
                     + structDef.getStructName().structName;
-            // Should this be global? We'll need to check other vardecs against it
-            final Set<Variable> variables = new HashSet<>(); 
+            // Add struct def variable
+            if (typeEnv.put(new Variable(structDef.getStructName().getName()), 
+                    new StructType(structDef.getStructName())) != null) {
+                throw new TypecheckerException(typeErrorInStructMessage + "duplicate variables with same name exist");
+            }
 
             for (Param param : structDef.getParams()) {
                 // If we add a variable, and it already exists, we have a duplicate
-                if (!variables.add(param.variable)) {
+                if (typeEnv.put(param.variable, param.getType()) != null) {
                     throw new TypecheckerException(typeErrorInStructMessage + "duplicate variables with same name exist");
                 }
 
@@ -92,21 +97,20 @@ public class Typechecker {
 
     // Map of statements to their typechecking functions
     private static final Map<Class<? extends Statement>, 
-            TypecheckingFunction<Statement, Map<Variable, Type>, Type>> STMT_TO_TYPE_FUNC = Map.of(
+            TypecheckingVoidFunction<Statement, Map<Variable, Type>>> STMT_TO_TYPE_FUNC = Map.of(
         AssignStmt.class, Typechecker::typecheckAssignStmt,
+        BreakStmt.class, Typechecker::typecheckBreakStmt,
         ExpressionStmt.class, Typechecker::typecheckExpStmt,
         IfElseStmt.class, Typechecker::typecheckIfElseStmt,
         PrintlnStmt.class, Typechecker::typecheckPrintlnStmt,
         ReturnStmt.class, Typechecker::typecheckReturnStmt,
         StmtBlock.class, Typechecker::typecheckStmtBlock,
         VardecStmt.class, Typechecker::typecheckVardecStmt,
-        WhileStmt.class, Typechecker::typecheckerWhileStmt
+        WhileStmt.class, Typechecker::typecheckWhileStmt
     );
 
-    private void typecheckStatements() throws TypecheckerException {
-        // Create an environment map
-        Map<Variable, Type> typeEnv = new HashMap<>();
-
+    private void typecheckStatements(Map<Variable, Type> typeEnv) throws TypecheckerException {
+        
         for (Statement stmt : program.getStatements()) {          
             // Get the statements class
             Class<? extends Statement> stmtClass = stmt.getClass();
@@ -121,56 +125,75 @@ public class Typechecker {
         }
     }
 
-    public static Type typecheckAssignStmt(final Statement assigStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckAssignStmt(final Statement assigStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public static Type typecheckExpStmt(final Statement expStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckBreakStmt(final Statement breakStmt, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        throw new TypecheckerException("Not implemented yet!");
+        // Type test = new VoidType();
+        // return test;
+    }
+
+    public static void typecheckExpStmt(final Statement expStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         ExpressionStmt castExpStmt = (ExpressionStmt)expStmt;
         // Get expression from the expression statement, typecheck that
-        return typecheckExp(castExpStmt.getExpression(), typeEnv);
+        typecheckExp(castExpStmt.getExpression(), typeEnv);
     }
 
-    public static Type typecheckIfElseStmt(final Statement ifElseStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckIfElseStmt(final Statement ifElseStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public static Type typecheckPrintlnStmt(final Statement printLnStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckPrintlnStmt(final Statement printLnStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public static Type typecheckReturnStmt(final Statement returnStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckReturnStmt(final Statement returnStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public static Type typecheckStmtBlock(final Statement stmtBlock, final Map<Variable, Type> typeEnv)
+    public static void typecheckStmtBlock(final Statement stmtBlock, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public static Type typecheckVardecStmt(final Statement vardecStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckVardecStmt(final Statement vardecStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        VardecStmt castVardecStmt = (VardecStmt)vardecStmt;
+        // Get type
+        Type type = castVardecStmt.getType();
+        // Compare to expression
+        Type expType = typecheckExp(castVardecStmt.getExpression(), typeEnv);
+        // If these are the same type
+        if (!type.equals(expType)) {
+            throw new TypecheckerException("Vardec declared type is " + type.getParsedValue()
+                                           + " but expression is " + expType.getParsedValue());
+        }
+        // Add variable to map (throw if already exists)
+        if (typeEnv.put(castVardecStmt.getVariable(), type) != null) {
+            throw new TypecheckerException("Variable " + castVardecStmt.getVariable().getName() 
+                                           + " already declared");
+        }
     }
 
-    public static Type typecheckerWhileStmt(final Statement whileStmt, final Map<Variable, Type> typeEnv)
+    public static void typecheckWhileStmt(final Statement whileStmt, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
@@ -216,7 +239,14 @@ public class Typechecker {
     public static Type typecheckVarExp(final Expression variableExp, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
         VariableExp castVarExp = (VariableExp)variableExp;
-        return typeEnv.get(castVarExp.getVar());
+        // Use optionals instead of this
+        Type type = typeEnv.get(castVarExp.getVar());
+        if (type == null) {
+            throw new TypecheckerException("Variable " + castVarExp.getVar().getName() 
+                                           + " not previously declared");
+        } else {
+            return type;
+        }
     }
 
     // Map of Enums to the types they can operate on
@@ -279,14 +309,16 @@ public class Typechecker {
 
     public static Type typecheckDotExp(final Expression dotExp, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
-        Type test = new VoidType();
-        return test;
+        throw new TypecheckerException("Not implemented yet!");
+        // Type test = new VoidType();
+        // return test;
     }
 
     public static Type typecheckUnaryOpExp(final Expression unaryOpExp, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
-        Type test = new VoidType();
-        return test;
+        throw new TypecheckerException("Not implemented yet!");
+        // Type test = new VoidType();
+        // return test;
     }
 
     public static Type typecheckExp(final Expression exp,
