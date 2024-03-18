@@ -3,7 +3,6 @@ package refraff.parser.struct;
 import java.util.List;
 
 import refraff.parser.AbstractSyntaxTreeNode;
-import refraff.parser.type.StructName;
 
 public class StructDef extends AbstractSyntaxTreeNode {
 

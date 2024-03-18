@@ -1,7 +1,8 @@
-package refraff.parser.type;
+package refraff.parser.struct;
 
+import refraff.parser.AbstractSyntaxTreeNode;
 
-public class StructName extends Type {
+public class StructName extends AbstractSyntaxTreeNode {
     
     private static final String STRUCT_NAME_TYPE = "struct";
 
@@ -15,13 +16,13 @@ public class StructName extends Type {
     }
 
     @Override
-    public boolean shouldThrowOnAssignment() {
-        return false;
+    public String getParsedValue() {
+        return this.structName;
     }
 
     @Override
-    public String getParsedValue() {
-        return this.structName;
+    public String getNodeTypeDescriptor() {
+        return structName;
     }
 
     // I just want my linter to be quiet

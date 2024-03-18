@@ -7,6 +7,7 @@ public class VariableExp extends PrimaryExpression {
     
     public VariableExp(String name) {
         super(name);
+
         this.name = name;
     }
 

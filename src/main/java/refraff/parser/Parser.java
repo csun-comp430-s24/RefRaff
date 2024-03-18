@@ -139,12 +139,12 @@ public class Parser {
 
         // Try to parse the struct name
         Optional<ParseResult<Type>> opStructName = parseType(currentPosition);
-        if (opStructName.isEmpty() || !(opStructName.get().result instanceof StructName)) {
+        if (opStructName.isEmpty() || !(opStructName.get().result instanceof StructType)) {
             throwParserException(structDefinition, "struct name", currentPosition);
         }
 
         ParseResult<Type> parsedTypeResult = opStructName.get();
-        StructName structName = (StructName) parsedTypeResult.result;
+        StructName structName = ((StructType) parsedTypeResult.result).getStructName().get();
         currentPosition = parsedTypeResult.nextPosition;
 
         // Ensure that there's a left brace here
@@ -1083,7 +1083,7 @@ public class Parser {
             IntToken.class, (token) -> new IntType(),
             BoolToken.class, (token) -> new BoolType(),
             VoidToken.class, (token) -> new VoidType(),
-            IdentifierToken.class, (token) -> new StructName(token.getTokenizedValue())
+            IdentifierToken.class, (token) -> new StructType(new StructName(token.getTokenizedValue()))
     );
 
     // type ::= 'int' | 'bool' | 'void' | structname
