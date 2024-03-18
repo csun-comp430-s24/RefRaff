@@ -382,6 +382,29 @@ public class TypecheckerTest {
         testThrowsTypecheckerException(invalidProgram);
     }
 
+
+    @Test
+    public void testStructAllocExpWithTooFewParams() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * new A {};
+         */
+        StructDef structDef = new StructDef(new StructName("A"), List.of(
+                new Param(new StructType(new StructName("A")), new Variable("a"))
+        ));
+
+        Expression expression = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of()));
+
+        Statement statement = new ExpressionStmt(expression);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
     @Test
     public void testStructAllocExpWithTooManyParams() {
         /*
