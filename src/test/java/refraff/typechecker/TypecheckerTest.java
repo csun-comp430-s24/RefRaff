@@ -26,6 +26,11 @@ public class TypecheckerTest {
 
     @Test
     public void testStructDefWithRecursiveStructVariableType() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         */
         StructDef structDef = new StructDef(new StructName("A"), List.of(
                 new Param(new StructType(new StructName("A")), new Variable("a"))
         ));
@@ -36,6 +41,12 @@ public class TypecheckerTest {
 
     @Test
     public void testStructDefWithOtherStructVariableType() {
+        /*
+         * struct A {
+         *   int foo;
+         *   bool bar;
+         * }
+         */
         StructDef structDef1 = new StructDef(new StructName("A"), List.of(
                 new Param(new IntType(), new Variable("foo")),
                 new Param(new BoolType(), new Variable("bar"))
@@ -49,6 +60,8 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
+    
+
     // Test invalid inputs
 
     private void testThrowsTypecheckerException(Program invalidProgram) {
@@ -57,6 +70,11 @@ public class TypecheckerTest {
 
     @Test
     public void testStructDefWithVoidTypeVariable() {
+        /*
+         * struct A {
+         *   Void b;
+         * }
+         */
         StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
                 new Param(new VoidType(), new Variable("b"))
         ));
@@ -67,6 +85,11 @@ public class TypecheckerTest {
 
     @Test
     public void testStructDefWithUndefinedStructTypeVariable() {
+        /*
+         * struct A {
+         *   B b;
+         * }
+         */
         StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
                 new Param(new StructType(new StructName("B")), new Variable("b"))
         ));
@@ -77,6 +100,12 @@ public class TypecheckerTest {
 
     @Test
     public void testStructDefWithRepeatedVariableName() {
+        /*
+         * struct A {
+         *   int b;
+         *   bool b;
+         * }
+         */
         StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
                 new Param(new IntType(), new Variable("b")),
                 new Param(new BoolType(), new Variable("b"))

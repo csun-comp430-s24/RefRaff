@@ -1,17 +1,28 @@
 package refraff.typechecker;
 
+import refraff.parser.ParseResult;
 import refraff.parser.Program;
 import refraff.parser.Variable;
 import refraff.parser.struct.Param;
 import refraff.parser.struct.StructDef;
 import refraff.parser.struct.StructName;
-import refraff.parser.type.StructType;
-import refraff.parser.type.Type;
-import refraff.parser.type.VoidType;
+import refraff.parser.type.*;
+import refraff.tokenizer.IdentifierToken;
+import refraff.tokenizer.Token;
+import refraff.tokenizer.reserved.BoolToken;
+import refraff.tokenizer.reserved.IntToken;
+import refraff.tokenizer.reserved.VoidToken;
+import refraff.tokenizer.symbol.*;
+import refraff.parser.expression.primaryExpression.*;
+import refraff.parser.operator.OperatorEnum;
+import refraff.parser.expression.*;
 
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class Typechecker {
@@ -79,4 +90,117 @@ public class Typechecker {
         throw new TypecheckerException(onVariableDeclaration + errorMessage);
     }
 
+    // Map of Expression classes to functions that return their types
+    private static final Map<Class<? extends Expression>, 
+            TypecheckingFunction<Expression, Map<Variable, Type>, Type>> EXP_TO_TYPE = Map.of(
+        BoolLiteralExp.class, (exp, typeEnv) -> new BoolType(),
+        FuncCallExp.class, Typechecker::typecheckFuncCallExp,
+        IntLiteralExp.class, (exp, typeEnv) -> new IntType(),
+        NullExp.class, (exp, typeEnv) -> new VoidType(),
+        ParenExp.class, Typechecker::typecheckParenExp,
+        StructAllocExp.class, Typechecker::typecheckStructAllocExp,
+        VariableExp.class, Typechecker::typecheckVarExp,
+        BinaryOpExp.class, Typechecker::typecheckerBinOpExp,
+        DotExp.class, Typechecker::typecheckDotExp,
+        UnaryOpExp.class, Typechecker::typecheckUnaryOpExp
+    );
+
+    public static Type typecheckFuncCallExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckParenExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckStructAllocExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckVarExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckerBinOpExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckDotExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckUnaryOpExp(final Expression binExp, final Map<Variable, Type> typeEnv)
+            throws TypecheckerException {
+        Type test = new VoidType();
+        return test;
+    }
+
+    public static Type typecheckExp(final Expression exp,
+                                    final Map<Variable, Type> typeEnv) throws TypecheckerException {
+
+        // Get the expression's class
+        Class<? extends Expression> expClass = exp.getClass();
+
+        if (!EXP_TO_TYPE.containsKey(expClass)) {
+            // Do I throw an error here? This should be an expression and it isn't? IDK
+            throw new TypecheckerException("Expected expression, got: " + expClass.toString());
+        }
+
+        Type type = EXP_TO_TYPE.get(expClass).apply(exp, typeEnv);
+        return type;
+    
+
+        // if (exp instanceof IntLiteralExp) {
+        //     return new IntType();
+        // } else if (exp instanceof BoolLiteralExp) {
+        //     return new BoolType();
+        // } else if (exp instanceof VariableExp) {
+        //     final Variable variable = ((VariableExp)exp).getVar();
+        //     if (typeEnv.get(variable) {
+        //         return typeEnv.get(variable);
+        //     } else {
+        //         throw new TypecheckerException("Variable not in scope: " + variable.name);
+        //     }
+        // } else if (exp instanceof BinaryOpExp) {
+        //     final BinaryOpExp asBin = (BinaryOpExp)asBin;
+        //     return typecheckBin(asBin, typeEnv);
+        // } else {
+        //     assert(false);
+        //     throw new TypecheckerException("Haven't implemented expression typechecking yet");
+        // }
+    }
+
+
+
+
+
+
+    /*
+     * private final static Map<Token, OperatorEnum> TOKEN_TO_OP = Map.ofEntries(
+        new SimpleImmutableEntry<>(new OrToken(), OperatorEnum.OR),
+        new SimpleImmutableEntry<>(new AndToken(), OperatorEnum.AND),
+        new SimpleImmutableEntry<>(new DoubleEqualsToken(), OperatorEnum.DOUBLE_EQUALS),
+        new SimpleImmutableEntry<>(new NotEqualsToken(), OperatorEnum.NOT_EQUALS),
+        new SimpleImmutableEntry<>(new LessThanEqualsToken(), OperatorEnum.LESS_THAN_EQUALS),
+        new SimpleImmutableEntry<>(new GreaterThanEqualsToken(), OperatorEnum.GREATER_THAN_EQUALS),
+        new SimpleImmutableEntry<>(new PlusToken(), OperatorEnum.PLUS),
+        new SimpleImmutableEntry<>(new MinusToken(), OperatorEnum.MINUS),
+        new SimpleImmutableEntry<>(new MultiplyToken(), OperatorEnum.MULTIPLY),
+        new SimpleImmutableEntry<>(new DivisionToken(), OperatorEnum.DIVISION),
+        new SimpleImmutableEntry<>(new NotToken(), OperatorEnum.NOT),
+        new SimpleImmutableEntry<>(new DotToken(), OperatorEnum.DOT)
+    );
+     */
 }

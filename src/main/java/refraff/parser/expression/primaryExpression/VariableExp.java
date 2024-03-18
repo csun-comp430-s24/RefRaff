@@ -1,17 +1,18 @@
 package refraff.parser.expression.primaryExpression;
 
+import refraff.parser.Variable;
 
 public class VariableExp extends PrimaryExpression {
 
-    private final String name; // I don't know if we need this
+    private final Variable var;
     
-    public VariableExp(String name) {
-        super(name);
+    public VariableExp(Variable var) {
+        super(var.name);
 
-        this.name = name;
+        this.var = var;
     }
 
-    public String getName() {
-        return name;
+    public Variable getVar() {
+        return var;
     }
 }
