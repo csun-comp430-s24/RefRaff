@@ -215,9 +215,8 @@ public class Typechecker {
 
     public static Type typecheckVarExp(final Expression variableExp, final Map<Variable, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        VariableExp castVarExp = (VariableExp)variableExp;
+        return typeEnv.get(castVarExp.getVar());
     }
 
     // Map of Enums to the types they can operate on

@@ -95,16 +95,14 @@ public class TypecheckerTest {
     @Test
     public void testExpWithBinOpExp() {
         /*
-         * (!isTrue && (4 + 3 * 7 >= count - otherCount.value / 5)) || false;
+         * (false && (4 + 3 * 7 >= 4 - 3 / 5)) || true;
          */
 
-        Expression varExpOtherCount = new VariableExp(new Variable("otherCount"));
-        Variable varValue = new Variable("value");
-        DotExp dotExp = new DotExp(varExpOtherCount, varValue);
+        Expression intLiteral1 = new IntLiteralExp(1);
         Expression intLiteral5 = new IntLiteralExp(5);
-        Expression binOpDivide = new BinaryOpExp(dotExp, OperatorEnum.DIVISION, intLiteral5);
-        Expression varExpCount = new VariableExp(new Variable("count"));
-        Expression binOpMinus = new BinaryOpExp(varExpCount, OperatorEnum.MINUS, binOpDivide);
+        Expression binOpDivide = new BinaryOpExp(intLiteral1, OperatorEnum.DIVISION, intLiteral5);
+        Expression intLiteral6 = new IntLiteralExp(6);
+        Expression binOpMinus = new BinaryOpExp(intLiteral6, OperatorEnum.MINUS, binOpDivide);//
 
         Expression intLiteral3 = new IntLiteralExp(3);
         Expression intLiteral7 = new IntLiteralExp(7);
@@ -114,13 +112,12 @@ public class TypecheckerTest {
 
         Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, binOpMinus);
         Expression parenGteExp = new ParenExp(binOpGte);
-        Expression varIsTrue = new VariableExp(new Variable("isTrue"));
-        Expression notOpExp = new UnaryOpExp(OperatorEnum.NOT, varIsTrue);
-
-        Expression andExp = new BinaryOpExp(notOpExp, OperatorEnum.AND, parenGteExp);
         Expression falseExp = new BoolLiteralExp(false);
+
+        Expression andExp = new BinaryOpExp(falseExp, OperatorEnum.AND, parenGteExp);
+        Expression trueExp = new BoolLiteralExp(true);
         Expression parenAndExp = new ParenExp(andExp);
-        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, falseExp);
+        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, trueExp);
 
         Statement statement = new ExpressionStmt(orExp);
 
@@ -183,4 +180,31 @@ public class TypecheckerTest {
         testThrowsTypecheckerException(invalidProgram);
     }
 
+    @Test
+    public void testExpStmtWithBinaryOpsThrowsExceptionOnBoolInGteExp() {
+        /*
+         * (false && (4 + 3 * 7 >= true)) || true;
+         */
+        Expression trueExp2 = new BoolLiteralExp(true);
+
+        Expression intLiteral3 = new IntLiteralExp(3);
+        Expression intLiteral7 = new IntLiteralExp(7);
+        Expression binOpMult = new BinaryOpExp(intLiteral3, OperatorEnum.MULTIPLY, intLiteral7);
+        Expression intLiteral4 = new IntLiteralExp(4);
+        Expression binOpAdd = new BinaryOpExp(intLiteral4, OperatorEnum.PLUS, binOpMult);
+
+        Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, trueExp2);
+        Expression parenGteExp = new ParenExp(binOpGte);
+        Expression falseExp = new BoolLiteralExp(false);
+
+        Expression andExp = new BinaryOpExp(falseExp, OperatorEnum.AND, parenGteExp);
+        Expression trueExp = new BoolLiteralExp(true);
+        Expression parenAndExp = new ParenExp(andExp);
+        Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, trueExp);
+
+        Statement statement = new ExpressionStmt(orExp);
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
 }
