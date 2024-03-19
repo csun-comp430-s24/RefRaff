@@ -8,6 +8,10 @@ public class Variable {
         this.name = name;
     }
 
+    public String getName() {
+        return name;
+    }
+
     @Override
     public boolean equals(final Object other) {
         return (other instanceof Variable &&

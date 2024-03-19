@@ -1,6 +1,6 @@
 package refraff.parser.expression.primaryExpression;
 
-import refraff.parser.type.Type;
+import refraff.parser.type.StructType;
 import refraff.parser.struct.StructActualParams;
 
 
@@ -8,17 +8,18 @@ public class StructAllocExp extends PrimaryExpression {
         
     private static final String STRUCT_ALLOC_EXP = "struct allocation expression";
 
-    private final Type structName;
+    private final StructType structType;
     private final StructActualParams params;
 
-    public StructAllocExp(Type structName, StructActualParams params) {
+    public StructAllocExp(StructType structType, StructActualParams params) {
         super(STRUCT_ALLOC_EXP);
-        this.structName = structName;
+
+        this.structType = structType;
         this.params = params;
     }
 
-    public Type getStructName() {
-        return structName;
+    public StructType getStructType() {
+        return structType;
     }
 
     public StructActualParams getParams() {

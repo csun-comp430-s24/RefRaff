@@ -328,7 +328,7 @@ public class ParserTest {
         );
 
         Expression intLiteral6 = new IntLiteralExp(6);
-        Expression varCount = new VariableExp("count");
+        Expression varCount = new VariableExp(new Variable("count"));
         Expression binOpDoubleEquals = new BinaryOpExp(varCount, OperatorEnum.DOUBLE_EQUALS, intLiteral6);
         Expression parenExp = new ParenExp(binOpDoubleEquals);
         Variable varIsTrue = new Variable("isTrue");
@@ -402,7 +402,7 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
-        DotExp dotExp = new DotExp(new VariableExp("example"), new Variable("result"));
+        DotExp dotExp = new DotExp(new VariableExp(new Variable("example")), new Variable("result"));
 
         statements.add(new AssignStmt(
                 new Variable("retval"),
@@ -434,7 +434,7 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
-        DotExp dotExp0 = new DotExp(new VariableExp("example"), new Variable("result"));
+        DotExp dotExp0 = new DotExp(new VariableExp(new Variable("example")), new Variable("result"));
         DotExp dotExp1 = new DotExp(dotExp0, new Variable("value"));
         DotExp dotExp2 = new DotExp(dotExp1, new Variable("rest"));
         DotExp dotExp3 = new DotExp(dotExp2, new Variable("next"));
@@ -463,7 +463,7 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
-        Expression leftExp = new VariableExp("retval");
+        Expression leftExp = new VariableExp(new Variable("retval"));
         Expression rightExp = new IntLiteralExp(2);
 
         BinaryOpExp multExp = new BinaryOpExp(leftExp, OperatorEnum.MULTIPLY, rightExp);
@@ -475,6 +475,36 @@ public class ParserTest {
 
         assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), 6),
                 parser.parseProgram(0));
+    }
+
+    private void testCompareExpWithOperator(OperatorEnum operator, Token tokenOperator) {
+        // 3 <op> 4;
+        Token[] input = toArray(new IntLiteralToken("3"), tokenOperator, new IntLiteralToken("4"), new SemicolonToken());
+
+        BinaryOpExp binaryOpExp = new BinaryOpExp(new IntLiteralExp(3), operator, new IntLiteralExp(4));
+        ExpressionStmt expressionStmt = new ExpressionStmt(binaryOpExp);
+
+        testStatementMatchesExpected(expressionStmt, input);
+    }
+
+    @Test
+    public void testCompareExpWithLessThanEquals() {
+        testCompareExpWithOperator(OperatorEnum.LESS_THAN_EQUALS, new LessThanEqualsToken());
+    }
+
+    @Test
+    public void testCompareExpWithGreaterThanEquals() {
+        testCompareExpWithOperator(OperatorEnum.GREATER_THAN_EQUALS, new GreaterThanEqualsToken());
+    }
+
+    @Test
+    public void testCompareExpWithLessThan() {
+        testCompareExpWithOperator(OperatorEnum.LESS_THAN, new LessThanToken());
+    }
+
+    @Test
+    public void testCompareExpWithGreaterThan() {
+        testCompareExpWithOperator(OperatorEnum.GREATER_THAN, new GreaterThanToken());
     }
 
     @Test
@@ -492,12 +522,12 @@ public class ParserTest {
             new RightParenToken(), new OrToken(), new FalseToken(), new SemicolonToken()
         );
 
-        Expression varExpOtherCount = new VariableExp("otherCount");
+        Expression varExpOtherCount = new VariableExp(new Variable("otherCount"));
         Variable varValue = new Variable("value");
         DotExp dotExp = new DotExp(varExpOtherCount, varValue);
         Expression intLiteral5 = new IntLiteralExp(5);
         Expression binOpDivide = new BinaryOpExp(dotExp, OperatorEnum.DIVISION, intLiteral5);
-        Expression varExpCount = new VariableExp("count");
+        Expression varExpCount = new VariableExp(new Variable("count"));
         Expression binOpMinus = new BinaryOpExp(varExpCount, OperatorEnum.MINUS, binOpDivide);
 
         Expression intLiteral3 = new IntLiteralExp(3);
@@ -508,7 +538,7 @@ public class ParserTest {
 
         Expression binOpGte = new BinaryOpExp(binOpAdd, OperatorEnum.GREATER_THAN_EQUALS, binOpMinus);
         Expression parenGteExp = new ParenExp(binOpGte);
-        Expression varIsTrue = new VariableExp("isTrue");
+        Expression varIsTrue = new VariableExp(new Variable("isTrue"));
         Expression notOpExp = new UnaryOpExp(OperatorEnum.NOT, varIsTrue);
 
         Expression andExp = new BinaryOpExp(notOpExp, OperatorEnum.AND, parenGteExp);
@@ -521,6 +551,28 @@ public class ParserTest {
         testStatementMatchesExpected(statement, input);
     }
 
+    @Test
+    public void testStructDefWithNoParams() {
+        // struct A {}
+        Token[] input = toArray(new StructToken(), new IdentifierToken("a"), new LeftBraceToken(), new RightBraceToken());
+        StructDef structDef = new StructDef(new StructName("a"), List.of());
+        Program program = new Program(List.of(structDef), List.of(), List.of());
+
+        testProgramMatchesExpectedResult(program, input);
+    }
+
+    @Test
+    public void testStructAllocationWithNoParams() {
+        // new A {};
+        Token[] input = toArray(new NewToken(), new IdentifierToken("A"), new LeftBraceToken(), new RightBraceToken(),
+                new SemicolonToken());
+
+        StructAllocExp structAllocExp = new StructAllocExp(new StructType(new StructName("A")),
+                new StructActualParams(List.of()));
+        ExpressionStmt expressionStmt = new ExpressionStmt(structAllocExp);
+
+        testStatementMatchesExpected(expressionStmt, input);
+    }
 
     @Test
     public void testParseProgramWithStructAllocation() throws ParserException {
@@ -610,7 +662,7 @@ public class ParserTest {
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
 
-        VariableExp variableList = new VariableExp("list");
+        VariableExp variableList = new VariableExp(new Variable("list"));
         CommaExp commaExp = new CommaExp(Arrays.asList(variableList));
         FunctionName funcNameLength = new FunctionName("length"); 
         FuncCallExp funcCallExp = new FuncCallExp(funcNameLength, commaExp);
@@ -643,8 +695,8 @@ public class ParserTest {
 
 
         BoolLiteralExp boolLitTrue = new BoolLiteralExp(true);
-        VariableExp varExpIndex = new VariableExp("index");
-        DotExp dotExp = new DotExp(new VariableExp("node"), new Variable("next"));
+        VariableExp varExpIndex = new VariableExp(new Variable("index"));
+        DotExp dotExp = new DotExp(new VariableExp(new Variable("node")), new Variable("next"));
         List<Expression> argsList = Arrays.asList(dotExp, varExpIndex, boolLitTrue);
         CommaExp commaExp = new CommaExp(argsList);
         FunctionName funcNameLength = new FunctionName("length");
@@ -657,9 +709,19 @@ public class ParserTest {
                 parser.parseProgram(0));
     }
 
+    // Invalid tests
+
+    // Test invalid inputs
 
     private void testProgramParsesWithException(Token... tokens) {
-        assertThrows(ParserException.class, () -> parseProgram(tokens));
+        assertThrows(ParserMalformedException.class, () -> parseProgram(tokens));
+    }
+
+    @Test
+    public void testStructDefWithNoParamNameThrowsException() {
+        // struct A { int; }
+        testProgramParsesWithException(new StructToken(), new IdentifierToken("A"), new LeftBraceToken(),
+                new IntToken(), new SemicolonToken(), new RightBraceToken());
     }
 
     @Test
@@ -842,6 +904,13 @@ public class ParserTest {
             new StructToken(), new AssignmentToken(), new LeftBraceToken(),
             new RightBraceToken(), new SemicolonToken()
         );
+    }
+
+    @Test
+    public void testStructAllocationWithIntTokenInsteadOfStructNameThrowsException() {
+        // new int {};
+        testProgramParsesWithException(new NewToken(), new IntToken(), new LeftBraceToken(), new RightBraceToken(),
+                new SemicolonToken());
     }
 
     @Test

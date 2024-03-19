@@ -18,5 +18,4 @@ public abstract class Type extends AbstractSyntaxTreeNode {
     public String getNodeTypeDescriptor() {
         return TYPE_DESCRIPTOR;
     }
-
 }

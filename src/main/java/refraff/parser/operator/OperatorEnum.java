@@ -7,6 +7,8 @@ public enum OperatorEnum {
     NOT_EQUALS("!="),
     LESS_THAN_EQUALS("<="),
     GREATER_THAN_EQUALS(">="),
+    LESS_THAN("<"),
+    GREATER_THAN(">"),
     PLUS("+"),
     MINUS("-"),
     MULTIPLY("*"),

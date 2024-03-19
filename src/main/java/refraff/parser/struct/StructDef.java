@@ -1,8 +1,12 @@
 package refraff.parser.struct;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import refraff.parser.AbstractSyntaxTreeNode;
+import refraff.parser.Variable;
+import refraff.parser.type.Type;
 
 public class StructDef extends AbstractSyntaxTreeNode {
 
