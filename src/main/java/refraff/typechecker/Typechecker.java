@@ -2,6 +2,7 @@ package refraff.typechecker;
 
 import refraff.SourcePosition;
 import refraff.parser.AbstractSyntaxTreeNode;
+import refraff.parser.Node;
 import refraff.parser.Program;
 import refraff.parser.Variable;
 import refraff.parser.struct.*;
@@ -200,7 +201,7 @@ public class Typechecker {
                 // If we add a variable, and it already exists, we have a duplicate
                 if (!standardizedVariables.add(Standardized.of(param.variable))) {
                     throwTypecheckerException(typeErrorInStructMessage, structDef, param,
-                            param.variable.getName() + " is already defined in this struct");
+                            "struct parameter `" + param.variable.getName() + "` has already been defined");
                 }
 
                 // Else, check that all variable declarations for the struct do not: have a return type of void
@@ -396,7 +397,7 @@ public class Typechecker {
         StructType structType = structAllocExp.getStructType();
         StructName structName = structType.getStructName().get();
 
-        final String structWhereWeAre = "struct " + structName;
+        final String structWhereWeAre = "struct `" + structName + "`";
         StructDef structDef = structNameToDef.get(Standardized.of(structName));
 
         if (structDef == null) {
@@ -455,38 +456,41 @@ public class Typechecker {
                 typeEnv);
     }
 
+    private static final BoolType BOOL_TYPE = Node.setNodeSource(new BoolType(), "bool");
+    private static final IntType INT_TYPE = Node.setNodeSource(new IntType(), "int");
+
     // Map of Enums to the types they can operate on
     private static final Map<OperatorEnum, List<Type>> OP_TO_OPERAND_TYPE = new HashMap<>() {{
-        put(OperatorEnum.NOT, List.of(new BoolType()));
-        put(OperatorEnum.OR, Arrays.asList(new BoolType()));
-        put(OperatorEnum.AND, Arrays.asList(new BoolType()));
-        put(OperatorEnum.DOUBLE_EQUALS, Arrays.asList(new BoolType(), new IntType()));
-        put(OperatorEnum.NOT_EQUALS, Arrays.asList(new BoolType(), new IntType()));
-        put(OperatorEnum.LESS_THAN_EQUALS, Arrays.asList(new IntType()));
-        put(OperatorEnum.GREATER_THAN_EQUALS, Arrays.asList(new IntType()));
-        put(OperatorEnum.LESS_THAN, Arrays.asList(new IntType()));
-        put(OperatorEnum.GREATER_THAN, Arrays.asList(new IntType()));
-        put(OperatorEnum.PLUS, Arrays.asList(new IntType()));
-        put(OperatorEnum.MINUS, Arrays.asList(new IntType()));
-        put(OperatorEnum.MULTIPLY, Arrays.asList(new IntType()));
-        put(OperatorEnum.DIVISION, Arrays.asList(new IntType()));
+        put(OperatorEnum.NOT, List.of(BOOL_TYPE));
+        put(OperatorEnum.OR, Arrays.asList(BOOL_TYPE));
+        put(OperatorEnum.AND, Arrays.asList(BOOL_TYPE));
+        put(OperatorEnum.DOUBLE_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE));
+        put(OperatorEnum.NOT_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE));
+        put(OperatorEnum.LESS_THAN_EQUALS, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.GREATER_THAN_EQUALS, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.LESS_THAN, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.GREATER_THAN, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.PLUS, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.MINUS, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.MULTIPLY, Arrays.asList(INT_TYPE));
+        put(OperatorEnum.DIVISION, Arrays.asList(INT_TYPE));
     }};
 
     // Map of Enums to the types they evaluate to
     private static final Map<OperatorEnum, Type> OP_TO_EVAL_TYPE = new HashMap<>() {{
-        put(OperatorEnum.NOT, new BoolType());
-        put(OperatorEnum.OR, new BoolType());
-        put(OperatorEnum.AND, new BoolType());
-        put(OperatorEnum.DOUBLE_EQUALS, new BoolType());
-        put(OperatorEnum.NOT_EQUALS, new BoolType());
-        put(OperatorEnum.LESS_THAN_EQUALS, new BoolType());
-        put(OperatorEnum.GREATER_THAN_EQUALS, new BoolType());
-        put(OperatorEnum.LESS_THAN, new BoolType());
-        put(OperatorEnum.GREATER_THAN, new BoolType());
-        put(OperatorEnum.PLUS, new IntType());
-        put(OperatorEnum.MINUS, new IntType());
-        put(OperatorEnum.MULTIPLY, new IntType());
-        put(OperatorEnum.DIVISION, new IntType());
+        put(OperatorEnum.NOT, BOOL_TYPE);
+        put(OperatorEnum.OR, BOOL_TYPE);
+        put(OperatorEnum.AND, BOOL_TYPE);
+        put(OperatorEnum.DOUBLE_EQUALS, BOOL_TYPE);
+        put(OperatorEnum.NOT_EQUALS, BOOL_TYPE);
+        put(OperatorEnum.LESS_THAN_EQUALS, BOOL_TYPE);
+        put(OperatorEnum.GREATER_THAN_EQUALS, BOOL_TYPE);
+        put(OperatorEnum.LESS_THAN, BOOL_TYPE);
+        put(OperatorEnum.GREATER_THAN, BOOL_TYPE);
+        put(OperatorEnum.PLUS, INT_TYPE);
+        put(OperatorEnum.MINUS, INT_TYPE);
+        put(OperatorEnum.MULTIPLY, INT_TYPE);
+        put(OperatorEnum.DIVISION, INT_TYPE);
     }};
 
     public boolean operandsAreValidType(List<Type> validTypes, Type type) {
@@ -532,9 +536,10 @@ public class Typechecker {
 
         if (!operandsAreValidType(validOperandTypes, leftHandType, rightHandType)) {
             // This should really be a more descriptive error message depending on the list of valid types
-            String errorMessage = String.format("expected one type of: {%s}", validOperandTypes.stream()
-                    .map(type -> "`" + type.getNodeTypeDescriptor() + "`")
-                    .collect(Collectors.joining(", ")));
+            String errorMessage = String.format("expected expression(s) to be type of: {%s}",
+                    validOperandTypes.stream()
+                        .map(type -> "`" + type.getSource().getSourceString() + "`")
+                        .collect(Collectors.joining(" | ")));
 
             throwTypecheckerException(error, binaryOpExp, binaryOpExp, errorMessage);
         }
@@ -601,9 +606,10 @@ public class Typechecker {
         List<Type> validTypes = OP_TO_OPERAND_TYPE.get(op);
         if (!operandsAreValidType(validTypes, expressionType)) {
             // This should really be a more descriptive error message depending on the list of valid types
-            String errorMessage = String.format("expected one type of: {%s}", validTypes.stream()
-                            .map(type -> "`" + type.getNodeTypeDescriptor() + "`")
-                            .collect(Collectors.joining(", ")));
+            String errorMessage = String.format("expected expression(s) to be type of: {%s}",
+                    validTypes.stream()
+                            .map(type -> "`" + type.getSource().getSourceString() + "`")
+                            .collect(Collectors.joining(" | ")));
 
             throwTypecheckerException(op.getSymbol() + " expression", exp, expressionType, errorMessage);
         }

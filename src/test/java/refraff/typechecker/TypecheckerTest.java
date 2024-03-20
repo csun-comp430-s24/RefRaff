@@ -728,18 +728,17 @@ public class TypecheckerTest {
         }
     }
 
-    //@Ignore("Method to screenshot typechecker error messages")
+    @Ignore("Method to screenshot typechecker error messages")
     @Test
     public void testTokenizeParseTypecheckInvalidProgram() {
-        String input = "null.var;";
+        String input = """
+                struct A {
+                  int foo;
+                  bool foo;
+                }""";
         try {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
-
-            ExpressionStmt expressionStmt = (ExpressionStmt) program.getStatements().get(0);
-            DotExp dotExp = (DotExp) expressionStmt.getExpression();
-            System.out.println(dotExp.getLeftExp().getExpressionType());
-
             Typechecker.typecheckProgram(program);
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
