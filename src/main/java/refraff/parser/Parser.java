@@ -1177,8 +1177,7 @@ public class Parser {
     private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_CLASS_TO_TYPE = Map.of(
             IntToken.class, (token) -> new IntType(),
             BoolToken.class, (token) -> new BoolType(),
-            VoidToken.class, (token) -> new VoidType(),
-            IdentifierToken.class, (token) -> new StructType(new StructName(token.getTokenizedValue()))
+            VoidToken.class, (token) -> new VoidType()
     );
 
     // type ::= 'int' | 'bool' | 'void' | structname
@@ -1186,6 +1185,12 @@ public class Parser {
         final Optional<Token> maybeToken = getToken(position);
         if (maybeToken.isEmpty()) {
             return Optional.empty();
+        }
+
+        // Explicitly handle identifiers to source both the struct name and struct type
+        if (isExpectedToken(position, IdentifierToken.class)) {
+            StructName structName = getSourcedNode(position, token -> new StructName(token.getTokenizedValue()));
+            return getOptionalSourcedParseResult(new StructType(structName), position, position + 1);
         }
 
         Token token = maybeToken.get();

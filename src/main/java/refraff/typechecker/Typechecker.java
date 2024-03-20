@@ -18,22 +18,12 @@ public class Typechecker {
 
     private final Program program;
 
-    private final Map<String, StructDef> structNameToDef;
+    private final Map<Standardized<StructName>, StructDef> structNameToDef;
 
-    private Typechecker(Program program) throws TypecheckerException {
+    private Typechecker(Program program) {
         this.program = program;
 
-        // Map all the struct definitions names to their AST definitions
-        // This throws an IllegalStateException if two structs share a name
-        // Should we catch it and throw a TypecheckerException?
-        try {
-            this.structNameToDef = program.getStructDefs().stream()
-                .collect(Collectors.toMap(
-                        structDef -> structDef.getStructName().getName(),
-                        structDef -> structDef));
-        } catch (IllegalStateException e) {
-            throw new TypecheckerException("Struct declarations share a name");
-        }
+        this.structNameToDef = new HashMap<>();
     }
 
     public static void typecheckProgram(Program program) throws TypecheckerException {
@@ -42,30 +32,29 @@ public class Typechecker {
 
     private void typecheckProgram() throws TypecheckerException {
         // Create an environment map
-        Map<String, Type> typeEnv = new HashMap<>();
+        Map<Standardized<Variable>, Type> typeEnv = new HashMap<>();
         typecheckStructDefs(typeEnv);
         typecheckStatements(typeEnv);
     }
 
     private void throwTypecheckerExceptionOnVariableExists(String beingParsed, AbstractSyntaxTreeNode parent, Variable variable,
-                                                                  Map<String, Type> typeEnv) throws TypecheckerException {
-        String variableName = variable.getName();
-        if (!typeEnv.containsKey(variableName)) {
+                                                                  Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        if (!typeEnv.containsKey(Standardized.of(variable))) {
             return;
         }
 
-        final String errorSuffix = "variable `" + variableName + "` is already defined in this scope";
+        final String errorSuffix = "variable `" + variable.getName() + "` is already defined in this scope";
         throwTypecheckerException(beingParsed, parent, variable, errorSuffix);
     }
 
     private Type throwTypecheckerExceptionOnVariableNotExists(String beingParsed, AbstractSyntaxTreeNode parent, Variable variable,
-                                                                     Map<String, Type> typeEnv) throws TypecheckerException {
-        String variableName = variable.getName();
-        if (typeEnv.containsKey(variableName)) {
-            return typeEnv.get(variableName);
+                                                                     Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        Standardized<Variable> standardizedVariable = Standardized.of(variable);
+        if (typeEnv.containsKey(standardizedVariable)) {
+            return typeEnv.get(standardizedVariable);
         }
 
-        final String errorSuffix = "variable `" + variableName + "` is not defined in this scope";
+        final String errorSuffix = "variable `" + variable.getName() + "` is not defined in this scope";
         throwTypecheckerException(beingParsed, parent, variable, errorSuffix);
 
         return null;
@@ -125,7 +114,7 @@ public class Typechecker {
 
         // Add space until we're under the child, then print the error message below the caret pointer and new line
         errorMessageBuilder.append(spacePrefix);
-        errorMessageBuilder.append("   ");
+        errorMessageBuilder.append("    ");
         errorMessageBuilder.append(errorMessage);
         errorMessageBuilder.append('\n');
 
@@ -133,7 +122,27 @@ public class Typechecker {
         throw new TypecheckerException(builtErrorMessage);
     }
 
-    private void typecheckStructDefs(Map<String, Type> typeEnv) throws TypecheckerException {
+    private void typecheckStructDefs(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        final String typeErrorInStructMessageFormat = "struct definition for `%s`";
+        
+        // Add all the structs manually before trying to parse a struct's fields (allow recursion/reference other structs)
+
+        // Map all the struct definitions names to their AST definitions
+        for (StructDef structDef : program.getStructDefs()) {
+            StructName structName = structDef.getStructName();
+            Standardized<StructName> standardizedStructName = Standardized.of(structName);
+            
+            // If we don't already have a struct definition defined, add it to the map
+            if (!structNameToDef.containsKey(standardizedStructName)) {
+                structNameToDef.put(standardizedStructName, structDef);
+                continue;
+            }
+            
+            String stringStructName = structName.getName();
+            throwTypecheckerException(String.format(typeErrorInStructMessageFormat, stringStructName),
+                    structDef, structName, "struct `" + stringStructName + "` has already been defined");
+        }
+        
         for (StructDef structDef : program.getStructDefs()) {
             final String typeErrorInStructMessage = "struct definition for `" + structDef.getStructName().structName + "`";
             // Add struct def variable
@@ -185,50 +194,51 @@ public class Typechecker {
 
             // Similarly, we most likely would not want functions to put their variables on the type environment
             // until we enter the body of a function
-            Set<String> variableNames = new HashSet<>();
+            Set<Standardized<Variable>> standardizedVariables = new HashSet<>();
 
             for (Param param : structDef.getParams()) {
                 // If we add a variable, and it already exists, we have a duplicate
-                if (!variableNames.add(param.variable.getName())) {
+                if (!standardizedVariables.add(Standardized.of(param.variable))) {
                     throwTypecheckerException(typeErrorInStructMessage, structDef, param,
                             param.variable.getName() + " is already defined in this struct");
                 }
 
                 // Else, check that all variable declarations for the struct do not: have a return type of void
                 // and that any struct name does exist
-                typecheckParamNoVoidAndStructNameMustExist(structDef, typeErrorInStructMessage, param);
+                final String onVariableDeclaration = typeErrorInStructMessage + " on parameter `" +
+                        param.variable.getName() + "` declaration";
+                typecheckTypeNotVoidAndStructNameMustExist(onVariableDeclaration, structDef, param.getType());
             }
         }
     }
 
-    private void typecheckParamNoVoidAndStructNameMustExist(AbstractSyntaxTreeNode parent, String errorPrefix,
-                                                            Param param) throws TypecheckerException {
-        final String onVariableDeclaration = errorPrefix + " on parameter `" + param.variable.getName() + "` declaration";
-        Type paramType = param.type;
-
-        if (paramType instanceof VoidType) {
-            throwTypecheckerException(onVariableDeclaration, parent, paramType,
-                    "void is not permitted as a type for struct parameters");
+    private void typecheckTypeNotVoidAndStructNameMustExist(String error, AbstractSyntaxTreeNode parent,
+                                                            Type type) throws TypecheckerException {
+        // If we are a void type, throw an error
+        if (type instanceof VoidType) {
+            throwTypecheckerException(error, parent, type, "`void` is only a valid type for function return values");
         }
 
-        if (!(paramType instanceof StructType)) {
+        // If we aren't a struct type, we don't care
+        if (!(type instanceof StructType)) {
             return;
         }
 
-        StructType paramStructType = (StructType) paramType;
-        String paramStructName = paramStructType.getStructName().get().getName();
+        // If we are a struct type, make sure we have a valid struct definition
+        StructType paramStructType = (StructType) type;
+        StructName paramStructName = paramStructType.getStructName().get();
 
-        if (structNameToDef.containsKey(paramStructName)) {
+        if (structNameToDef.containsKey(Standardized.of(paramStructName))) {
             return;
         }
 
-        String errorMessage = String.format("struct type %s is not defined", paramStructName);
-        throwTypecheckerException(onVariableDeclaration, parent, paramType, errorMessage);
+        String detailedErrorMessage = String.format("struct type `%s` is not defined", paramStructName.getName());
+        throwTypecheckerException(error, parent, type, detailedErrorMessage);
     }
 
     // Map of statements to their typechecking functions
     private static final Map<Class<? extends Statement>, 
-            TypecheckingVoidFunction<Typechecker, Statement, Map<String, Type>>> STMT_TO_TYPE_FUNC = Map.of(
+            TypecheckingVoidFunction<Typechecker, Statement, Map<Standardized<Variable>, Type>>> STMT_TO_TYPE_FUNC = Map.of(
         AssignStmt.class, Typechecker::typecheckAssignStmt,
         BreakStmt.class, Typechecker::typecheckBreakStmt,
         ExpressionStmt.class, Typechecker::typecheckExpStmt,
@@ -240,7 +250,7 @@ public class Typechecker {
         WhileStmt.class, Typechecker::typecheckWhileStmt
     );
 
-    private void typecheckStatements(Map<String, Type> typeEnv) throws TypecheckerException {
+    private void typecheckStatements(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
         
         for (Statement stmt : program.getStatements()) {          
             // Get the statements class
@@ -248,7 +258,7 @@ public class Typechecker {
 
             if (!STMT_TO_TYPE_FUNC.containsKey(stmtClass)) {
                 // Isn't a statement?
-                throw new TypecheckerException("Expected statement, got: " + stmtClass.toString());
+                throw new UnsupportedOperationException("Map did not contain mapping function for: " + stmtClass);
             }
 
             // These functions will throw exceptions if there are type errors
@@ -256,7 +266,7 @@ public class Typechecker {
         }
     }
 
-    public void typecheckAssignStmt(final Statement stmt, final Map<String, Type> typeEnv)
+    public void typecheckAssignStmt(final Statement stmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         final String beingParsed = "assignment statement";
 
@@ -272,53 +282,56 @@ public class Typechecker {
         assignStmt.expression.setExpressionType(variableType);
     }
 
-    public void typecheckBreakStmt(final Statement breakStmt, final Map<String, Type> typeEnv)
+    public void typecheckBreakStmt(final Statement breakStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckExpStmt(final Statement expStmt, final Map<String, Type> typeEnv)
+    public void typecheckExpStmt(final Statement expStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         ExpressionStmt castExpStmt = (ExpressionStmt)expStmt;
         // Get expression from the expression statement, typecheck that
         typecheckExp(castExpStmt.getExpression(), typeEnv);
     }
 
-    public void typecheckIfElseStmt(final Statement ifElseStmt, final Map<String, Type> typeEnv)
+    public void typecheckIfElseStmt(final Statement ifElseStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckPrintlnStmt(final Statement printLnStmt, final Map<String, Type> typeEnv)
+    public void typecheckPrintlnStmt(final Statement printLnStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckReturnStmt(final Statement returnStmt, final Map<String, Type> typeEnv)
+    public void typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckStmtBlock(final Statement stmtBlock, final Map<String, Type> typeEnv)
+    public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckVardecStmt(final Statement vardecStmt, final Map<String, Type> typeEnv)
+    public void typecheckVardecStmt(final Statement vardecStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         VardecStmt castVardecStmt = (VardecStmt)vardecStmt;
-        // Get type
+
+        // Get type and make sure it's not void or a struct name that does not exist
         Type type = castVardecStmt.getType();
+        typecheckTypeNotVoidAndStructNameMustExist("vardec statement", vardecStmt, type);
+
         // Compare to expression
         Type expType = typecheckExp(castVardecStmt.getExpression(), typeEnv);
 
@@ -326,16 +339,16 @@ public class Typechecker {
         throwTypecheckerExceptionOnMismatchedTypes("vardec statement", vardecStmt, expType, type, expType);
 
         // Add variable to map (throw if already exists)
-        if (typeEnv.put(castVardecStmt.getVariable().getName(), type) != null) {
-            throw new TypecheckerException("Variable " + castVardecStmt.getVariable().getName() 
-                                           + " already declared");
+        if (typeEnv.put(Standardized.of(castVardecStmt.getVariable()), type) != null) {
+            throwTypecheckerExceptionOnVariableExists("vardec statement", vardecStmt, castVardecStmt.getVariable(),
+                    typeEnv);
         }
 
         // Set the expression type to be type of the variable
         castVardecStmt.getExpression().setExpressionType(type);
     }
 
-    public void typecheckWhileStmt(final Statement whileStmt, final Map<String, Type> typeEnv)
+    public void typecheckWhileStmt(final Statement whileStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
@@ -344,44 +357,47 @@ public class Typechecker {
 
     // Map of Expression classes to functions that return their types
     private static final Map<Class<? extends Expression>, 
-            TypecheckingFunction<Typechecker, Expression, Map<String, Type>, Type>> EXP_TO_TYPE_FUNC = Map.of(
-        BoolLiteralExp.class, (typechecker, exp, typeEnv) -> new BoolType(),
-        FuncCallExp.class, Typechecker::typecheckFuncCallExp,
-        IntLiteralExp.class, (typechecker, exp, typeEnv) -> new IntType(),
-        NullExp.class, (typechecker, exp, typeEnv) -> new StructType(null),
-        ParenExp.class, Typechecker::typecheckParenExp,
-        StructAllocExp.class, Typechecker::typecheckStructAllocExp,
-        VariableExp.class, Typechecker::typecheckVarExp,
-        BinaryOpExp.class, Typechecker::typecheckerBinOpExp,
-        DotExp.class, Typechecker::typecheckDotExp,
-        UnaryOpExp.class, Typechecker::typecheckUnaryOpExp
+            TypecheckingFunction<Typechecker, Expression, Map<Standardized<Variable>, Type>, Type>> EXP_TO_TYPE_FUNC = Map.of(
+                    // We already handle the expression types in the parser for literal values
+                    BoolLiteralExp.class, (typechecker, exp, typeEnv) -> exp.getExpressionType(),
+                    IntLiteralExp.class, (typechecker, exp, typeEnv) -> exp.getExpressionType(),
+                    NullExp.class, (typechecker, exp, typeEnv) -> exp.getExpressionType(),
+
+                    // We need to typecheck these manually
+                    FuncCallExp.class, Typechecker::typecheckFuncCallExp,
+                    ParenExp.class, Typechecker::typecheckParenExp,
+                    StructAllocExp.class, Typechecker::typecheckStructAllocExp,
+                    VariableExp.class, Typechecker::typecheckVarExp,
+                    BinaryOpExp.class, Typechecker::typecheckerBinOpExp,
+                    DotExp.class, Typechecker::typecheckDotExp,
+                    UnaryOpExp.class, Typechecker::typecheckUnaryOpExp
     );
 
-    public Type typecheckFuncCallExp(final Expression funcCallExp, final Map<String, Type> typeEnv)
+    public Type typecheckFuncCallExp(final Expression funcCallExp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public Type typecheckParenExp(final Expression parenExp, final Map<String, Type> typeEnv)
+    public Type typecheckParenExp(final Expression parenExp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         ParenExp castParenExp = (ParenExp)parenExp;
         // Get expression in the parentheses, typecheck that
         return typecheckExp(castParenExp.getExp(), typeEnv);
     }
 
-    public Type typecheckStructAllocExp(final Expression exp, final Map<String, Type> typeEnv)
+    public Type typecheckStructAllocExp(final Expression exp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         final String beingParsed = "struct allocation expression";
         StructAllocExp structAllocExp = (StructAllocExp) exp;
 
         // Struct name should be a safe unwrap - the parser will have looked for an identifier after new, not a null token
         StructType structType = structAllocExp.getStructType();
-        String structName = structType.getStructName().get().getName();
+        StructName structName = structType.getStructName().get();
 
         final String structWhereWeAre = "struct " + structName;
-        StructDef structDef = structNameToDef.get(structName);
+        StructDef structDef = structNameToDef.get(Standardized.of(structName));
 
         if (structDef == null) {
             throwTypecheckerException(beingParsed, exp, structType, structWhereWeAre + " is not defined");
@@ -409,7 +425,7 @@ public class Typechecker {
             Variable definedVariable = definedParam.variable;
 
             // Check that the variable names match (in order)
-            if (!definedVariable.getName().equals(allocationParam.var.getName())) {
+            if (!Standardized.standardizedEquals(definedVariable, allocationParam.var)) {
                 throwTypecheckerException(beingParsed, exp, allocationParam, "expected allocation for variable `"
                         + definedVariable.name + "` but received allocation for variable `" + allocationParam.var.name + "`");
             }
@@ -431,7 +447,7 @@ public class Typechecker {
         return structAllocExp.getStructType();
     }
 
-    public Type typecheckVarExp(final Expression expression, final Map<String, Type> typeEnv)
+    public Type typecheckVarExp(final Expression expression, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         VariableExp variableExp = (VariableExp) expression;
 
@@ -488,7 +504,7 @@ public class Typechecker {
         return operandsAreValidType(validTypes, leftHandType) && leftHandType.hasTypeEquality(rightHandType);
     }
 
-    public Type typecheckerBinOpExp(final Expression binaryOpExp, final Map<String, Type> typeEnv)
+    public Type typecheckerBinOpExp(final Expression binaryOpExp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         // Get the left and right hand sides
         BinaryOpExp castBinOpExp = (BinaryOpExp)binaryOpExp;
@@ -502,17 +518,25 @@ public class Typechecker {
 
         // This may be unnecessary, but check that the operand is in the map
         if (!OP_TO_OPERAND_TYPE.containsKey(op) || !OP_TO_EVAL_TYPE.containsKey(op)) {
-            throw new TypecheckerException("Expected operator, but found: " + op.toString());
+            throw new UnsupportedOperationException("Map did not find binary operator for: " + op.toString());
         }
 
         // Use the operator to decide what type the expressions should be
         List<Type> validOperandTypes = OP_TO_OPERAND_TYPE.get(op);
 
+        final String error = op.getSymbol() + " expression";
+
         // Throw exception if the operands are invalid types
+        throwTypecheckerExceptionOnMismatchedTypes(error, binaryOpExp, castBinOpExp.getRightExp(),
+                leftHandType, rightHandType);
+
         if (!operandsAreValidType(validOperandTypes, leftHandType, rightHandType)) {
-            throw new TypecheckerException("Operands are of invalid type: " + validOperandTypes.toString()
-                    + ", " + leftHandType.getNodeTypeDescriptor() + " "
-                    + rightHandType.getNodeTypeDescriptor());
+            // This should really be a more descriptive error message depending on the list of valid types
+            String errorMessage = String.format("expected one type of: {%s}", validOperandTypes.stream()
+                    .map(type -> "`" + type.getNodeTypeDescriptor() + "`")
+                    .collect(Collectors.joining(", ")));
+
+            throwTypecheckerException(error, binaryOpExp, binaryOpExp, errorMessage);
         }
 
         // Return the binary operation's evaluation type and set our type for the next expression
@@ -522,7 +546,7 @@ public class Typechecker {
         return evalType;
     }
 
-    public Type typecheckDotExp(final Expression exp, final Map<String, Type> typeEnv)
+    public Type typecheckDotExp(final Expression exp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         final String beingParsed = "dot expression";
 
@@ -530,20 +554,20 @@ public class Typechecker {
         Type leftHandType = typecheckExp(dotExp.getLeftExp(), typeEnv);
 
         if (!(leftHandType instanceof StructType)) {
-            final String errorSuffix = "expected a reference to a struct instance but received a type of "
-                    + leftHandType.getParsedValue();
+            final String errorSuffix = "expected a struct reference but received a type of `"
+                    + leftHandType.getParsedValue() + "`";
             throwTypecheckerException(beingParsed, exp, leftHandType, errorSuffix);
         }
 
         StructType structType = (StructType) leftHandType;
         if (structType.isNullStruct()) {
-            final String errorSuffix = "expected a reference to a struct instance but received raw reference to null";
+            final String errorSuffix = "expected a struct reference but received raw `null` reference";
             throwTypecheckerException(beingParsed, exp, leftHandType, errorSuffix);
         }
 
         // By this point, if we evaluated an expression that is a type of struct, that struct should absolutely exist
-        String structName = structType.getStructName().get().getName();
-        StructDef structDef = structNameToDef.get(structName);
+        StructName structName = structType.getStructName().get();
+        StructDef structDef = structNameToDef.get(Standardized.of(structName));
 
         Variable structField = dotExp.getRightVar();
         Type structFieldType = null;
@@ -557,7 +581,7 @@ public class Typechecker {
 
         // Check that the variable we used does exist as a parameter (or field) for the struct
         if (structFieldType == null) {
-            final String errorSuffix = "struct parameter " + structField.name + " is not defined on struct " + structType;
+            final String errorSuffix = "parameter `" + structField.name + "` is not defined on struct `" + structType + "`";
             throwTypecheckerException(beingParsed, exp, structField, errorSuffix);
         }
 
@@ -565,7 +589,7 @@ public class Typechecker {
         return structFieldType;
     }
 
-    public Type typecheckUnaryOpExp(final Expression exp, final Map<String, Type> typeEnv)
+    public Type typecheckUnaryOpExp(final Expression exp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         // This is VERY similar to parsing binary ops, probably could refactor at some point
         UnaryOpExp unaryOpExp = (UnaryOpExp) exp;
@@ -577,8 +601,8 @@ public class Typechecker {
         List<Type> validTypes = OP_TO_OPERAND_TYPE.get(op);
         if (!operandsAreValidType(validTypes, expressionType)) {
             // This should really be a more descriptive error message depending on the list of valid types
-            String errorMessage = String.format("expected matching types of: {%s}", validTypes.stream()
-                            .map(Type::getNodeTypeDescriptor)
+            String errorMessage = String.format("expected one type of: {%s}", validTypes.stream()
+                            .map(type -> "`" + type.getNodeTypeDescriptor() + "`")
                             .collect(Collectors.joining(", ")));
 
             throwTypecheckerException(op.getSymbol() + " expression", exp, expressionType, errorMessage);
@@ -591,7 +615,7 @@ public class Typechecker {
     }
 
     public Type typecheckExp(final Expression exp,
-                                    final Map<String, Type> typeEnv) throws TypecheckerException {
+                                    final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
 
         // Get the expression's class
         Class<? extends Expression> expClass = exp.getClass();
@@ -599,7 +623,7 @@ public class Typechecker {
         if (!EXP_TO_TYPE_FUNC.containsKey(expClass)) {
             // Do I throw an error here? This should be an expression and it isn't? IDK
             // Maybe an "unsupported exception" letting us know we did development bad is good here
-            throw new UnsupportedOperationException("Expected expression in map, got: " + expClass);
+            throw new UnsupportedOperationException("Map did not contain mapping function for: " + expClass);
         }
 
         Type type = EXP_TO_TYPE_FUNC.get(expClass).apply(this, exp, typeEnv);

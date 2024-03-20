@@ -1,6 +1,8 @@
 package refraff.parser.expression.primaryExpression;
 
 
+import refraff.Source;
+import refraff.parser.Node;
 import refraff.parser.type.IntType;
 
 import java.util.Objects;
@@ -15,6 +17,12 @@ public class IntLiteralExp extends PrimaryExpression {
         super(NODE_TYPE_DESCRIPTOR, new IntType());
 
         this.intLiteral = intLiteral;
+    }
+
+    @Override
+    public Node setSource(Source source) throws IllegalStateException {
+        getExpressionType().setSource(source);
+        return super.setSource(source);
     }
     
     public int getIntLiteral() {

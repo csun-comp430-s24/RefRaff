@@ -26,6 +26,37 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 public class TypecheckerTest {
 
+    // Helper methods to set some source that would normally be defined through the tokenizer/parser combination
+    
+    private IntType getIntType() {
+        return Node.setNodeSource(new IntType(), "int");
+    }
+    
+    private BoolType getBoolType() {
+        return Node.setNodeSource(new BoolType(), "bool");
+    }
+
+    private VoidType getVoidType() {
+        return Node.setNodeSource(new VoidType(), "void");
+    }
+
+    private NullExp getNullExp() {
+        return Node.setNodeSource(new NullExp(), "null");
+    }
+    
+    private Variable getVariable(String name) {
+        return Node.setNodeSource(new Variable(name), name);
+    }
+
+    private StructType getStructType(String name) {
+        StructName structName = getStructName(name);
+        return Node.setNodeSource(new StructType(structName), name);
+    }
+
+    private StructName getStructName(String name) {
+        return Node.setNodeSource(new StructName(name), name);
+    }
+
     // Test valid inputs
 
     private void testDoesNotThrowTypecheckerException(Program program) {
@@ -39,8 +70,9 @@ public class TypecheckerTest {
          *   A a;
          * }
          */
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(Node.setNodeSource(new StructType(new StructName("A")), "A"), new Variable("a"))
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))
         ));
 
         Program program = new Program(List.of(structDef), List.of(), List.of());
@@ -59,13 +91,13 @@ public class TypecheckerTest {
          *   A a;
          * }
          */
-        StructDef structDef1 = new StructDef(new StructName("A"), List.of(
-                new Param(Node.setNodeSource(new IntType(), "int"), new Variable("foo")),
-                new Param(Node.setNodeSource(new BoolType(), "bool"), new Variable("bar"))
+        StructDef structDef1 = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("foo")),
+                new Param(getBoolType(), getVariable("bar"))
         ));
 
-        StructDef structDef2 = new StructDef(new StructName("B"), List.of(
-                new Param(Node.setNodeSource(new StructType(new StructName("A")), "A"), new Variable("a"))
+        StructDef structDef2 = new StructDef(getStructName("B"), List.of(
+                new Param(getStructType("A"), getVariable("a"))
         ));
 
         Program program = new Program(List.of(structDef1, structDef2), List.of(), List.of());
@@ -82,15 +114,15 @@ public class TypecheckerTest {
          * new A { a: null };
          */
 
-        StructType aType = Node.setNodeSource(new StructType(new StructName("A")), "A");
+        StructType aType = getStructType("A");
 
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(aType, new Variable("a"))
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(aType, getVariable("a"))
         ));
 
         Expression expression = new StructAllocExp(aType,
                 new StructActualParams(List.of(
-                        new StructActualParam(new Variable("a"), new NullExp()
+                        new StructActualParam(getVariable("a"), getNullExp()
                         ))));
         Statement statement = new ExpressionStmt(expression);
 
@@ -113,20 +145,20 @@ public class TypecheckerTest {
          *   }
          * };
          */
-        StructType aType = Node.setNodeSource(new StructType(new StructName("A")), "A");
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(aType, new Variable("a"))
+        StructType aType = getStructType("A");
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(aType, getVariable("a"))
         ));
 
         // Inside nested new A
         Expression nestedAllocExp = new StructAllocExp(aType,
                 new StructActualParams(List.of(
-                        new StructActualParam(new Variable("a"), new NullExp()))
+                        new StructActualParam(getVariable("a"), getNullExp()))
                 ));
 
         // Outside alloc that contains a: <nested>
         Expression outsideAllocExp = new StructAllocExp(aType, new StructActualParams(
-                List.of(new StructActualParam(new Variable("a"), nestedAllocExp))
+                List.of(new StructActualParam(getVariable("a"), nestedAllocExp))
         ));
 
         Statement statement = new ExpressionStmt(outsideAllocExp);
@@ -148,16 +180,16 @@ public class TypecheckerTest {
          * A a = null;
          * a.a.a;
          */
-        StructName name = new StructName("A");
-        StructType type = Node.setNodeSource(new StructType(name), "A");
+        StructName name = getStructName("A");
+        StructType type = getStructType("A");
 
-        Variable variable = new Variable("a");
+        Variable variable = getVariable("a");
 
         StructDef structDef = new StructDef(name, List.of(
                 new Param(type, variable)
         ));
 
-        VardecStmt vardec = new VardecStmt(type, variable, new NullExp());
+        VardecStmt vardec = new VardecStmt(type, variable, getNullExp());
 
         VariableExp variableExp = new VariableExp(variable);
 
@@ -191,11 +223,11 @@ public class TypecheckerTest {
          * foo;
          */
         Statement vardecStmt = new VardecStmt(
-            Node.setNodeSource(new IntType(), "int"), 
-            new Variable("foo"),
+            getIntType(), 
+            getVariable("foo"),
             new IntLiteralExp(6)
         );
-        Statement varExpStmt = new ExpressionStmt(new VariableExp(new Variable("foo")));
+        Statement varExpStmt = new ExpressionStmt(new VariableExp(getVariable("foo")));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, varExpStmt));
         testDoesNotThrowTypecheckerException(program);
     }
@@ -206,8 +238,8 @@ public class TypecheckerTest {
          * bool a = false;
          * a = true;
          */
-        Statement vardec = new VardecStmt(Node.setNodeSource(new BoolType(), "bool"), new Variable("a"), new BoolLiteralExp(false));
-        Statement assign = new AssignStmt(new Variable("a"), new BoolLiteralExp(true));
+        Statement vardec = new VardecStmt(getBoolType(), getVariable("a"), new BoolLiteralExp(false));
+        Statement assign = new AssignStmt(getVariable("a"), new BoolLiteralExp(true));
 
         Program program = new Program(List.of(), List.of(), List.of(vardec, assign));
         testDoesNotThrowTypecheckerException(program);
@@ -267,16 +299,16 @@ public class TypecheckerTest {
          */
 
         Statement declareFoo = new VardecStmt(
-            Node.setNodeSource(new IntType(), "int"),
-            new Variable("foo"),
+            getIntType(),
+            getVariable("foo"),
             new IntLiteralExp(6));
         
         Statement declareIsBar = new VardecStmt(
-            Node.setNodeSource(new BoolType(), "bool"),
-            new Variable("isBar"),
+            getBoolType(),
+            getVariable("isBar"),
             new BoolLiteralExp(true));
 
-        Expression varExpFoo = new VariableExp(new Variable("foo"));
+        Expression varExpFoo = new VariableExp(getVariable("foo"));
         Expression intLiteral5 = new IntLiteralExp(5);
         Expression binOpDivide = new BinaryOpExp(varExpFoo, OperatorEnum.DIVISION, intLiteral5);
         Expression intLiteral6 = new IntLiteralExp(6);
@@ -293,7 +325,7 @@ public class TypecheckerTest {
         Expression falseExp = new BoolLiteralExp(false);
 
         Expression andExp = new BinaryOpExp(falseExp, OperatorEnum.AND, parenGteExp);
-        Expression varExpIsBar = new VariableExp(new Variable("isBar"));
+        Expression varExpIsBar = new VariableExp(getVariable("isBar"));
         Expression parenAndExp = new ParenExp(andExp);
         Expression orExp = new BinaryOpExp(parenAndExp, OperatorEnum.OR, varExpIsBar);
 
@@ -318,8 +350,8 @@ public class TypecheckerTest {
          *   void b;
          * }
          */
-        StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
-                new Param(new VoidType(), new Variable("b"))
+        StructDef invalidStructDef = new StructDef(getStructName("A"), List.of(
+                new Param(getVoidType(), getVariable("b"))
         ));
 
         Program invalidProgram = new Program(List.of(invalidStructDef), List.of(), List.of());
@@ -337,16 +369,18 @@ public class TypecheckerTest {
          *   int c;
          * }
          */
+        StructName aStructName = getStructName("A");
+
         StructDef structA = new StructDef(
-            new StructName("A"),
+                aStructName,
             List.of(
-                new Param(Node.setNodeSource(new IntType(), "int"), new Variable("b"))
+                new Param(getIntType(), getVariable("b"))
             )
         );
         StructDef structB = new StructDef(
-            new StructName("A"),
+                aStructName,
             List.of(
-                new Param(Node.setNodeSource(new IntType(), "int"), new Variable("c"))
+                new Param(getIntType(), getVariable("c"))
             )
         );
 
@@ -361,8 +395,8 @@ public class TypecheckerTest {
          *   B b;
          * }
          */
-        StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
-                new Param(Node.setNodeSource(new StructType(new StructName("B")), "B"), new Variable("b"))
+        StructDef invalidStructDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("B"), getVariable("b"))
         ));
 
         Program invalidProgram = new Program(List.of(invalidStructDef), List.of(), List.of());
@@ -377,9 +411,9 @@ public class TypecheckerTest {
          *   bool b;
          * }
          */
-        StructDef invalidStructDef = new StructDef(new StructName("A"), List.of(
-                new Param(Node.setNodeSource(new IntType(), "int"), new Variable("b")),
-                new Param(Node.setNodeSource(new BoolType(), "bool"), new Variable("b"))
+        StructDef invalidStructDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("b")),
+                new Param(getBoolType(), getVariable("b"))
         ));
 
         Program invalidProgram = new Program(List.of(invalidStructDef), List.of(), List.of());
@@ -396,9 +430,9 @@ public class TypecheckerTest {
          *
          * new A {};
          */
-        StructType aType = Node.setNodeSource(new StructType(new StructName("A")), "A");
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(aType, new Variable("a"))
+        StructType aType = getStructType("A");
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(aType, getVariable("a"))
         ));
 
         Expression expression = new StructAllocExp(aType, new StructActualParams(List.of()));
@@ -421,15 +455,15 @@ public class TypecheckerTest {
          *   b: 6
          * };
          */
-        StructType aType = Node.setNodeSource(new StructType(new StructName("A")), "A");
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(aType, new Variable("a"))
+        StructType aType = getStructType("A");
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(aType, getVariable("a"))
         ));
 
         Expression expression = new StructAllocExp(aType,
                 new StructActualParams(List.of(
-                        new StructActualParam(new Variable("a"), new NullExp()),
-                        new StructActualParam(new Variable("b"), new IntLiteralExp(6)))
+                        new StructActualParam(getVariable("a"), getNullExp()),
+                        new StructActualParam(getVariable("b"), new IntLiteralExp(6)))
                 ));
 
         Statement statement = new ExpressionStmt(expression);
@@ -449,14 +483,14 @@ public class TypecheckerTest {
          *   b: null
          * };
          */
-        StructType aType = Node.setNodeSource(new StructType(new StructName("A")), "A");
-        StructDef structDef = new StructDef(new StructName("A"), List.of(
-                new Param(aType, new Variable("a"))
+        StructType aType = getStructType("A");
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(aType, getVariable("a"))
         ));
 
         Expression expression = new StructAllocExp(aType,
                 new StructActualParams(List.of(
-                        new StructActualParam(new Variable("b"), new NullExp()))
+                        new StructActualParam(getVariable("b"), getNullExp()))
                 ));
 
         Statement statement = new ExpressionStmt(expression);
@@ -476,10 +510,10 @@ public class TypecheckerTest {
          *   a: false
          * };
          */
-        StructName name = new StructName("A");
-        StructType type = Node.setNodeSource(new StructType(name), "A");
+        StructName name = getStructName("A");
+        StructType type = getStructType("A");
 
-        Variable variable = new Variable("a");
+        Variable variable = getVariable("a");
 
         StructDef structDef = new StructDef(name, List.of(
                 new Param(type, variable)
@@ -499,7 +533,7 @@ public class TypecheckerTest {
     @Test
     public void testDotExpWithoutStructThrowsException() {
         // false.foo;
-        Expression expression = new DotExp(new BoolLiteralExp(false), new Variable("foo"));
+        Expression expression = new DotExp(new BoolLiteralExp(false), getVariable("foo"));
         Statement statement = new ExpressionStmt(expression);
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
@@ -509,7 +543,7 @@ public class TypecheckerTest {
     @Test
     public void testDotExpWithExplicitNullThrowsException() {
         // null.foo;
-        Expression expression = new DotExp(new NullExp(), new Variable("foo"));
+        Expression expression = new DotExp(getNullExp(), getVariable("foo"));
         Statement statement = new ExpressionStmt(expression);
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
@@ -527,10 +561,10 @@ public class TypecheckerTest {
          *   a: null
          * }.c;
          */
-        StructName name = new StructName("A");
-        StructType type = Node.setNodeSource(new StructType(name), "A");
+        StructName name = getStructName("A");
+        StructType type = getStructType("A");
 
-        Variable variable = new Variable("a");
+        Variable variable = getVariable("a");
 
         StructDef structDef = new StructDef(name, List.of(
                 new Param(type, variable)
@@ -538,10 +572,10 @@ public class TypecheckerTest {
 
         Expression allocExp = new StructAllocExp(type,
                 new StructActualParams(List.of(
-                        new StructActualParam(variable, new NullExp()))
+                        new StructActualParam(variable, getNullExp()))
                 ));
 
-        Expression dotExp = new DotExp(allocExp, new Variable("c"));
+        Expression dotExp = new DotExp(allocExp, getVariable("c"));
         Statement statement = new ExpressionStmt(dotExp);
 
         Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
@@ -582,7 +616,7 @@ public class TypecheckerTest {
          * foo;
          */
 
-        Statement varExpStmt = new ExpressionStmt(new VariableExp(new Variable("foo")));
+        Statement varExpStmt = new ExpressionStmt(new VariableExp(getVariable("foo")));
         Program invalidProgram = new Program(List.of(), List.of(), List.of(varExpStmt));
         testThrowsTypecheckerException(invalidProgram);
     }
@@ -596,8 +630,8 @@ public class TypecheckerTest {
 //
 //        StructDef structDef = new StructDef(new StructName("foo"), new ArrayList<Param>());
 //        Statement vardecStmt = new VardecStmt(
-//                Node.setNodeSource(new IntType(), "int"),
-//                new Variable("foo"),
+//                getIntType(),
+//                getVariable("foo"),
 //                new IntLiteralExp(6));
 //        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
 //        testThrowsTypecheckerException(invalidProgram);
@@ -608,7 +642,7 @@ public class TypecheckerTest {
         /*
          * a = true;
          */
-        Statement assign = new AssignStmt(new Variable("a"), new BoolLiteralExp(true));
+        Statement assign = new AssignStmt(getVariable("a"), new BoolLiteralExp(true));
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(assign));
         testThrowsTypecheckerException(invalidProgram);
@@ -620,8 +654,8 @@ public class TypecheckerTest {
          * bool a = false;
          * a = 3;
          */
-        Statement vardec = new VardecStmt(Node.setNodeSource(new BoolType(), "bool"), new Variable("a"), new BoolLiteralExp(false));
-        Statement assign = new AssignStmt(new Variable("a"), new IntLiteralExp(3));
+        Statement vardec = new VardecStmt(getBoolType(), getVariable("a"), new BoolLiteralExp(false));
+        Statement assign = new AssignStmt(getVariable("a"), new IntLiteralExp(3));
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(vardec, assign));
         testThrowsTypecheckerException(invalidProgram);
@@ -638,16 +672,16 @@ public class TypecheckerTest {
          */
 
         Statement intVardecStmt = new VardecStmt(
-                Node.setNodeSource(new IntType(), "int"),
-                new Variable("foo"),
+                getIntType(),
+                getVariable("foo"),
                 new IntLiteralExp(6));
         Statement boolVardecStmt = new VardecStmt(
-                Node.setNodeSource(new IntType(), "int"),
-                new Variable("bar"),
+                getIntType(),
+                getVariable("bar"),
                 new BoolLiteralExp(true));
         Statement assignStmt = new AssignStmt(
-                new Variable("foo"),
-                new VariableExp(new Variable("bar")));
+                getVariable("foo"),
+                new VariableExp(getVariable("bar")));
         Program invalidProgram = new Program(List.of(), List.of(), List.of(intVardecStmt, boolVardecStmt, assignStmt));
         testThrowsTypecheckerException(invalidProgram);
     }
@@ -688,6 +722,24 @@ public class TypecheckerTest {
         try {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
+            Typechecker.typecheckProgram(program);
+        } catch (TokenizerException | ParserException | TypecheckerException ex) {
+            fail(ex.toString());
+        }
+    }
+
+    //@Ignore("Method to screenshot typechecker error messages")
+    @Test
+    public void testTokenizeParseTypecheckInvalidProgram() {
+        String input = "null.var;";
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Program program = Parser.parseProgram(sourcedTokens);
+
+            ExpressionStmt expressionStmt = (ExpressionStmt) program.getStatements().get(0);
+            DotExp dotExp = (DotExp) expressionStmt.getExpression();
+            System.out.println(dotExp.getLeftExp().getExpressionType());
+
             Typechecker.typecheckProgram(program);
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
