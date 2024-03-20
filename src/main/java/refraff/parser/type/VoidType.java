@@ -13,8 +13,4 @@ public class VoidType extends Type {
         return other instanceof VoidType;
     }
 
-    @Override
-    public int hashCode() {
-        return VOID_TYPE.hashCode();
-    }
 }

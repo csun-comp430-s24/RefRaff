@@ -938,7 +938,6 @@ public class Parser {
             IntLiteralToken.class, (token) -> new IntLiteralExp(Integer.parseInt(token.getTokenizedValue())),
             TrueToken.class, (token) -> new BoolLiteralExp(true),
             FalseToken.class, (token) -> new BoolLiteralExp(false),
-            IdentifierToken.class, (token) -> new VariableExp(new Variable(token.getTokenizedValue())),
             NullToken.class, (token) -> new NullExp()
     );
 
@@ -971,6 +970,10 @@ public class Parser {
             return getOptionalSourcedParseResult(exp, position, position + 1);
         }
 
+        if (isExpectedToken(position, IdentifierToken.class)) {
+            return parseVariableExpression(position);
+        }
+
         // Then try to parse struct allocation
         optionalPrimaryExp = parseStructAlloc(position);
         if (!optionalPrimaryExp.isEmpty()) {
@@ -985,6 +988,16 @@ public class Parser {
 
         // We could not find a matching primary expression, and what even could it be?
         throw new ParserNoElementFoundException("primary expression");
+    }
+
+    private Optional<ParseResult<Expression>> parseVariableExpression(final int position) throws ParserException {
+        Optional<ParseResult<Variable>> optionalParsedVar = parseVar(position);
+        ParseResult<Variable> parsedVarResult = optionalParsedVar.get();
+
+        Expression expression = new VariableExp(parsedVarResult.result);
+        expression.setSource(parsedVarResult.result.getSource());
+
+        return Optional.of(new ParseResult<>(expression, parsedVarResult.nextPosition));
     }
 
     // `new` structname `{` struct_actual_params `}`

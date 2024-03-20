@@ -1043,7 +1043,10 @@ public class ParserTest {
         IntType returnType = new IntType();
         returnType.setSource(intReturnSource);
 
-        VariableExp aBodyVariableExp = new VariableExp("a");
+        Variable aBodyVariable = new Variable("a");
+        aBodyVariable.setSource(aSource);
+
+        VariableExp aBodyVariableExp = new VariableExp(aBodyVariable);
         aBodyVariableExp.setSource(aSource);
 
         IntLiteralExp twoExp = new IntLiteralExp(2);

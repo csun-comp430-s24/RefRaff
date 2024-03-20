@@ -109,8 +109,8 @@ public class Source {
     public String toString() {
         return String.format(
                 "%s to %s: `%s`",
-                getStartPosition().toLinePosition(true),
-                getEndPosition().toLinePosition(false),
+                getStartPosition().toLinePosition(false),
+                getEndPosition().toLinePosition(true),
                 getSourceString()
         );
     }

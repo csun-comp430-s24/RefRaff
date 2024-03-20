@@ -13,8 +13,4 @@ public class IntType extends Type {
         return other instanceof IntType;
     }
 
-    @Override
-    public int hashCode() {
-        return INT_TYPE.hashCode();
-    }
 }

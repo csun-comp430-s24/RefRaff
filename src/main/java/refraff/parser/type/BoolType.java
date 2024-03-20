@@ -13,8 +13,4 @@ public class BoolType extends Type {
         return other instanceof BoolType;
     }
 
-    @Override
-    public int hashCode() {
-        return BOOL_TYPE.hashCode();
-    }
 }
