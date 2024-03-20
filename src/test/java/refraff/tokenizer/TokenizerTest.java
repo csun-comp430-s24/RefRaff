@@ -4,6 +4,9 @@ import org.junit.Test;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 
+import refraff.Source;
+import refraff.SourcePosition;
+import refraff.Sourced;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
 import refraff.util.ResourceUtil;
@@ -16,6 +19,7 @@ import java.util.regex.Pattern;
 
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 public class TokenizerTest {
@@ -24,7 +28,7 @@ public class TokenizerTest {
 
     // Test valid inputs
 
-    private List<Token> getTokensWithoutException(String input) {
+    private List<Sourced<Token>> getTokensWithoutException(String input) {
         try {
             return new Tokenizer(input).tokenize();
         } catch (TokenizerException ex) {
@@ -35,10 +39,12 @@ public class TokenizerTest {
     }
 
     private void testTokenizerInputMatchesExpectedTokens(String input, Token... expectedTokensArray) {
-        List<Token> actualTokens = getTokensWithoutException(input);
-        List<Token> expectedTokens = Arrays.asList(expectedTokensArray);
+        List<Sourced<Token>> actualTokens = getTokensWithoutException(input);
 
-        assertEquals(expectedTokens, actualTokens);
+        List<Token> actualUnsourcedTokens = actualTokens.stream().map(Sourced::getValue).toList();
+        List<Token> expectedUnsourcedTokens = Arrays.asList(expectedTokensArray);
+
+        assertEquals(expectedUnsourcedTokens, actualUnsourcedTokens);
     }
 
     @Test
@@ -242,12 +248,12 @@ public class TokenizerTest {
     }
 
     @Test
-    public void testTokenizeIdentifierNotReservedWeyword2() {
+    public void testTokenizeIdentifierNotReservedWord2() {
         testTokenizerInputMatchesExpectedTokens("returnType", new IdentifierToken("returnType"));
     }
 
     @Test
-    public void testTokenizeIdentifierNotReservedWeyword3() {
+    public void testTokenizeIdentifierNotReservedWord3() {
         testTokenizerInputMatchesExpectedTokens("return7", new IdentifierToken("return7"));
     }
 
@@ -366,6 +372,92 @@ public class TokenizerTest {
     public void testTokenizerThrowsOnIntLiteralTokenWithLeadingZeros() {
         testTokenizerThrowsException("0123");
     }
+
+    // Sourced token tests
+
+
+    @Test
+    public void testTokenizeFuncDefinition() throws TokenizerException {
+        String expectedInput = """
+                func foo(int a): int {
+                  return a + 2;
+                }""";
+
+        // func foo(int a): int {
+        Source funcSource = new Source("func", new SourcePosition(1, 1), new SourcePosition(1, 5));
+        Sourced<Token> funcSourcedToken = new Sourced<>(funcSource, new FuncToken());
+
+        Source fooSource = new Source("foo", new SourcePosition(1, 6), new SourcePosition(1, 9));
+        Sourced<Token> fooSourcedToken = new Sourced<>(fooSource, new IdentifierToken("foo"));
+
+        Source leftParenSource = new Source("(", new SourcePosition(1, 9), new SourcePosition(1, 10));
+        Sourced<Token> leftParenSourcedToken = new Sourced<>(leftParenSource, new LeftParenToken());
+
+        Source intParamSource = new Source("int", new SourcePosition(1, 10), new SourcePosition(1, 13));
+        Sourced<Token> intParamSourcedToken = new Sourced<>(intParamSource, new IntToken());
+
+        Source aParamSource = new Source("a", new SourcePosition(1, 14), new SourcePosition(1, 15));
+        Sourced<Token> aParamSourcedToken = new Sourced<>(aParamSource, new IdentifierToken("a"));
+
+        Source rightParenSource = new Source(")", new SourcePosition(1, 15), new SourcePosition(1, 16));
+        Sourced<Token> rightParenSourcedToken = new Sourced<>(rightParenSource, new RightParenToken());
+
+        Source colonSource = new Source(":", new SourcePosition(1, 16), new SourcePosition(1, 17));
+        Sourced<Token> colonSourcedToken = new Sourced<>(colonSource, new ColonToken());
+
+        Source intReturnSource = new Source("int", new SourcePosition(1, 18), new SourcePosition(1, 21));
+        Sourced<Token> intReturnSourcedToken = new Sourced<>(intReturnSource, new IntToken());
+
+        Source leftBraceSource = new Source("{", new SourcePosition(1, 22), new SourcePosition(1, 23));
+        Sourced<Token> leftBraceSourcedToken = new Sourced<>(leftBraceSource, new LeftBraceToken());
+
+        // <space><space>return a + 2;
+        Source returnSource = new Source("return", new SourcePosition(2, 3), new SourcePosition(2, 9));
+        Sourced<Token> returnSourcedToken = new Sourced<>(returnSource, new ReturnToken());
+
+        Source aSource = new Source("a", new SourcePosition(2, 10), new SourcePosition(2, 11));
+        Sourced<Token> aSourcedToken = new Sourced<>(aSource, new IdentifierToken("a"));
+
+        Source plusSource = new Source("+", new SourcePosition(2, 12), new SourcePosition(2, 13));
+        Sourced<Token> plusSourcedToken = new Sourced<>(plusSource, new PlusToken());
+
+        Source twoSource = new Source("2", new SourcePosition(2, 14), new SourcePosition(2, 15));
+        Sourced<Token> twoSourcedToken = new Sourced<>(twoSource, new IntLiteralToken("2"));
+
+        Source semicolonSource = new Source(";", new SourcePosition(2, 15), new SourcePosition(2, 16));
+        Sourced<Token> semicolonSourcedToken = new Sourced<>(semicolonSource, new SemicolonToken());
+
+        // }
+        Source rightBraceSource = new Source("}", new SourcePosition(3, 1), new SourcePosition(3, 2));
+        Sourced<Token> rightBraceSourcedToken = new Sourced<>(rightBraceSource, new RightBraceToken());
+
+        List<Sourced<Token>> actualSourcedTokens = new Tokenizer(expectedInput).tokenize();
+        List<Sourced<Token>> expectedSourcedTokens = List.of(funcSourcedToken, fooSourcedToken, leftParenSourcedToken,
+                intParamSourcedToken, aParamSourcedToken, rightParenSourcedToken, colonSourcedToken,
+                intReturnSourcedToken, leftBraceSourcedToken, returnSourcedToken, aSourcedToken, plusSourcedToken,
+                twoSourcedToken, semicolonSourcedToken, rightBraceSourcedToken);
+
+        assertEquals(expectedSourcedTokens, actualSourcedTokens);
+    }
+
+    private void testReconstructedSourceInputMatchesExpected(String originalInput, List<Sourced<Token>> sourcedTokens) {
+        // Map the actual sources into a singular source composed of the whole program
+        Source source = Source.fromSources(sourcedTokens.stream()
+                .map(Sourced::getSource)
+                .toList());
+        String sourceReconstructedInput = source.getSourceString();
+
+        // Assert the source can recreate the original program
+        assertEquals(originalInput, sourceReconstructedInput);
+    }
+
+    @Test
+    public void testTokenizeSourcedExampleProgram() {
+        String sampleProgram = ResourceUtil.readProgramInputFile();
+        List<Sourced<Token>> sourcedTokens = getTokensWithoutException(sampleProgram);
+
+        testReconstructedSourceInputMatchesExpected(sampleProgram, sourcedTokens);
+    }
   
     // Dynamic tests
 
@@ -416,10 +508,10 @@ public class TokenizerTest {
         return tokens.stream()
                 .map(token ->
                         dynamicTest(token + " token exists and is a subclass of " + baseClassName, () -> {
-                            List<Token> tokenizedTokens = getTokensWithoutException(token);
-                            assertEquals("List should contain exactly one token", 1, tokenizedTokens.size());
+                            List<Sourced<Token>> tokenizedSourcedTokens = getTokensWithoutException(token);
+                            assertEquals(1, tokenizedSourcedTokens.size(), "List should contain exactly one token");
 
-                            Token tokenizedToken = tokenizedTokens.get(0);
+                            Token tokenizedToken = tokenizedSourcedTokens.get(0).getValue();
                             assertEquals(token, tokenizedToken.getTokenizedValue());
 
                             Class<? extends Token> tokenClass = tokenizedToken.getClass();

@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public class IfElseStmt extends Statement {
 
+    private static final String NODE_TYPE_DESCRIPTOR = "if else";
+
     private final Expression condition;
     private final Statement ifBody;
     private final Optional<Statement> elseBody;
@@ -16,13 +18,12 @@ public class IfElseStmt extends Statement {
     }
 
     public IfElseStmt(Expression condition, Statement ifBody, Statement elseBody) {
-        super("Unsure");
+        super(NODE_TYPE_DESCRIPTOR);
 
         this.condition = condition;
         this.ifBody = ifBody;
         this.elseBody = Optional.ofNullable(elseBody);
     }
-
 
     public Expression getCondition() {
         return condition;
@@ -38,13 +39,16 @@ public class IfElseStmt extends Statement {
 
     @Override
     public int hashCode() {
-        return Objects.hash(condition, ifBody, elseBody);
+        return Objects.hash(super.hashCode(), condition, ifBody, elseBody);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof IfElseStmt otherIfElse && condition.equals(otherIfElse.condition)
-                && ifBody.equals(otherIfElse.ifBody) && elseBody.equals(otherIfElse.elseBody);
+        return super.equals(other)
+                && other instanceof IfElseStmt otherIfElse
+                && Objects.equals(getCondition(), otherIfElse.getCondition())
+                && Objects.equals(getIfBody(), otherIfElse.getIfBody())
+                && Objects.equals(getElseBody(), otherIfElse.getElseBody());
     }
 
 }

@@ -1,26 +1,24 @@
 package refraff.parser;
 
-public class Variable {
+import java.util.Objects;
+
+public class Variable extends AbstractSyntaxTreeNode {
+
+    private static final String NODE_TYPE_DESCRIPTOR = "variable";
     
     public final String name;
 
-    public Variable(final String name) {
+    public Variable(String name) {
+        super(NODE_TYPE_DESCRIPTOR);
+
         this.name = name;
     }
 
     @Override
     public boolean equals(final Object other) {
-        return (other instanceof Variable &&
-                name.equals(((Variable)other).name));
+        return super.equals(other)
+                && other instanceof Variable otherVariable
+                && Objects.equals(name, otherVariable.name);
     }
 
-    @Override
-    public int hashCode() {
-        return name.hashCode();
-    }
-
-    @Override
-    public String toString() {
-        return "Variable(" + name + ")";
-    }
 }

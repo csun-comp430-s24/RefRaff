@@ -1,33 +1,54 @@
 package refraff.parser;
 
-public abstract class AbstractSyntaxTreeNode implements Node {
+import refraff.Source;
+import refraff.Sourceable;
 
-    /*
-        * Format for printing the token nicely: "<descriptor> '<tokenizedValue>'"
-        * e.g. "Variable 'counter'"
-        * "Type 'int'"
-        * "Statement 'Variable declaration'"
-        * "int literal expression 6"
-        * 
-        * This may be more useful when debugging the compiler and getting helpful error
-        * messages.
-     */
-    private static final String TO_STRING_FORMAT = "%s '%s'";
+import java.util.Objects;
 
-    private final String parsedValue;
+public abstract class AbstractSyntaxTreeNode implements Node, Sourceable {
 
-    public AbstractSyntaxTreeNode(String parsedValue) {
-        this.parsedValue = parsedValue;
+    private static final String TO_STRING_FORMAT = "Node %s sourced from %s contains value `%s`";
+
+    private final String nodeTypeDescriptor;
+
+    private Source source;
+    private boolean hasSourceBeenSet;
+
+    public AbstractSyntaxTreeNode(String nodeTypeDescriptor) {
+        this.nodeTypeDescriptor = nodeTypeDescriptor;
+
+        this.source = Source.DEFAULT_TESTING_SOURCE;
+        this.hasSourceBeenSet = false;
+    }
+
+    @Override
+    public Source getSource() {
+        return this.source;
+    }
+
+    public void setSource(Source source) throws IllegalStateException {
+        if (hasSourceBeenSet) {
+            throw new IllegalStateException("This source has already been set.");
+        }
+
+        this.hasSourceBeenSet = true;
+        this.source = source;
     }
 
     @Override
     public String getParsedValue() {
-        return this.parsedValue;
+        return source.getSourceString();
+    }
+
+    @Override
+    public String getNodeTypeDescriptor() {
+        return this.nodeTypeDescriptor;
     }
 
     @Override
     public String toString() {
-        return String.format(TO_STRING_FORMAT, getNodeTypeDescriptor(), getParsedValue());
+        return String.format(TO_STRING_FORMAT, getNodeTypeDescriptor(), source.toPositionString(),
+                source.getSourceString());
     }
 
     @Override
@@ -37,7 +58,7 @@ public abstract class AbstractSyntaxTreeNode implements Node {
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof AbstractSyntaxTreeNode otherToken 
-        && getParsedValue().equals(otherToken.getParsedValue());
+        return other instanceof AbstractSyntaxTreeNode otherNode
+                && Objects.equals(getSource(), otherNode.getSource());
     }
 }

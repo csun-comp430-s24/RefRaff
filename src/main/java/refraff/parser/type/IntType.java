@@ -1,10 +1,10 @@
 package refraff.parser.type;
 
 public class IntType extends Type {
-    
-    private static final String INT_TYPE = "int";
+
+    private static final String NODE_TYPE_DESCRIPTOR = "int type";
 
     public IntType() {
-        super(INT_TYPE);
+        super(NODE_TYPE_DESCRIPTOR);
     }
 }

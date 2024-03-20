@@ -24,6 +24,8 @@ public class ResourceUtil {
                     stringBuffer.append(scanner.nextLine());
                     stringBuffer.append('\n');
                 }
+
+                stringBuffer.deleteCharAt(stringBuffer.length() - 1);
             }
         });
 

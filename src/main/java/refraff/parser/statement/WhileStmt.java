@@ -26,13 +26,15 @@ public class WhileStmt extends Statement {
 
     @Override
     public int hashCode() {
-        return Objects.hash(condition, body);
+        return Objects.hash(super.hashCode(), condition, body);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof WhileStmt otherWhile && condition.equals(otherWhile.condition)
-                && body.equals(otherWhile.body);
+        return super.equals(other)
+                && other instanceof WhileStmt otherWhile
+                && Objects.equals(getCondition(), otherWhile.getCondition())
+                && Objects.equals(getBody(), otherWhile.getBody());
     }
 
 }

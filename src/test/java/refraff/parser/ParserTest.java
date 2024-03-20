@@ -10,6 +10,9 @@ import java.util.*;
 
 import org.junit.Test;
 
+import refraff.Source;
+import refraff.SourcePosition;
+import refraff.Sourced;
 import refraff.parser.function.*;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
@@ -28,14 +31,24 @@ public class ParserTest {
         return tokens;
     }
 
+    private List<Sourced<Token>> toSourcedList(Token... tokens) {
+        return Arrays.stream(tokens)
+                .map(token -> new Sourced<>(Source.DEFAULT_TESTING_SOURCE, token))
+                .toList();
+    }
+
     private ParseResult<Program> parseProgram(Token... tokens) throws ParserException {
-        return new ParseResult<>(Parser.parseProgram(tokens), tokens.length);
+        return parseProgram(toSourcedList(tokens));
+    }
+
+    private ParseResult<Program> parseProgram(List<Sourced<Token>> sourcedTokens) throws ParserException {
+        return new ParseResult<>(Parser.parseProgram(sourcedTokens), sourcedTokens.size());
     }
 
     private <T extends AbstractSyntaxTreeNode> Optional<ParseResult<T>> testParsesWithoutException(
-            ParsingFunction<Parser, Optional<ParseResult<T>>> parsingFunction, Token... tokens) {
+            ParsingFunction<Parser, Optional<ParseResult<T>>> parsingFunction, List<Sourced<Token>> defaultSourcedTokens) {
         try {
-            final Parser parser = new Parser(tokens);
+            final Parser parser = new Parser(defaultSourcedTokens);
             return parsingFunction.apply(parser);
         } catch (ParserException ex) {
             fail(ex);
@@ -48,12 +61,21 @@ public class ParserTest {
         testMatchesExpectedResult(parser -> Optional.of(parseProgram(tokens)), expectedValue, tokens);
     }
 
+    private void testProgramMatchesExpectedResult(Program expectedValue, List<Sourced<Token>> sourcedTokens) {
+        testMatchesExpectedResult(parser -> Optional.of(parseProgram(sourcedTokens)), expectedValue, sourcedTokens);
+    }
+
     private <T extends AbstractSyntaxTreeNode> void testMatchesExpectedResult(ParsingFunction<Parser,
             Optional<ParseResult<T>>> parsingFunction, T expectedValue, Token... tokens) {
-        Optional<ParseResult<T>> optionalParseResult = testParsesWithoutException(parsingFunction, tokens);
+        testMatchesExpectedResult(parsingFunction, expectedValue, toSourcedList(tokens));
+    }
+
+    private <T extends AbstractSyntaxTreeNode> void testMatchesExpectedResult(ParsingFunction<Parser,
+            Optional<ParseResult<T>>> parsingFunction, T expectedValue, List<Sourced<Token>> sourcedTokens) {
+        Optional<ParseResult<T>> optionalParseResult = testParsesWithoutException(parsingFunction, sourcedTokens);
         assertFalse("Parse result must contain something", optionalParseResult.isEmpty());
 
-        ParseResult<T> expectedResult = new ParseResult<>(expectedValue, tokens.length);
+        ParseResult<T> expectedResult = new ParseResult<>(expectedValue, sourcedTokens.size());
         ParseResult<T> actualResult = optionalParseResult.get();
 
         assertEquals(expectedResult, actualResult);
@@ -62,7 +84,7 @@ public class ParserTest {
     // Test valid inputs
 
     private void testExpressionMatchesExpectedResult(Expression expression, Token... inputs) {
-        testMatchesExpectedResult(parser -> parser.parseExp(0), expression, inputs);
+        testMatchesExpectedResult(parser -> parser.parseExp(0), expression, toSourcedList(inputs));
     }
 
     @Test
@@ -92,11 +114,6 @@ public class ParserTest {
     @Test // For coverage, honestly
     public void testVariableEquals() {
         assertEquals(new Variable("example"), new Variable("example"));
-    }
-
-    @Test // This is also for coverage
-    public void testVariableToStringMatchesExpected() {
-        assertEquals(new Variable("blue").toString(), "Variable(blue)");
     }
 
     @Test
@@ -170,14 +187,15 @@ public class ParserTest {
 
     @Test
     public void testParseVardec() throws ParserException {
-        final Token[] input = new Token[] {
-            new IntToken(),
-            new IdentifierToken("variableName"),
-            new AssignmentToken(),
-            new IntLiteralToken("6"),
-            new SemicolonToken()
-        };
-        final Parser parser = new Parser(input);
+        Token[] input = toArray(
+                new IntToken(),
+                new IdentifierToken("variableName"),
+                new AssignmentToken(),
+                new IntLiteralToken("6"),
+                new SemicolonToken()
+        );
+
+        final Parser parser = new Parser(toSourcedList(input));
         assertEquals(Optional.of(new ParseResult<VardecStmt>(new VardecStmt(
                                     new IntType(),
                                     new Variable("variableName"),
@@ -192,14 +210,14 @@ public class ParserTest {
          * int variableName = 6;
          * just a different entry point
          */
-        final Token[] input = new Token[] {
+        Token[] input = toArray(
             new IntToken(),
             new IdentifierToken("variableName"),
             new AssignmentToken(),
             new IntLiteralToken("6"),
             new SemicolonToken()
-        };
-        final Parser parser = new Parser(input);
+        );
+        final Parser parser = new Parser(toSourcedList(input));
         final List<StructDef> structDefs = new ArrayList<>();
         final List<FunctionDef> functionDefs = new ArrayList<>();
         final List<Statement> statements = new ArrayList<>();
@@ -345,7 +363,7 @@ public class ParserTest {
          *    Node rest;
          * }
          */
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new StructToken(),
                 new IdentifierToken("Node"),
                 new LeftBraceToken(),
@@ -356,7 +374,7 @@ public class ParserTest {
                 new IdentifierToken("rest"),
                 new SemicolonToken(),
                 new RightBraceToken()
-        };
+        );
         final Parser parser = new Parser(input);
 
         final List<Param> params = new ArrayList<>();
@@ -389,14 +407,14 @@ public class ParserTest {
     @Test
     public void testProgramWithDotOpExpression() throws ParserException {
         // retval = example.result;
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new IdentifierToken("retval"),
                 new AssignmentToken(),
                 new IdentifierToken("example"),
                 new DotToken(),
                 new IdentifierToken("result"),
                 new SemicolonToken()
-        };
+        );
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
         final List<FunctionDef> functionDefs = new ArrayList<>();
@@ -415,7 +433,7 @@ public class ParserTest {
     @Test
     public void testProgramWithSequentialDotOpExpression() throws ParserException {
         // retval = example.result.value.rest.next;
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new IdentifierToken("retval"),
                 new AssignmentToken(),
                 new IdentifierToken("example"),
@@ -428,7 +446,7 @@ public class ParserTest {
                 new DotToken(),
                 new IdentifierToken("next"),
                 new SemicolonToken()
-        };
+        );
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
         final List<FunctionDef> functionDefs = new ArrayList<>();
@@ -450,14 +468,14 @@ public class ParserTest {
     @Test
     public void testProgramWithMultOpExpression() throws ParserException {
         // retval = retval * 2;
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new IdentifierToken("retval"),
                 new AssignmentToken(),
                 new IdentifierToken("retval"),
                 new MultiplyToken(),
                 new IntLiteralToken("2"),
                 new SemicolonToken()
-        };
+        );
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
         final List<FunctionDef> functionDefs = new ArrayList<>();
@@ -590,7 +608,7 @@ public class ParserTest {
          *   };
          */
 
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new IdentifierToken("Node"), new IdentifierToken("list"), new AssignmentToken(),
                 new NewToken(), new IdentifierToken("Node"), new LeftBraceToken(),
                 new IdentifierToken("value"), new ColonToken(), new IntLiteralToken("0"),
@@ -602,7 +620,7 @@ public class ParserTest {
                 new CommaToken(), new IdentifierToken("rest"), new ColonToken(), new NullToken(),
                 new RightBraceToken(), new RightBraceToken(), new RightBraceToken(),
                 new SemicolonToken()
-        };
+        );
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
         final List<FunctionDef> functionDefs = new ArrayList<>();
@@ -651,11 +669,11 @@ public class ParserTest {
          * println(length(list));
          */
 
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new PrintlnToken(), new LeftParenToken(), new IdentifierToken("length"),
                 new LeftParenToken(), new IdentifierToken("list"), new RightParenToken(),
                 new RightParenToken(), new SemicolonToken()
-        };
+        );
 
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
@@ -670,7 +688,7 @@ public class ParserTest {
 
         statements.add(printlnStmt);
 
-        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.length),
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.size()),
                 parser.parseProgram(0));
     }
 
@@ -681,12 +699,12 @@ public class ParserTest {
          * length(node.next, index, true);
          */
 
-        final Token[] input = new Token[] {
+        final List<Sourced<Token>> input = toSourcedList(
                 new IdentifierToken("length"), new LeftParenToken(), new IdentifierToken("node"),
                 new DotToken(), new IdentifierToken("next"), new CommaToken(), 
                 new IdentifierToken("index"), new CommaToken(), new TrueToken(), 
-                new RightParenToken(), new SemicolonToken() 
-        };
+                new RightParenToken(), new SemicolonToken()
+        );
 
         final Parser parser = new Parser(input);
         final List<StructDef> structDefs = new ArrayList<>();
@@ -705,7 +723,7 @@ public class ParserTest {
 
         statements.add(expStmt);
 
-        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.length),
+        assertEquals(new ParseResult<>(new Program(structDefs, functionDefs, statements), input.size()),
                 parser.parseProgram(0));
     }
 
@@ -938,6 +956,115 @@ public class ParserTest {
                 ), 7
             )
         );
+    }
+
+    // Source tests
+
+    @Test
+    public void testSourcedTokens() {
+        // Kill me please - this test should be very sufficient for all cases
+
+        String input = """
+                func foo(int a): int {
+                  return a + 2;
+                }""";
+
+        // func foo(int a): int {
+        Source funcSource = new Source("func", new SourcePosition(1, 1), new SourcePosition(1, 5));
+        Sourced<Token> funcSourcedToken = new Sourced<>(funcSource, new FuncToken());
+
+        Source fooSource = new Source("foo", new SourcePosition(1, 6), new SourcePosition(1, 9));
+        Sourced<Token> fooSourcedToken = new Sourced<>(fooSource, new IdentifierToken("foo"));
+
+        Source leftParenSource = new Source("(", new SourcePosition(1, 9), new SourcePosition(1, 10));
+        Sourced<Token> leftParenSourcedToken = new Sourced<>(leftParenSource, new LeftParenToken());
+
+        Source intParamSource = new Source("int", new SourcePosition(1, 10), new SourcePosition(1, 13));
+        Sourced<Token> intParamSourcedToken = new Sourced<>(intParamSource, new IntToken());
+
+        Source aParamSource = new Source("a", new SourcePosition(1, 14), new SourcePosition(1, 15));
+        Sourced<Token> aParamSourcedToken = new Sourced<>(aParamSource, new IdentifierToken("a"));
+
+        Source rightParenSource = new Source(")", new SourcePosition(1, 15), new SourcePosition(1, 16));
+        Sourced<Token> rightParenSourcedToken = new Sourced<>(rightParenSource, new RightParenToken());
+
+        Source colonSource = new Source(":", new SourcePosition(1, 16), new SourcePosition(1, 17));
+        Sourced<Token> colonSourcedToken = new Sourced<>(colonSource, new ColonToken());
+
+        Source intReturnSource = new Source("int", new SourcePosition(1, 18), new SourcePosition(1, 21));
+        Sourced<Token> intReturnSourcedToken = new Sourced<>(intReturnSource, new IntToken());
+
+        Source leftBraceSource = new Source("{", new SourcePosition(1, 22), new SourcePosition(1, 23));
+        Sourced<Token> leftBraceSourcedToken = new Sourced<>(leftBraceSource, new LeftBraceToken());
+
+        // <space><space>return a + 2;
+        Source returnSource = new Source("return", new SourcePosition(2, 3), new SourcePosition(2, 9));
+        Sourced<Token> returnSourcedToken = new Sourced<>(returnSource, new ReturnToken());
+
+        Source aSource = new Source("a", new SourcePosition(2, 10), new SourcePosition(2, 11));
+        Sourced<Token> aSourcedToken = new Sourced<>(aSource, new IdentifierToken("a"));
+
+        Source plusSource = new Source("+", new SourcePosition(2, 12), new SourcePosition(2, 13));
+        Sourced<Token> plusSourcedToken = new Sourced<>(plusSource, new PlusToken());
+
+        Source twoSource = new Source("2", new SourcePosition(2, 14), new SourcePosition(2, 15));
+        Sourced<Token> twoSourcedToken = new Sourced<>(twoSource, new IntLiteralToken("2"));
+
+        Source semicolonSource = new Source(";", new SourcePosition(2, 15), new SourcePosition(2, 16));
+        Sourced<Token> semicolonSourcedToken = new Sourced<>(semicolonSource, new SemicolonToken());
+
+        // }
+        Source rightBraceSource = new Source("}", new SourcePosition(3, 1), new SourcePosition(3, 2));
+        Sourced<Token> rightBraceSourcedToken = new Sourced<>(rightBraceSource, new RightBraceToken());
+
+        List<Sourced<Token>> sourcedTokens = List.of(funcSourcedToken, fooSourcedToken, leftParenSourcedToken,
+                intParamSourcedToken, aParamSourcedToken, rightParenSourcedToken, colonSourcedToken,
+                intReturnSourcedToken, leftBraceSourcedToken, returnSourcedToken, aSourcedToken, plusSourcedToken,
+                twoSourcedToken, semicolonSourcedToken, rightBraceSourcedToken);
+
+        // Start defining all the required function definition parameters with correct sourcing
+
+        FunctionName functionName = new FunctionName("foo");
+        functionName.setSource(fooSource);
+
+        IntType paramType = new IntType();
+        paramType.setSource(intParamSource);
+
+        Variable aParamVariable = new Variable("a");
+        aParamVariable.setSource(aParamSource);
+
+        // int a
+        Param aParam = new Param(paramType, aParamVariable);
+        aParam.setSource(new Source("int a", intParamSource.getStartPosition(),
+                aParamVariable.getSource().getEndPosition()));
+
+        IntType returnType = new IntType();
+        returnType.setSource(intReturnSource);
+
+        VariableExp aBodyVariableExp = new VariableExp("a");
+        aBodyVariableExp.setSource(aSource);
+
+        IntLiteralExp twoExp = new IntLiteralExp(2);
+        twoExp.setSource(twoSource);
+
+        BinaryOpExp addExp = new BinaryOpExp(aBodyVariableExp, OperatorEnum.PLUS, twoExp);
+        addExp.setSource(new Source("a + 2", aSource.getStartPosition(), twoSource.getEndPosition()));
+
+        ReturnStmt returnStmt = new ReturnStmt(addExp);
+        returnStmt.setSource(new Source("return a + 2;", returnSource.getStartPosition(),
+                semicolonSource.getEndPosition()));
+
+        StmtBlock body = new StmtBlock(List.of(returnStmt));
+        body.setSource(new Source("{\n  return a + 2;\n}", leftBraceSource.getStartPosition(),
+                rightBraceSource.getEndPosition()));
+
+        FunctionDef functionDef = new FunctionDef(functionName, List.of(aParam), returnType, body);
+        functionDef.setSource(new Source(input, funcSource.getStartPosition(), rightBraceSource.getEndPosition()));
+
+        Program program = new Program(List.of(), List.of(functionDef), List.of());
+        program.setSource(functionDef.getSource());
+
+        testProgramMatchesExpectedResult(program, sourcedTokens);
     }
 
 }
