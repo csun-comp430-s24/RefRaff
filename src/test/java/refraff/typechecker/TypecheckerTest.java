@@ -733,9 +733,14 @@ public class TypecheckerTest {
     public void testTokenizeParseTypecheckInvalidProgram() {
         String input = """
                 struct A {
-                  int foo;
-                  bool foo;
-                }""";
+                    A a;
+                }
+                
+                A a = new A {
+                    a: new B {
+                        a: new B {}
+                    }
+                };""";
         try {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);

@@ -141,7 +141,7 @@ public class Typechecker {
             
             String stringStructName = structName.getName();
             throwTypecheckerException(String.format(typeErrorInStructMessageFormat, stringStructName),
-                    structDef, structName, "struct `" + stringStructName + "` has already been defined");
+                    structDef, structName, "struct type `" + stringStructName + "` has already been defined");
         }
         
         for (StructDef structDef : program.getStructDefs()) {
@@ -397,11 +397,11 @@ public class Typechecker {
         StructType structType = structAllocExp.getStructType();
         StructName structName = structType.getStructName().get();
 
-        final String structWhereWeAre = "struct `" + structName + "`";
+        final String structWhereWeAre = "struct type `" + structName.getSource().getSourceString() + "`";
         StructDef structDef = structNameToDef.get(Standardized.of(structName));
 
         if (structDef == null) {
-            throwTypecheckerException(beingParsed, exp, structType, structWhereWeAre + " is not defined");
+            throwTypecheckerException(beingParsed, exp, structName, structWhereWeAre + " is not defined");
         }
 
         List<Param> structDefinedParams = structDef.getParams();
@@ -586,7 +586,7 @@ public class Typechecker {
 
         // Check that the variable we used does exist as a parameter (or field) for the struct
         if (structFieldType == null) {
-            final String errorSuffix = "parameter `" + structField.name + "` is not defined on struct `" + structType + "`";
+            final String errorSuffix = "parameter `" + structField.name + "` is not defined on struct type `" + structType + "`";
             throwTypecheckerException(beingParsed, exp, structField, errorSuffix);
         }
 
