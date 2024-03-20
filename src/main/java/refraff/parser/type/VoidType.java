@@ -8,4 +8,13 @@ public class VoidType extends Type {
         super(NODE_TYPE_DESCRIPTOR);
     }
 
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof VoidType;
+    }
+
+    @Override
+    public int hashCode() {
+        return VOID_TYPE.hashCode();
+    }
 }

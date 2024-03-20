@@ -20,6 +20,10 @@ public class Param extends AbstractSyntaxTreeNode {
         this.variable = variable;
     }
 
+    public Type getType() {
+        return type;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), type, variable);

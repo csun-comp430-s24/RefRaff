@@ -16,6 +16,10 @@ public class StructName extends AbstractSyntaxTreeNode {
         this.structName = structName;
     }
 
+    public String getName() {
+        return structName;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), structName);

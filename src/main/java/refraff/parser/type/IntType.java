@@ -7,4 +7,14 @@ public class IntType extends Type {
     public IntType() {
         super(NODE_TYPE_DESCRIPTOR);
     }
+
+    @Override
+    public boolean equals(Object other) {
+        return other instanceof IntType;
+    }
+
+    @Override
+    public int hashCode() {
+        return INT_TYPE.hashCode();
+    }
 }

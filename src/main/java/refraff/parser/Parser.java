@@ -938,7 +938,7 @@ public class Parser {
             IntLiteralToken.class, (token) -> new IntLiteralExp(Integer.parseInt(token.getTokenizedValue())),
             TrueToken.class, (token) -> new BoolLiteralExp(true),
             FalseToken.class, (token) -> new BoolLiteralExp(false),
-            IdentifierToken.class, (token) -> new VariableExp(token.getTokenizedValue()),
+            IdentifierToken.class, (token) -> new VariableExp(new Variable(token.getTokenizedValue())),
             NullToken.class, (token) -> new NullExp()
     );
 

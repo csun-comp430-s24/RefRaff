@@ -14,6 +14,10 @@ public class Variable extends AbstractSyntaxTreeNode {
         this.name = name;
     }
 
+    public String getName() {
+        return name;
+    }
+
     @Override
     public boolean equals(final Object other) {
         return super.equals(other)
