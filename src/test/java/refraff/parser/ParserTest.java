@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
 
+import org.junit.Assert;
 import org.junit.Test;
 
 import refraff.Source;
@@ -23,6 +24,9 @@ import refraff.parser.statement.*;
 import refraff.parser.struct.*;
 import refraff.parser.operator.*;
 import refraff.parser.expression.primaryExpression.*;
+import refraff.typechecker.Typechecker;
+import refraff.typechecker.TypecheckerException;
+import refraff.util.ResourceUtil;
 
 
 public class ParserTest {
@@ -1070,6 +1074,20 @@ public class ParserTest {
         program.setSource(functionDef.getSource());
 
         testProgramMatchesExpectedResult(program, sourcedTokens);
+    }
+
+
+    // Integration test
+
+    @Test
+    public void testTokenizeParseProgramWithoutException() {
+        String input = ResourceUtil.readProgramInputFile();
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Parser.parseProgram(sourcedTokens);
+        } catch (TokenizerException | ParserException ex) {
+            Assert.fail(ex.toString());
+        }
     }
 
 }

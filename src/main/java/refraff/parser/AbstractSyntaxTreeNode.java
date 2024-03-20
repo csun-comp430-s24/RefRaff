@@ -5,7 +5,7 @@ import refraff.Sourceable;
 
 import java.util.Objects;
 
-public abstract class AbstractSyntaxTreeNode implements Node, Sourceable {
+public abstract class AbstractSyntaxTreeNode implements Node {
 
     private static final String TO_STRING_FORMAT = "Node %s sourced from %s contains value `%s`";
 
@@ -26,13 +26,16 @@ public abstract class AbstractSyntaxTreeNode implements Node, Sourceable {
         return this.source;
     }
 
-    public void setSource(Source source) throws IllegalStateException {
+    @Override
+    public Node setSource(Source source) throws IllegalStateException {
         if (hasSourceBeenSet) {
             throw new IllegalStateException("This source has already been set.");
         }
 
         this.hasSourceBeenSet = true;
         this.source = source;
+
+        return this;
     }
 
     @Override

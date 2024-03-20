@@ -2,6 +2,7 @@ package refraff.parser.type;
 
 import refraff.parser.struct.StructName;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class StructType extends Type {
@@ -38,9 +39,25 @@ public class StructType extends Type {
     public boolean equals(Object other) {
         return super.equals(other)
                 && other instanceof StructType otherStructType
-                // If I or the other are null instances, but not both of us, or if we match our raw types
-                && ((isNullStruct() ^ otherStructType.isNullStruct()) ||
-                        optionalStructName.equals(otherStructType.optionalStructName));
+                && optionalStructName.equals(otherStructType.optionalStructName);
     }
 
+    @Override
+    public boolean hasTypeEquality(Type other) {
+        if (!super.hasTypeEquality(other) || !(other instanceof StructType)) {
+            return false;
+        }
+
+        StructType otherStructType = (StructType) other;
+        if (isNullStruct() && otherStructType.isNullStruct()) {
+            // If we're both null, what is our actual struct type? We have no idea
+            return false;
+        } else if (isNullStruct() == otherStructType.isNullStruct()) {
+            // If we're both not null, check that our struct names match exactly
+            return Objects.equals(getStructName().get(), otherStructType.getStructName().get());
+        } else {
+            // If one of us is null, then the null struct type will change its type to the type of our other struct
+            return true;
+        }
+    }
 }
