@@ -1,5 +1,8 @@
 package refraff.tokenizer;
 
+import refraff.Source;
+import refraff.SourcePosition;
+
 public abstract class AbstractToken implements Token {
 
     /*

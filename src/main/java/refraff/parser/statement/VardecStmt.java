@@ -7,6 +7,8 @@ import refraff.parser.expression.Expression;
 import java.util.Objects;
 
 public class VardecStmt extends Statement {
+
+    private static final String NODE_TYPE_DESCRIPTOR = "vardec";
     
     private final Type type;
     private final Variable variable; 
@@ -14,11 +16,8 @@ public class VardecStmt extends Statement {
 
     public VardecStmt(Type type, 
             Variable variable, Expression expression) {
-        super(
-            type.getParsedValue()
-            + variable.hashCode()
-            + expression.getParsedValue()
-        );
+        super(NODE_TYPE_DESCRIPTOR);
+
         this.type = type;
         this.variable = variable;
         this.expression = expression;
@@ -38,12 +37,16 @@ public class VardecStmt extends Statement {
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, variable, expression);
+        return Objects.hash(super.hashCode(), type, variable, expression);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof VardecStmt otherVardec;
+        return super.equals(other)
+                && other instanceof VardecStmt otherVardec
+                && Objects.equals(getType(), otherVardec.getType())
+                && Objects.equals(getVariable(), otherVardec.getVariable())
+                && Objects.equals(getExpression(), otherVardec.getExpression());
     }
 
 }

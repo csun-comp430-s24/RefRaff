@@ -2,14 +2,17 @@ package refraff.parser.type;
 
 import refraff.parser.struct.StructName;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class StructType extends Type {
 
+    private static final String NODE_TYPE_DESCRIPTOR = "struct type";
+
     private final Optional<StructName> optionalStructName;
 
     public StructType(StructName structName) {
-        super(structName == null ? "null instance" : structName.getParsedValue());
+        super(NODE_TYPE_DESCRIPTOR);
 
         this.optionalStructName = Optional.ofNullable(structName);
     }
@@ -34,10 +37,27 @@ public class StructType extends Type {
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof StructType otherStructType &&
-                // If I or the other are null instances, but not both of us, or if we match our raw types
-                ((isNullStruct() ^ otherStructType.isNullStruct()) ||
-                        optionalStructName.equals(otherStructType.optionalStructName));
+        return super.equals(other)
+                && other instanceof StructType otherStructType
+                && optionalStructName.equals(otherStructType.optionalStructName);
     }
 
+    @Override
+    public boolean hasTypeEquality(Type other) {
+        if (!super.hasTypeEquality(other) || !(other instanceof StructType)) {
+            return false;
+        }
+
+        StructType otherStructType = (StructType) other;
+        if (isNullStruct() && otherStructType.isNullStruct()) {
+            // If we're both null, this is fine?
+            return true;
+        } else if (isNullStruct() == otherStructType.isNullStruct()) {
+            // If we're both not null, check that our struct names match exactly
+            return Objects.equals(getStructName().get(), otherStructType.getStructName().get());
+        } else {
+            // If one of us is null, then the null struct type will change its type to the type of our other struct
+            return true;
+        }
+    }
 }

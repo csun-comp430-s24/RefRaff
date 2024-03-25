@@ -1,5 +1,7 @@
 package refraff.tokenizer;
 
+import refraff.Sourced;
+
 public interface Token {
 
     /**
