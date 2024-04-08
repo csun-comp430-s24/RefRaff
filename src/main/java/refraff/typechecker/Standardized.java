@@ -5,6 +5,7 @@ import refraff.SourcePosition;
 import refraff.parser.Node;
 import refraff.parser.Variable;
 import refraff.parser.struct.StructName;
+import refraff.parser.function.FunctionName;
 
 import java.util.Objects;
 import java.util.function.Function;
@@ -52,6 +53,11 @@ public class Standardized<T extends Node> {
         return new Standardized<>(variable, Variable::new);
     }
 
+    // For type environment deepcopy in typechecker
+    public static Standardized<Variable> of(Standardized<Variable> standardizedVariable) {
+        return new Standardized<Variable>(standardizedVariable.getStandardizedNode(), Variable::new);
+    }
+
     public static boolean standardizedEquals(Variable variable1, Variable variable2) {
         Standardized<Variable> standardized1 = Standardized.of(variable1);
         Standardized<Variable> standardized2 = Standardized.of(variable2);
@@ -61,6 +67,10 @@ public class Standardized<T extends Node> {
 
     public static Standardized<StructName> of(StructName structName) {
         return new Standardized<>(structName, StructName::new);
+    }
+
+    public static Standardized<FunctionName> of(FunctionName funcName) {
+        return new Standardized<>(funcName, FunctionName::new);
     }
 
 }

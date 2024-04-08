@@ -14,5 +14,4 @@ public class PrimaryExpression extends Expression {
     public PrimaryExpression(String detailedDescriptor, Type expressionType) {
         super(NODE_TYPE_DESCRIPTOR + detailedDescriptor, expressionType);
     }
-
 }

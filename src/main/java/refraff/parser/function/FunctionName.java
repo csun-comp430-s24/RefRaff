@@ -16,6 +16,10 @@ public class FunctionName extends Type {
         this.functionName = structName;
     }
 
+    public String getName() {
+        return functionName;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), functionName);

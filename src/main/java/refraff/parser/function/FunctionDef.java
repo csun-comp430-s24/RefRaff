@@ -29,6 +29,8 @@ public class FunctionDef extends AbstractSyntaxTreeNode {
         this.params = params;
         this.returnType = returnType;
         this.functionBody = functionBody;
+
+        // Also create a function signature for the function map in the typechecker
     }
 
     public FunctionName getFunctionName() {

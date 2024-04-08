@@ -11,6 +11,7 @@ import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
+import refraff.parser.function.*;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -20,11 +21,13 @@ public class Typechecker {
     private final Program program;
 
     private final Map<Standardized<StructName>, StructDef> structNameToDef;
+    private final Map<Standardized<FunctionName>, FunctionDef> functionNameToDef;
 
     private Typechecker(Program program) {
         this.program = program;
 
         this.structNameToDef = new HashMap<>();
+        this.functionNameToDef = new HashMap<>();
     }
 
     public static void typecheckProgram(Program program) throws TypecheckerException {
@@ -35,7 +38,8 @@ public class Typechecker {
         // Create an environment map
         Map<Standardized<Variable>, Type> typeEnv = new HashMap<>();
         typecheckStructDefs(typeEnv);
-        typecheckStatements(typeEnv);
+        typecheckFunctionDefs(typeEnv);
+        typecheckProgramStatements(typeEnv);
     }
 
     private void throwTypecheckerExceptionOnVariableExists(String beingParsed, AbstractSyntaxTreeNode parent, Variable variable,
@@ -125,9 +129,8 @@ public class Typechecker {
 
     private void typecheckStructDefs(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
         final String typeErrorInStructMessageFormat = "struct definition for `%s`";
-        
+    
         // Add all the structs manually before trying to parse a struct's fields (allow recursion/reference other structs)
-
         // Map all the struct definitions names to their AST definitions
         for (StructDef structDef : program.getStructDefs()) {
             StructName structName = structDef.getStructName();
@@ -148,53 +151,6 @@ public class Typechecker {
             final String typeErrorInStructMessage = "struct definition for `" + structDef.getStructName().structName + "`";
             // Add struct def variable
 
-            // I don't think we should add these to the type environment - that would treat them as variables defined in scope
-            // at all times. Take the example (valid C) below:
-
-            /*
-             * typedef struct A {
-             *   struct A* a;
-             * } A;
-             *
-             * int main() {
-             *   A* a = NULL;
-             *   a = a->a;
-             *   return 0
-             * }
-             */
-
-            // We wouldn't be able to vardec any struct parameter name in any statement in the function, since
-            // the variable would always be in scope. But we would be able to assign a value to those variables,
-            // even though that wouldn't make sense from the program's perspective. This could be an issue if we have a
-            // struct field called `size` and wanted to use the variable name `size` anywhere else in the program.
-
-            // I think the better solution would be to have the struct fields only be in scope for dot operations.
-            // This would allow for programs equivalent to ones we could generate in our target language of C:
-
-            /*
-             * struct A {
-             *   A a;
-             * }
-             *
-             * A a = null;
-             * a = a.a;
-             */
-
-            // For struct allocations, that could get a bit weirder, but we could treat the 'actual params' in structs
-            // as labels for what we should expect to use as a parameter, instead of defined variables.
-            // Something like the following:
-
-            /*
-             * struct B {
-             *   int value;
-             * }
-             *
-             * int value = 3;
-             * new B { value: value; }; // Sets the value field of B to be whatever variable value we have in scope
-             */
-
-            // Similarly, we most likely would not want functions to put their variables on the type environment
-            // until we enter the body of a function
             Set<Standardized<Variable>> standardizedVariables = new HashSet<>();
 
             for (Param param : structDef.getParams()) {
@@ -237,6 +193,46 @@ public class Typechecker {
         throwTypecheckerException(error, parent, type, detailedErrorMessage);
     }
 
+    private void typecheckFunctionDefs(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        final String typeErrorInFunctionMessageFormat = "function definition for `%s`";
+
+        // Type environment for each function
+        Map<Standardized<Variable>, Type> functionTypeEnv;
+        
+        // Map all the function definitions names to their AST definitions
+        for (FunctionDef funcDef : program.getFunctionDefs()) {
+            FunctionName funcName = funcDef.getFunctionName();
+            Standardized<FunctionName> standardizedFuncName = Standardized.of(funcName);
+
+            // Because the order of the function definitions matters in C, I'm going to
+            // Add the function definition first (because recursion is allowed)
+            // MAKE THIS CHECK FOR NEW FUNCTION SIGNATURE RATHER THAN FUNCTION NAME
+            // CAN I STANDARDIZE A WHOLE FUNCTION SIGNATURE
+            if (!functionNameToDef.containsKey(standardizedFuncName)) {
+                functionNameToDef.put(standardizedFuncName, funcDef);
+            } else {
+                String stringFuncName = funcName.getName();
+                throwTypecheckerException(String.format(typeErrorInFunctionMessageFormat, stringFuncName),
+                        funcDef, funcName, "struct type `" + stringFuncName + "` has already been defined");
+            }
+
+            // Create a new type environment to check the function body
+            functionTypeEnv = new HashMap<>(typeEnv);
+            // And then type check the function statement block
+            typecheckStmtBlock(funcDef.getFunctionBody(), functionTypeEnv);
+
+            // NEED TO IMPLEMENT TYPECHECK STATEMENT BLOCK
+            
+        }
+
+        // I think I need to type check everything inside the function definition as if it's its own program
+        // With its own scope and everything 
+        // So we would need the typeEnv for knowing what the function definitions are.
+        // So I'll make a new type environment on top of the current one (that contains current and earlier
+        // function definitions). But when we move onto the rest of the statements, we
+        // Are back to the base type environment with just the struct and function definitions
+    }
+
     // Map of statements to their typechecking functions
     private static final Map<Class<? extends Statement>, 
             TypecheckingVoidFunction<Typechecker, Statement, Map<Standardized<Variable>, Type>>> STMT_TO_TYPE_FUNC = Map.of(
@@ -251,9 +247,14 @@ public class Typechecker {
         WhileStmt.class, Typechecker::typecheckWhileStmt
     );
 
-    private void typecheckStatements(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+    // Added because we also need to be able to check the statement block list of statements
+    private void typecheckProgramStatements(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        typecheckStatements(typeEnv, program.getStatements());
+    }
+
+    private void typecheckStatements(Map<Standardized<Variable>, Type> typeEnv, List<Statement> stmts) throws TypecheckerException {
         
-        for (Statement stmt : program.getStatements()) {          
+        for (Statement stmt : stmts) {          
             // Get the statements class
             Class<? extends Statement> stmtClass = stmt.getClass();
 
@@ -311,18 +312,28 @@ public class Typechecker {
         // return test;
     }
 
-    public void typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
+    public Type typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
         // Type test = new VoidType();
         // return test;
     }
 
-    public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
+    public Type typecheckFunctionBody(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         throw new TypecheckerException("Not implemented yet!");
+        // Start checking statements until you get to the return type
+        // Save it to a list of return types
+        // When I get to the end, check that all return types are the same
+        // Return the return type
         // Type test = new VoidType();
         // return test;
+    }
+
+    public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
+            throws TypecheckerException {
+        StmtBlock castStmtBlock = (StmtBlock)stmtBlock;
+        typecheckStatements(typeEnv, castStmtBlock.getBlockBody());
     }
 
     public void typecheckVardecStmt(final Statement vardecStmt, final Map<Standardized<Variable>, Type> typeEnv)

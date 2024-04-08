@@ -6,10 +6,8 @@ import org.junit.jupiter.api.Disabled;
 import refraff.Sourced;
 import refraff.parser.*;
 import refraff.parser.struct.*;
-import refraff.parser.type.BoolType;
-import refraff.parser.type.IntType;
-import refraff.parser.type.StructType;
-import refraff.parser.type.VoidType;
+import refraff.parser.type.*;
+import refraff.parser.function.*;
 import refraff.parser.expression.*;
 import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
@@ -20,6 +18,7 @@ import refraff.tokenizer.TokenizerException;
 import refraff.util.ResourceUtil;
 
 import java.util.List;
+import java.util.ArrayList;
 
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -335,7 +334,50 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
-    
+    @Test
+    public void testFunctionDefinitionReturnsBool() {
+        /*
+        *  func alwaysTrue(): bool {
+        *       return true;
+        *   }
+        */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+            new FunctionName("alwaysTrue"),
+            new ArrayList<Param>(),
+            getBoolType(),
+            funcBody
+        );
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    // Tests for function definitions
+    // Test that a function that returns another function call type checks that
+    // Test that a function that returns another function call that returns the wrong type throws an error
+    // Test a function with a parameter
+    // Test a function with two parameters
+    // Test a function with void doesn't and doesn't return anything doesn't throw an error
+    // Test a function with void type and returns something throws an error
+    // Test two function with the same name but different signatures
+
+    // private void testFunctionDefinitionWithWileLoop() {
+    //     /*
+    //     *  func length(Node list): int {
+    //             int retval = 0;
+    //             while (list != null) {
+    //                 retval = retval + 1;
+    //                 list = list.rest;
+    //             }
+    //         return retval;
+    //         }
+    //     */
+    // }
+
 
     // Test invalid inputs
 
@@ -621,22 +663,6 @@ public class TypecheckerTest {
         testThrowsTypecheckerException(invalidProgram);
     }
 
-//    @Test
-//    public void testStructNameIsReusedInVardecThrowsException() {
-//        /*
-//         * struct foo = {};
-//         * int foo = 6;
-//         */
-//
-//        StructDef structDef = new StructDef(new StructName("foo"), new ArrayList<Param>());
-//        Statement vardecStmt = new VardecStmt(
-//                getIntType(),
-//                getVariable("foo"),
-//                new IntLiteralExp(6));
-//        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
-//        testThrowsTypecheckerException(invalidProgram);
-//    }
-
     @Test
     public void testAssignStmtWithNoVariableInScopeThrowsException() {
         /*
@@ -710,6 +736,28 @@ public class TypecheckerTest {
         Statement statement = new ExpressionStmt(expression);
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testFunctionDefinitionReturnsIntInsteadOfBoolThrowsException() {
+        /*
+        *  func alwaysTrue(): bool {
+        *       return 0;
+        *   }
+        */
+
+        Expression intLiteral0 = new IntLiteralExp(0);
+        Statement returnStmt0 = new ReturnStmt(intLiteral0);
+        FunctionBody funcBody = new FunctionBody(List.of(returnStmt0));
+        FunctionDef funcDef = new FunctionDef(
+            new FunctionName("alwaysTrue"),
+            new ArrayList<Param>(),
+            getBoolType(),
+            funcBody
+        );
+
+        Program invalidProgram = new Program(List.of(), List.of(funcDef), List.of());
         testThrowsTypecheckerException(invalidProgram);
     }
 
