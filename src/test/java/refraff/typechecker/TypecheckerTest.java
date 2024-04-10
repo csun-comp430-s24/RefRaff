@@ -498,20 +498,36 @@ public class TypecheckerTest {
 
     // Tests for function definitions
     // Test function with mutliple return statements (when if/else typechecking is implemented)
-    // Test function with different typed return statements throws error
+    // Test function with different typed return statements throws error (after if/else)
+    // Should we check for return reachability?
 
-    // private void testFunctionDefinitionWithWileLoop() {
-    //     /*
-    //     *  func length(Node list): int {
-    //             int retval = 0;
-    //             while (list != null) {
-    //                 retval = retval + 1;
-    //                 list = list.rest;
-    //             }
-    //         return retval;
-    //         }
-    //     */
-    // }
+
+    @Test
+    public void testStructNameAsParamType() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * func foo(A a) : void {
+         *   return;
+         * }
+         */
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+    
+        FunctionBody funcBody = new FunctionBody(List.of(new ReturnStmt()));
+        Param param = new Param(getStructType("A"), getVariable("a"));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("foo"),
+                List.of(param),
+                getVoidType(),
+                funcBody
+        );
+
+        Program program = new Program(List.of(structDef), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
 
 
     // Test invalid inputs
