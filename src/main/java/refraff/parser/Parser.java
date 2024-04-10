@@ -1225,9 +1225,10 @@ public class Parser {
         return new ParseResult<>(t, exclusiveEndPosition);
     }
 
-    private <T extends AbstractSyntaxTreeNode> Optional<ParseResult<T>> getOptionalSourcedParseResult(T t,
-                                                                                                      int inclusiveStartPosition,
-                                                                                                      int exclusiveEndPosition) {
+    private <T extends AbstractSyntaxTreeNode> Optional<ParseResult<T>> 
+            getOptionalSourcedParseResult(T t,
+                                          int inclusiveStartPosition,
+                                          int exclusiveEndPosition) {
         return Optional.of(getSourcedParseResult(t, inclusiveStartPosition, exclusiveEndPosition));
     }
 

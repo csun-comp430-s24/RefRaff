@@ -201,6 +201,8 @@ public class Typechecker {
         
         // Map all the function definitions names to their AST definitions
         for (FunctionDef funcDef : program.getFunctionDefs()) {
+            String beingParsed = "";
+            // Replace this with signature
             FunctionName funcName = funcDef.getFunctionName();
             Standardized<FunctionName> standardizedFuncName = Standardized.of(funcName);
 
@@ -213,24 +215,23 @@ public class Typechecker {
             } else {
                 String stringFuncName = funcName.getName();
                 throwTypecheckerException(String.format(typeErrorInFunctionMessageFormat, stringFuncName),
-                        funcDef, funcName, "struct type `" + stringFuncName + "` has already been defined");
+                        funcDef, funcName, "function signature `" + stringFuncName + "` has already been defined");
             }
 
             // Create a new type environment to check the function body
             functionTypeEnv = new HashMap<>(typeEnv);
             // And then type check the function statement block
-            typecheckStmtBlock(funcDef.getFunctionBody(), functionTypeEnv);
+            // This is handled differently from the statement block because it needs to return the return type
+            Type functionBodyType = typecheckFunctionBody(funcDef.getFunctionBody(), functionTypeEnv);
 
-            // NEED TO IMPLEMENT TYPECHECK STATEMENT BLOCK
+            // Then get the stated return type of the function
+            Type functionType = funcDef.getReturnType();
+
+            // Throw an error if the return types don't match
+            throwTypecheckerExceptionOnMismatchedTypes(beingParsed, program, functionBodyType,
+                                                       functionType, functionBodyType);
             
         }
-
-        // I think I need to type check everything inside the function definition as if it's its own program
-        // With its own scope and everything 
-        // So we would need the typeEnv for knowing what the function definitions are.
-        // So I'll make a new type environment on top of the current one (that contains current and earlier
-        // function definitions). But when we move onto the rest of the statements, we
-        // Are back to the base type environment with just the struct and function definitions
     }
 
     // Map of statements to their typechecking functions
@@ -321,13 +322,50 @@ public class Typechecker {
 
     public Type typecheckFunctionBody(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Start checking statements until you get to the return type
-        // Save it to a list of return types
-        // When I get to the end, check that all return types are the same
-        // Return the return type
-        // Type test = new VoidType();
-        // return test;
+        StmtBlock functionBody = (StmtBlock)stmtBlock;
+        // throw new TypecheckerException("Not implemented yet!");
+        // Make list of return types
+        List<Type> functionBodyTypes = new ArrayList<>();
+
+        // For each statement
+        for (Statement stmt : functionBody.getBlockBody()) {
+            // If this is a return statement
+            if (stmt.getClass().equals(ReturnStmt.class)) {
+                functionBodyTypes.add(typecheckReturnStmt(stmt, typeEnv));
+            } else {
+                // For any other statement, just type check as normal
+                // For now I'm making a list with a single statement,
+                // But I should factor out teypecheck statement (singular)
+                typecheckStatements(typeEnv, List.of(stmt));
+            }
+        }
+
+        // If the return types list is empty, return void type
+        if (functionBodyTypes.isEmpty()) {
+            return new VoidType();
+        } else {
+            // Otherwise, check that the return types don't conflict, and return
+            return validateReturnTypes(functionBodyTypes, stmtBlock);
+        }
+    }
+
+    public Type validateReturnTypes(final List<Type> returnTypes, AbstractSyntaxTreeNode parent) 
+            throws TypecheckerException {
+        String beingParsed = "return statement";
+        // Get the first type's class
+        Class<? extends Type> returnType = returnTypes.get(0).getClass();
+
+        // Check that this doesn't conflict with the other return types
+        for (Type type : returnTypes) {
+            if (type.getClass().equals(returnType)) {
+                // Throw error if there is more than one return type
+                // throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent, 
+                //         firstType, type, returnTypes.get(0));
+                throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent,
+                        returnTypes.get(0), type, returnTypes.get(0));
+            }
+        }
+        return returnTypes.get(0);
     }
 
     public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
