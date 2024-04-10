@@ -350,7 +350,7 @@ public class TypecheckerTest {
         Statement returnStmtTrue = new ReturnStmt(boolTrue);
         StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
         FunctionDef funcDef = new FunctionDef(
-            new FunctionName("alwaysTrue"),
+            getFunctionName("alwaysTrue"),
             new ArrayList<Param>(),
             getBoolType(),
             funcBody
@@ -430,7 +430,6 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
-    // Test a function with void and doesn't return anything doesn't throw an error
     @Test
     public void testVoidFunctionReturnsWithNoExp() {
         /*
@@ -445,7 +444,7 @@ public class TypecheckerTest {
         StmtBlock funcBody = new StmtBlock(List.of(assignStmt, returnStmt));
         Param paramX = new Param(getIntType(), getVariable("x"));
         FunctionDef funcDef = new FunctionDef(
-                new FunctionName("returnsNothing"),
+                getFunctionName("returnsNothing"),
                 List.of(paramX),
                 getVoidType(),
                 funcBody);
@@ -465,7 +464,7 @@ public class TypecheckerTest {
         Statement vardecStmt = new VardecStmt(getIntType(), getVariable("x"), new IntLiteralExp(0));
         StmtBlock funcBody = new StmtBlock(List.of(vardecStmt));
         FunctionDef funcDef = new FunctionDef(
-                new FunctionName("thePointOfNoReturn"),
+                getFunctionName("thePointOfNoReturn"),
                 new ArrayList<Param>(),
                 getVoidType(),
                 funcBody);
@@ -474,14 +473,32 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
-    // Tests for function definitions
-    // Test a function with void type and returns something throws an error
-    // Test two function with the same name but different signatures
-    // Test two functions with the same signatures throws
-    // Test function calls function that isn't defined yet throws
-    // Test function with mutliple return statements
-    // Test function with different typed return statements throws error
     // Test recursive function
+    @Test
+    public void testRecursiveFunction() {
+        /*
+         * func andBeyond(): bool {
+         *   return andBeyond();
+         * }
+         */
+
+        CommaExp commaExp = new CommaExp(new ArrayList<Expression>());
+        FuncCallExp funcCallExp = new FuncCallExp(getFunctionName("andBeyond"), commaExp);
+        Statement returnStmt = new ReturnStmt(funcCallExp);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmt));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("andBeyond"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    // Tests for function definitions
+    // Test function with mutliple return statements (when if/else typechecking is implemented)
+    // Test function with different typed return statements throws error
 
     // private void testFunctionDefinitionWithWileLoop() {
     //     /*
@@ -900,11 +917,67 @@ public class TypecheckerTest {
                 getBoolType(),
                 funcBody);
 
-        Expression boolTrue2 = new BoolLiteralExp(true);
+        Expression boolTrue2 = new BoolLiteralExp(false);
         Statement returnStmtTrue2 = new ReturnStmt(boolTrue2);
         StmtBlock funcBody2 = new StmtBlock(List.of(returnStmtTrue2));
         FunctionDef funcDef2 = new FunctionDef(
                 getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody2);
+
+        Program invalidProgram = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testVoidFunctionReturnsSomethingThrowsException() {
+        /*
+         * func voidFunc(): void {
+         *   return 0;
+         * }
+         */
+
+        Expression intLiteral0 = new IntLiteralExp(0);
+        Statement returnStmt0 = new ReturnStmt(intLiteral0);
+        FunctionBody funcBody = new FunctionBody(List.of(returnStmt0));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("voidFunc"),
+                new ArrayList<Param>(),
+                getVoidType(),
+                funcBody);
+
+        Program invalidProgram = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testFunctionCallsNotYetDefinedFunctionThrowsException() {
+        /*
+         * func firstFunc(): bool {
+         *   return secondFunc();
+         * }
+         * 
+         * func secondFunc(): bool {
+         *   return false;
+         * }
+         */
+
+        CommaExp args = new CommaExp(new ArrayList<Expression>());
+        Expression secondFuncCallExp = new FuncCallExp(getFunctionName("secondFunc"), args);
+        Statement returnSecondFunc = new ReturnStmt(secondFuncCallExp);
+        StmtBlock funcBody = new StmtBlock(List.of(returnSecondFunc));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("firstFunc"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        Expression boolTrue2 = new BoolLiteralExp(false);
+        Statement returnStmtTrue2 = new ReturnStmt(boolTrue2);
+        StmtBlock funcBody2 = new StmtBlock(List.of(returnStmtTrue2));
+        FunctionDef funcDef2 = new FunctionDef(
+                getFunctionName("secondFunc"),
                 new ArrayList<Param>(),
                 getBoolType(),
                 funcBody2);

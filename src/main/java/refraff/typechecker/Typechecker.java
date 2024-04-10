@@ -205,10 +205,7 @@ public class Typechecker {
             FunctionName funcName = funcDef.getFunctionName();
             Standardized<FunctionName> standardizedFuncName = Standardized.of(funcName);
 
-            // Because the order of the function definitions matters in C, I'm going to
-            // Add the function definition first (because recursion is allowed)
-            // MAKE THIS CHECK FOR NEW FUNCTION SIGNATURE RATHER THAN FUNCTION NAME
-            // CAN I STANDARDIZE A WHOLE FUNCTION SIGNATURE
+            // Check if the function name is already in the map
             if (!functionNameToDef.containsKey(standardizedFuncName)) {
                 functionNameToDef.put(standardizedFuncName, new ArrayList<>(List.of(funcDef)));
             } else {
