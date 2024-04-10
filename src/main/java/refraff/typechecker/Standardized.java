@@ -53,10 +53,10 @@ public class Standardized<T extends Node> {
         return new Standardized<>(variable, Variable::new);
     }
 
-    // For type environment deepcopy in typechecker
-    public static Standardized<Variable> of(Standardized<Variable> standardizedVariable) {
-        return new Standardized<Variable>(standardizedVariable.getStandardizedNode(), Variable::new);
-    }
+    // // For type environment deepcopy in typechecker
+    // public static Standardized<Variable> of(Standardized<Variable> standardizedVariable) {
+    //     return new Standardized<Variable>(standardizedVariable.getStandardizedNode(), Variable::new);
+    // }
 
     public static boolean standardizedEquals(Variable variable1, Variable variable2) {
         Standardized<Variable> standardized1 = Standardized.of(variable1);

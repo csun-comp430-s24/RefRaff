@@ -56,6 +56,10 @@ public class TypecheckerTest {
         return Node.setNodeSource(new StructName(name), name);
     }
 
+    private FunctionName getFunctionName(String name) {
+        return Node.setNodeSource(new FunctionName(name), name);
+    }
+
     // Test valid inputs
 
     private void testDoesNotThrowTypecheckerException(Program program) {
@@ -339,7 +343,7 @@ public class TypecheckerTest {
         /*
         *  func alwaysTrue(): bool {
         *       return true;
-        *   }
+        *  }
         */
 
         Expression boolTrue = new BoolLiteralExp(true);
@@ -356,14 +360,128 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
+    @Test
+    public void testFunctionDefinitionsWithSameNameDifferentSignature() {
+        /*
+         * func alwaysTrue(): bool {
+         *   return true;
+         * }
+         * 
+         * func alwaysTrue(int num): bool {
+         *   return true;
+         * }
+         */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        Expression boolTrue2 = new BoolLiteralExp(true);
+        Statement returnStmtTrue2 = new ReturnStmt(boolTrue2);
+        StmtBlock funcBody2 = new StmtBlock(List.of(returnStmtTrue2));
+        Param param = new Param(getIntType(), getVariable("num"));
+        FunctionDef funcDef2 = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                List.of(param),
+                getBoolType(),
+                funcBody2);
+
+        Program program = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionDefinitionReturnsFunctionCallWithSameType() {
+        /*
+         * func alwaysTrue(): bool {
+         *   return true;
+         * }
+         * 
+         * func returnsCall(): bool {
+         *   return alwaysTrue();
+         * }
+         */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        CommaExp args = new CommaExp(new ArrayList<Expression>());
+        Expression funcCall = new FuncCallExp(getFunctionName("alwaysTrue"), args);
+        Statement returnFuncCall = new ReturnStmt(funcCall);
+        StmtBlock funcBody2 = new StmtBlock(List.of(returnFuncCall));
+        FunctionDef funcDef2 = new FunctionDef(
+                getFunctionName("returnsCall"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody2);
+
+        Program program = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    // Test a function with void and doesn't return anything doesn't throw an error
+    @Test
+    public void testVoidFunctionReturnsWithNoExp() {
+        /*
+         * func returnsNothing(int x): void {
+         *   x = 0;
+         *   return;
+         * }
+         */
+
+        Statement assignStmt = new AssignStmt(getVariable("x"), new IntLiteralExp(0));
+        Statement returnStmt = new ReturnStmt();
+        StmtBlock funcBody = new StmtBlock(List.of(assignStmt, returnStmt));
+        Param paramX = new Param(getIntType(), getVariable("x"));
+        FunctionDef funcDef = new FunctionDef(
+                new FunctionName("returnsNothing"),
+                List.of(paramX),
+                getVoidType(),
+                funcBody);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testVoidFunctionWithNoReturn() {
+        /*
+         * func thePointOfNoReturn(): void {
+         *   int x = 0;
+         * }
+         */
+
+        Statement vardecStmt = new VardecStmt(getIntType(), getVariable("x"), new IntLiteralExp(0));
+        StmtBlock funcBody = new StmtBlock(List.of(vardecStmt));
+        FunctionDef funcDef = new FunctionDef(
+                new FunctionName("thePointOfNoReturn"),
+                new ArrayList<Param>(),
+                getVoidType(),
+                funcBody);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
     // Tests for function definitions
-    // Test that a function that returns another function call type checks that
-    // Test that a function that returns another function call that returns the wrong type throws an error
-    // Test a function with a parameter
-    // Test a function with two parameters
-    // Test a function with void doesn't and doesn't return anything doesn't throw an error
     // Test a function with void type and returns something throws an error
     // Test two function with the same name but different signatures
+    // Test two functions with the same signatures throws
+    // Test function calls function that isn't defined yet throws
+    // Test function with mutliple return statements
+    // Test function with different typed return statements throws error
+    // Test recursive function
 
     // private void testFunctionDefinitionWithWileLoop() {
     //     /*
@@ -751,13 +869,47 @@ public class TypecheckerTest {
         Statement returnStmt0 = new ReturnStmt(intLiteral0);
         FunctionBody funcBody = new FunctionBody(List.of(returnStmt0));
         FunctionDef funcDef = new FunctionDef(
-            new FunctionName("alwaysTrue"),
+            getFunctionName("alwaysTrue"),
             new ArrayList<Param>(),
             getBoolType(),
             funcBody
         );
 
         Program invalidProgram = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testDuplicateFunctionSignaturesThrowsException() {
+        /*
+         * func alwaysTrue(): bool {
+         *   return true;
+         * }
+         * 
+         * func alwaysTrue(): bool {
+         *   return false;
+         * }
+         */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        Expression boolTrue2 = new BoolLiteralExp(true);
+        Statement returnStmtTrue2 = new ReturnStmt(boolTrue2);
+        StmtBlock funcBody2 = new StmtBlock(List.of(returnStmtTrue2));
+        FunctionDef funcDef2 = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody2);
+
+        Program invalidProgram = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
         testThrowsTypecheckerException(invalidProgram);
     }
 

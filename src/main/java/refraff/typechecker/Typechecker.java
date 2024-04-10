@@ -21,7 +21,7 @@ public class Typechecker {
     private final Program program;
 
     private final Map<Standardized<StructName>, StructDef> structNameToDef;
-    private final Map<Standardized<FunctionName>, FunctionDef> functionNameToDef;
+    private final Map<Standardized<FunctionName>, List<FunctionDef>> functionNameToDef;
 
     private Typechecker(Program program) {
         this.program = program;
@@ -201,7 +201,6 @@ public class Typechecker {
         
         // Map all the function definitions names to their AST definitions
         for (FunctionDef funcDef : program.getFunctionDefs()) {
-            String beingParsed = "";
             // Replace this with signature
             FunctionName funcName = funcDef.getFunctionName();
             Standardized<FunctionName> standardizedFuncName = Standardized.of(funcName);
@@ -211,26 +210,42 @@ public class Typechecker {
             // MAKE THIS CHECK FOR NEW FUNCTION SIGNATURE RATHER THAN FUNCTION NAME
             // CAN I STANDARDIZE A WHOLE FUNCTION SIGNATURE
             if (!functionNameToDef.containsKey(standardizedFuncName)) {
-                functionNameToDef.put(standardizedFuncName, funcDef);
+                functionNameToDef.put(standardizedFuncName, new ArrayList<>(List.of(funcDef)));
             } else {
-                String stringFuncName = funcName.getName();
-                throwTypecheckerException(String.format(typeErrorInFunctionMessageFormat, stringFuncName),
-                        funcDef, funcName, "function signature `" + stringFuncName + "` has already been defined");
+                // Check if the signature matches one that already exists for this name
+                // Get the parameter lists
+                List<FunctionDef> existingFuncDefs = functionNameToDef.get(standardizedFuncName);
+                // For each function def
+                for (FunctionDef existingFuncDef : existingFuncDefs) {
+                    // If the current function's parameter types match this list
+                    if (existingFuncDef.matchesSignatureOf(funcDef)) {
+                        // Throw an exception
+                        String stringFuncName = funcName.getName();
+                        throwTypecheckerException(String.format(typeErrorInFunctionMessageFormat, stringFuncName),
+                                funcDef, funcName, "function signature for `" + stringFuncName + "` has already been defined");
+                    }
+                }
+                // Add the function definition to the list of definitions under this name
+                // List<FunctionDef> funcDefList = functionNameToDef.get(standardizedFuncName);
+                // funcDefList.add(funcDef);
+                existingFuncDefs.add(funcDef);
             }
 
             // Create a new type environment to check the function body
             functionTypeEnv = new HashMap<>(typeEnv);
-            // And then type check the function statement block
-            // This is handled differently from the statement block because it needs to return the return type
+            // Add the function's parameters to the type environment
+            for (Param param : funcDef.getParams()) {
+                functionTypeEnv.put(Standardized.of(param.getVariable()), param.getType());
+            }
+            // And then type check the function body statement block
             Type functionBodyType = typecheckFunctionBody(funcDef.getFunctionBody(), functionTypeEnv);
 
             // Then get the stated return type of the function
             Type functionType = funcDef.getReturnType();
 
             // Throw an error if the return types don't match
-            throwTypecheckerExceptionOnMismatchedTypes(beingParsed, program, functionBodyType,
+            throwTypecheckerExceptionOnMismatchedTypes(funcName.getName(), program, functionBodyType,
                                                        functionType, functionBodyType);
-            
         }
     }
 
@@ -315,15 +330,24 @@ public class Typechecker {
 
     public Type typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        // Get the return statement's expression
+        ReturnStmt castReturnStmt = (ReturnStmt)returnStmt;
+
+        // Get the optional of the return expression
+        Optional<Expression> optionalExp = castReturnStmt.getReturnValue();
+
+        // If it doesn't exist, return voidtype
+        if (optionalExp.isEmpty()) {
+            return new VoidType();
+        } else {
+            // Otherwise, typecheck the expression and return the type
+            return typecheckExp(optionalExp.get(), typeEnv);
+        }
     }
 
     public Type typecheckFunctionBody(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         StmtBlock functionBody = (StmtBlock)stmtBlock;
-        // throw new TypecheckerException("Not implemented yet!");
         // Make list of return types
         List<Type> functionBodyTypes = new ArrayList<>();
 
@@ -357,7 +381,7 @@ public class Typechecker {
 
         // Check that this doesn't conflict with the other return types
         for (Type type : returnTypes) {
-            if (type.getClass().equals(returnType)) {
+            if (!type.getClass().equals(returnType)) {
                 // Throw error if there is more than one return type
                 // throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent, 
                 //         firstType, type, returnTypes.get(0));
@@ -423,11 +447,56 @@ public class Typechecker {
                     UnaryOpExp.class, Typechecker::typecheckUnaryOpExp
     );
 
+    // Returns true if the arguments (commaExpList) types match the param list types
+    public boolean argsMatchSignature(final List<Expression> commaExpList, final List<Param> paramList, 
+            final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        // If the arg list and param list are not the same size
+        if (commaExpList.size() != paramList.size()) {
+            return false;
+        }
+
+        for (int i = 0; i < commaExpList.size(); i++) {
+            // Get the argument's type
+            Type argType = typecheckExp(commaExpList.get(i), typeEnv);
+            // If an arg type doesn't match a param type, return false
+            if (!argType.getClass().equals(paramList.get(i).getType().getClass())) {
+                return false;
+            }
+        }
+        // All of the types match, return true
+        return true;
+    }
+
+    // Check that function call's arguments match a signature by the function's name,
+    // Then return the function's return type
     public Type typecheckFuncCallExp(final Expression funcCallExp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        final String beingParsed = "function call expression";
+        FuncCallExp castFuncCallExp = (FuncCallExp)funcCallExp;
+        // Get function name and param list
+        FunctionName funcName = castFuncCallExp.getFuncName();
+
+
+        // Get existing function definitions by that name
+        final String funcWhereWeAre = "function name `" + funcName.getSource().getSourceString() + "`";
+        List<FunctionDef> existingFuncDefs = functionNameToDef.get(Standardized.of(funcName));
+
+        if (existingFuncDefs == null) {
+            throwTypecheckerException(beingParsed, funcCallExp, funcName, funcWhereWeAre + " is not defined");
+        }
+
+        // For each signature of this function name
+        for (FunctionDef existingFuncDef : existingFuncDefs) {
+            // Check if the arguments match the signature
+            if (argsMatchSignature(castFuncCallExp.getCommaExp().getExpressions(), existingFuncDef.getParams(), typeEnv)) {
+                // If one does, return the function's return type
+                return existingFuncDef.getReturnType();
+            }
+        }
+
+        // If we got here, the arguments don't match any signatures, so throw an exception
+        throwTypecheckerException(beingParsed, funcCallExp, funcName, funcWhereWeAre + " argument list does not match param types");
+        return new VoidType(); // This'll never be reached because of the exception. But it won't compile without this?
     }
 
     public Type typecheckParenExp(final Expression parenExp, final Map<Standardized<Variable>, Type> typeEnv)

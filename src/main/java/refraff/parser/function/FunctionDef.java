@@ -33,6 +33,39 @@ public class FunctionDef extends AbstractSyntaxTreeNode {
         // Also create a function signature for the function map in the typechecker
     }
 
+    // Returns true if the types in the param lists of both function defs match
+    public boolean matchesSignatureOf(FunctionDef otherFuncDef) {
+        List<Param> otherParams = otherFuncDef.getParams();
+        // If the lists are different lengths, return false
+        if (this.params.size() != otherParams.size()) {
+            return false;
+        }
+        
+        for (int i = 0; i < this.params.size(); i++) {
+            // If the types of the parameters don't match, return false
+            if (!this.params.get(i).getClass().equals(otherParams.get(i).getClass())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // // Returns true if the other comma expression's types matches this param list's types
+    // public boolean matchesSignatureOf(CommaExp otherArgs) {
+    //     // If the lists are different lengths, return false
+    //     if (this.params.size() != otherParams.size()) {
+    //         return false;
+    //     }
+
+    //     for (int i = 0; i < this.params.size(); i++) {
+    //         // If the types of the parameters don't match, return false
+    //         if (!this.params.get(i).getClass().equals(otherParams.get(i).getClass())) {
+    //             return false;
+    //         }
+    //     }
+    //     return true;
+    // }
+
     public FunctionName getFunctionName() {
         return functionName;
     }

@@ -17,6 +17,10 @@ public class CommaExp extends AbstractSyntaxTreeNode {
         this.expressions = expressions;
     }
 
+    public List<Expression> getExpressions() {
+        return this.expressions;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), expressions);
