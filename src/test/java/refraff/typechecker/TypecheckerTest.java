@@ -2,7 +2,8 @@ package refraff.typechecker;
 
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.TestFactory;
 import refraff.Sourced;
 import refraff.parser.*;
 import refraff.parser.struct.*;
@@ -19,6 +20,8 @@ import refraff.util.ResourceUtil;
 
 import java.util.List;
 import java.util.ArrayList;
+import java.util.*;
+import java.util.function.BiFunction;
 
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -230,6 +233,7 @@ public class TypecheckerTest {
             getVariable("foo"),
             new IntLiteralExp(6)
         );
+
         Statement varExpStmt = new ExpressionStmt(new VariableExp(getVariable("foo")));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, varExpStmt));
         testDoesNotThrowTypecheckerException(program);
@@ -259,6 +263,124 @@ public class TypecheckerTest {
 
         assertTrue(expression.getExpressionType().hasTypeEquality(new BoolType()));
     }
+
+//    @TestFactory
+//    public List<DynamicTest> testOrOp() {
+//        OperatorEnum orOp = OperatorEnum.OR;
+//
+//        return List.of(
+//
+//        )
+//        testBinOpBool(orOp, getBoolType());
+//    }
+//
+//    private List<DynamicTest> testBinOp(OperatorEnum op, Type expectedReturnType, Class<? extends Type>... allowedParamTypes) {
+//        Set<Class<? extends Type>> allowedTypesSet = new HashSet<>(List.of(allowedParamTypes));
+//
+//        return List.of(
+//                getTest(op, expectedReturnType, allowedTypesSet, IntType.class)
+//        )
+//    }
+//
+//    private static final Map<Class<? extends Type>, >
+//
+//    private DynamicTest getTest(OperatorEnum op, Type expectedReturnType, Set<Class<? extends Type>> allowedParamTypesSet,
+//                                Class<? extends Type> currentType) {
+//        List<Class<? extends Type>> fullTypeList = List.of(IntType.class, VoidType.class, BoolType.class, StructType.class);
+//
+//        if (allowedParamTypesSet.contains(currentType)) {
+//            return DynamicTest.dynamicTest("",
+//                    () -> assertThrows(AssertionError.class, () -> testFunction.apply(op, expectedReturnType)));
+//        }
+//
+//        return DynamicTest.dynamicTest("",
+//                () -> assertThrows(AssertionError.class, () -> testFunction.apply(op, expectedReturnType)));
+//    }
+
+    private DynamicTest testBinOpInt(OperatorEnum op, Type expectedType) {
+        // 5 <op> 7
+        return testBinOp(Optional.empty(), Optional.empty(), new IntLiteralExp(5), op, new IntLiteralExp(7), expectedType);
+    }
+
+    private DynamicTest testBinOpBool(OperatorEnum op, Type expectedType) {
+        // true <op> false
+        return testBinOp(Optional.empty(), Optional.empty(), new BoolLiteralExp(true), op, new BoolLiteralExp(false),
+                expectedType);
+    }
+
+    private DynamicTest testBinOpMatchingStructType(OperatorEnum op, Type expectedType) {
+        StructName structName = getStructName("A");
+        StructType structType = getStructType("A");
+
+        StructDef structDef = new StructDef(structName, List.of());
+        Optional<List<StructDef>> structDefs = Optional.of(List.of(structDef));
+
+        // A a = null;
+        Variable a = getVariable("a");
+        Statement aVardec = new VardecStmt(structType, a, getNullExp());
+
+        // A b = null;
+        Variable b = getVariable("b");
+        Statement bVardec = new VardecStmt(structType, b, getNullExp());
+
+        Optional<List<Statement>> precedingStatements = Optional.of(List.of(aVardec, bVardec));
+
+        // a <op> b
+        VariableExp aExp = new VariableExp(a);
+        VariableExp bExp = new VariableExp(b);
+
+        return testBinOp(structDefs, precedingStatements, aExp, op, bExp, expectedType);
+    }
+
+    private DynamicTest testBinOpNotMatchingStructType(OperatorEnum op, Type expectedType) {
+        StructName aStructName = getStructName("A");
+        StructType aStructType = getStructType("A");
+        StructDef aStructDef = new StructDef(aStructName, List.of());
+
+        StructName bStructName = getStructName("B");
+        StructType bStructType = getStructType("B");
+        StructDef bStructDef = new StructDef(bStructName, List.of());
+
+        Optional<List<StructDef>> structDefs = Optional.of(List.of(aStructDef, bStructDef));
+
+        // A a = null;
+        Variable a = getVariable("a");
+        Statement aVardec = new VardecStmt(aStructType, a, getNullExp());
+
+        // B b = null;
+        Variable b = getVariable("b");
+        Statement bVardec = new VardecStmt(bStructType, b, getNullExp());
+
+        Optional<List<Statement>> precedingStatements = Optional.of(List.of(aVardec, bVardec));
+
+        // a <op> b
+        VariableExp aExp = new VariableExp(a);
+        VariableExp bExp = new VariableExp(b);
+
+        return testBinOp(structDefs, precedingStatements, aExp, op, bExp, expectedType);
+    }
+
+    private DynamicTest testBinOpBothNullStructType(OperatorEnum op, Type expectedType) {
+        return testBinOp(Optional.empty(), Optional.empty(), getNullExp(), op, getNullExp(), expectedType);
+    }
+
+    private DynamicTest testBinOp(Optional<List<StructDef>> optionalStructDefs, Optional<List<Statement>> precedingStatements,
+                           Expression leftExpression, OperatorEnum op, Expression rightExpression, Type expectedType) {
+        List<StructDef> structDefs = optionalStructDefs.orElse(List.of());
+
+        Expression expression = new BinaryOpExp(leftExpression, op, rightExpression);
+        Statement statement = new ExpressionStmt(expression);
+
+        List<Statement> statements = new ArrayList<>(precedingStatements.orElse(List.of()));
+        statements.add(statement);
+
+        Program program = new Program(structDefs, List.of(), statements);
+        testDoesNotThrowTypecheckerException(program);
+
+        return DynamicTest.dynamicTest("",
+                () -> assertTrue(expectedType.hasTypeEquality(expression.getExpressionType())));
+    }
+
 
     @Test
     public void testExpWithBinOpExp() {
