@@ -1248,6 +1248,13 @@ public class TypecheckerTest {
     }
 
     @Test
+    public void testReturnStmtNotInFunctionDefThrowsException() {
+        // return;
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(new ReturnStmt()));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
     public void testIfElseWithNonBooleanConditionThrowsException() {
         // if (7) {}
         IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(7), new StmtBlock());

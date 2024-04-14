@@ -12,6 +12,7 @@ import refraff.parser.operator.OperatorEnum;
 import refraff.parser.expression.*;
 import refraff.parser.statement.*;
 import refraff.parser.function.*;
+import refraff.util.Pair;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,6 +25,9 @@ public class Typechecker {
     private final Map<Standardized<FunctionName>, List<FunctionDef>> functionNameToDef;
 
     private final Stack<Boolean> loopStack;
+    private final List<Pair<ReturnStmt, Type>> allReturnTypesInThisFunction;
+
+    private boolean withinFunctionDef;
 
     private Typechecker(Program program) {
         this.program = program;
@@ -32,6 +36,9 @@ public class Typechecker {
         this.functionNameToDef = new HashMap<>();
 
         this.loopStack = new Stack<>();
+        this.allReturnTypesInThisFunction = new ArrayList<>();
+
+        this.withinFunctionDef = false;
     }
 
     public static void typecheckProgram(Program program) throws TypecheckerException {
@@ -248,11 +255,12 @@ public class Typechecker {
             for (Param param : funcDef.getParams()) {
                 functionTypeEnv.put(Standardized.of(param.getVariable()), param.getType());
             }
-            // And then type check the function body statement block
-            Type functionBodyType = typecheckFunctionBody(funcDef.getFunctionBody(), functionTypeEnv);
 
             // Then get the stated return type of the function
             Type functionType = funcDef.getReturnType();
+
+            // And then type check the function body statement block
+            Type functionBodyType = typecheckFunctionBody(functionType, funcDef.getFunctionBody(), functionTypeEnv);
 
             // Throw an error if the return types don't match
             throwTypecheckerExceptionOnMismatchedTypes(funcName.getName(), program, functionBodyType,
@@ -363,66 +371,72 @@ public class Typechecker {
 
     public Type typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
+        // If we aren't in a function definition, then return is invalid
+        if (!withinFunctionDef) {
+            throwTypecheckerException("return statement", returnStmt, returnStmt,
+                    "return not allowed outside of function definitions");
+        }
+
         // Get the return statement's expression
-        ReturnStmt castReturnStmt = (ReturnStmt)returnStmt;
+        ReturnStmt castReturnStmt = (ReturnStmt) returnStmt;
 
         // Get the optional of the return expression
         Optional<Expression> optionalExp = castReturnStmt.getReturnValue();
+        Type returnType = optionalExp.isEmpty() ? VOID_TYPE : typecheckExp(optionalExp.get(), typeEnv);
 
-        // If it doesn't exist, return voidtype
-        if (optionalExp.isEmpty()) {
-            return VOID_TYPE;
-        } else {
-            // Otherwise, typecheck the expression and return the type
-            return typecheckExp(optionalExp.get(), typeEnv);
-        }
+        allReturnTypesInThisFunction.add(Pair.of(castReturnStmt, returnType));
+        return returnType;
     }
 
-    public Type typecheckFunctionBody(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
-            throws TypecheckerException {
-        StmtBlock functionBody = (StmtBlock)stmtBlock;
-        // Make list of return types
-        List<Type> functionBodyTypes = new ArrayList<>();
+    public Type typecheckFunctionBody(final Type functionReturnType, final StmtBlock functionBody,
+                                      final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        this.withinFunctionDef = true;
+        typecheckStatements(typeEnv, functionBody.getBlockBody());
+        this.withinFunctionDef = false;
 
-        // For each statement
-        for (Statement stmt : functionBody.getBlockBody()) {
-            // If this is a return statement
-            if (stmt.getClass().equals(ReturnStmt.class)) {
-                functionBodyTypes.add(typecheckReturnStmt(stmt, typeEnv));
-            } else {
-                // For any other statement, just type check as normal
-                // For now I'm making a list with a single statement,
-                // But I should factor out teypecheck statement (singular)
-                typecheckStatements(typeEnv, List.of(stmt));
-            }
-        }
+        // This method won't accept keep track of returns within nested statement blocks: e.g. while
+        // It may be easier to keep track of a global function tracker, and append the return types to a global list
+//        // For each statement
+//        for (Statement stmt : functionBody.getBlockBody()) {
+//            // If this is a return statement
+//            if (stmt.getClass().equals(ReturnStmt.class)) {
+//                System.out.println("Return statement: " + stmt);
+//                functionBodyTypes.add(typecheckReturnStmt(stmt, typeEnv));
+//            } else {
+//                System.out.println("Other statement: " + stmt);
+//                // For any other statement, just type check as normal
+//                // For now I'm making a list with a single statement,
+//                // But I should factor out teypecheck statement (singular)
+//
+//            }
+//        }
+//
+//        // If the return types list is empty, return void type
+//        if (functionBodyTypes.isEmpty()) {
+//            return VOID_TYPE;
+//        }
 
-        // If the return types list is empty, return void type
-        if (functionBodyTypes.isEmpty()) {
-            return VOID_TYPE;
-        } else {
-            // Otherwise, check that the return types don't conflict, and return
-            return validateReturnTypes(functionBodyTypes, stmtBlock);
-        }
+        throwIfReturnsDoNotMatchFunctionReturnType(functionReturnType, allReturnTypesInThisFunction, functionBody);
+        allReturnTypesInThisFunction.clear();
+
+        return functionReturnType;
     }
 
-    public Type validateReturnTypes(final List<Type> returnTypes, AbstractSyntaxTreeNode parent) 
-            throws TypecheckerException {
+    public void throwIfReturnsDoNotMatchFunctionReturnType(final Type functionReturnType,
+                                                           final List<Pair<ReturnStmt, Type>> returnTypes,
+                                                           AbstractSyntaxTreeNode parent) throws TypecheckerException {
         String beingParsed = "return statement";
-        // Get the first type's class
-        Type returnType = returnTypes.get(0);
 
         // Check that this doesn't conflict with the other return types
-        for (Type type : returnTypes) {
-            if (!type.hasTypeEquality(returnType)) {
-                // Throw error if there is more than one return type
-                // throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent, 
-                //         firstType, type, returnTypes.get(0));
-                throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent,
-                        returnTypes.get(0), type, returnTypes.get(0));
+        for (Pair<ReturnStmt, Type> returnStmtTypePair : returnTypes) {
+            ReturnStmt returnStmt = returnStmtTypePair.getLeft();
+            Type type = returnStmtTypePair.getRight();
+
+            if (!type.hasTypeEquality(functionReturnType)) {
+                // Throw error if the return type does not match the declared function return type
+                throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent, returnStmt, functionReturnType, type);
             }
         }
-        return returnTypes.get(0);
     }
 
     public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
