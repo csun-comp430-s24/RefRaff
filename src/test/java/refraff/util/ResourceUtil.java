@@ -11,6 +11,7 @@ public class ResourceUtil {
     private static final String TEST_DIRECTORY = "src/test/resources";
 
     private static final String PROGRAM_FILE = "program.txt";
+    private static final String PROGRAM2_FILE = "program2.txt";
 
     public static String readInputFile(String filePath) {
         File file = new File(TEST_DIRECTORY, filePath);
@@ -34,5 +35,9 @@ public class ResourceUtil {
 
     public static String readProgramInputFile() {
         return readInputFile(PROGRAM_FILE);
+    }
+
+    public static String readProgram2InputFile() {
+        return readInputFile(PROGRAM2_FILE);
     }
 }

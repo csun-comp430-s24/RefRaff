@@ -357,7 +357,8 @@ public class Typechecker {
 
         // If structs or void are here, throw an exception
         // In the future, we should support println with structs!
-        throwTypecheckerException("println statement", printlnStmt, toPrint, "println is only defined for ints and bools");
+        throwTypecheckerException("println statement", printlnStmt, toPrint, "println is only defined for int and bool," +
+                " but received type `" + toPrintType.getSource().getSourceString() + "`");
     }
 
     public Type typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
@@ -615,14 +616,15 @@ public class Typechecker {
     private static final BoolType BOOL_TYPE = Node.setNodeSource(new BoolType(), "bool");
     private static final IntType INT_TYPE = Node.setNodeSource(new IntType(), "int");
     private static final VoidType VOID_TYPE = Node.setNodeSource(new VoidType(), "void");
+    private static final StructType STRUCT_TYPE = Node.setNodeSource(new StructType(null), "null");
 
     // Map of Enums to the types they can operate on
     private static final Map<OperatorEnum, List<Type>> OP_TO_OPERAND_TYPE = new HashMap<>() {{
         put(OperatorEnum.NOT, List.of(BOOL_TYPE));
         put(OperatorEnum.OR, Arrays.asList(BOOL_TYPE));
         put(OperatorEnum.AND, Arrays.asList(BOOL_TYPE));
-        put(OperatorEnum.DOUBLE_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE));
-        put(OperatorEnum.NOT_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE));
+        put(OperatorEnum.DOUBLE_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE, STRUCT_TYPE));
+        put(OperatorEnum.NOT_EQUALS, Arrays.asList(BOOL_TYPE, INT_TYPE, STRUCT_TYPE));
         put(OperatorEnum.LESS_THAN_EQUALS, Arrays.asList(INT_TYPE));
         put(OperatorEnum.GREATER_THAN_EQUALS, Arrays.asList(INT_TYPE));
         put(OperatorEnum.LESS_THAN, Arrays.asList(INT_TYPE));
@@ -732,10 +734,12 @@ public class Typechecker {
         StructDef structDef = structNameToDef.get(Standardized.of(structName));
 
         Variable structField = dotExp.getRightVar();
+        Standardized<Variable> standardizedStructField = Standardized.of(structField);
         Type structFieldType = null;
 
         for (Param param : structDef.getParams()) {
-            if (structField.equals(param.variable)) {
+            Standardized<Variable> standardizedVar = Standardized.of(param.variable);
+            if (standardizedStructField.equals(standardizedVar)) {
                 structFieldType = param.type;
                 break;
             }
@@ -743,7 +747,8 @@ public class Typechecker {
 
         // Check that the variable we used does exist as a parameter (or field) for the struct
         if (structFieldType == null) {
-            final String errorSuffix = "parameter `" + structField.name + "` is not defined on struct type `" + structType + "`";
+            final String errorSuffix = "parameter `" + structField.getName() +
+                    "` is not defined on struct type `" + structType.getSource().getSourceString() + "`";
             throwTypecheckerException(beingParsed, exp, structField, errorSuffix);
         }
 

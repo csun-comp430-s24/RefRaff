@@ -50,11 +50,11 @@ public class StructType extends Type {
 
         StructType otherStructType = (StructType) other;
         if (isNullStruct() && otherStructType.isNullStruct()) {
-            // If we're both null, this is fine?
+            // If we're both null, this is fine.
             return true;
         } else if (isNullStruct() == otherStructType.isNullStruct()) {
             // If we're both not null, check that our struct names match exactly
-            return Objects.equals(getStructName().get(), otherStructType.getStructName().get());
+            return Objects.equals(getStructName().get().structName, otherStructType.getStructName().get().structName);
         } else {
             // If one of us is null, then the null struct type will change its type to the type of our other struct
             return true;

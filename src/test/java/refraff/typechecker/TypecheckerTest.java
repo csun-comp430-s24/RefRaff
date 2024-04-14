@@ -1300,10 +1300,21 @@ public class TypecheckerTest {
 
     // Integration test
 
-    @Ignore("Should be ignored until typechecker is complete.")
     @Test
     public void testTokenizeParseTypecheckProgramWithoutException() {
         String input = ResourceUtil.readProgramInputFile();
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Program program = Parser.parseProgram(sourcedTokens);
+            Typechecker.typecheckProgram(program);
+        } catch (TokenizerException | ParserException | TypecheckerException ex) {
+            fail(ex.toString());
+        }
+    }
+
+    @Test
+    public void testTokenizeParseTypecheckProgram2WithoutException() {
+        String input = ResourceUtil.readProgram2InputFile();
         try {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
