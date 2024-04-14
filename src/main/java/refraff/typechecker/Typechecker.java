@@ -23,11 +23,15 @@ public class Typechecker {
     private final Map<Standardized<StructName>, StructDef> structNameToDef;
     private final Map<Standardized<FunctionName>, List<FunctionDef>> functionNameToDef;
 
+    private final Stack<Boolean> loopStack;
+
     private Typechecker(Program program) {
         this.program = program;
 
         this.structNameToDef = new HashMap<>();
         this.functionNameToDef = new HashMap<>();
+
+        this.loopStack = new Stack<>();
     }
 
     public static void typecheckProgram(Program program) throws TypecheckerException {
@@ -76,6 +80,16 @@ public class Typechecker {
         final String errorSuffix = rightHandChild.getNodeTypeDescriptor() + " does not match expected type " +
                 leftHand.getSource().getSourceString();
         throwTypecheckerException(beingParsed, parent, rightHandChild, errorSuffix);
+    }
+
+    private void throwTypecheckerExceptionOnNonBooleanType(String beingParsed, AbstractSyntaxTreeNode parent,
+                                                           AbstractSyntaxTreeNode child, Type type) throws TypecheckerException {
+        if (type.hasTypeEquality(new BoolType())) {
+            return;
+        }
+
+        final String errorSuffix = child.getNodeTypeDescriptor() + " does not match expected bool type";
+        throwTypecheckerException(beingParsed, parent, child, errorSuffix);
     }
 
     private void throwTypecheckerException(String beingParsed, AbstractSyntaxTreeNode parent,
@@ -299,9 +313,11 @@ public class Typechecker {
 
     public void typecheckBreakStmt(final Statement breakStmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        if (!loopStack.isEmpty()) {
+            return;
+        }
+
+        throwTypecheckerException("break statement", breakStmt, breakStmt, "break used outside of a loop");
     }
 
     public void typecheckExpStmt(final Statement expStmt, final Map<Standardized<Variable>, Type> typeEnv)
@@ -419,11 +435,17 @@ public class Typechecker {
         castVardecStmt.getExpression().setExpressionType(type);
     }
 
-    public void typecheckWhileStmt(final Statement whileStmt, final Map<Standardized<Variable>, Type> typeEnv)
+    public void typecheckWhileStmt(final Statement stmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        WhileStmt whileStmt = (WhileStmt) stmt;
+
+        Expression condition = whileStmt.getCondition();
+        throwTypecheckerExceptionOnNonBooleanType("while statement", whileStmt, condition,
+                typecheckExp(condition, typeEnv));
+
+        loopStack.push(true);
+        typecheckStatements(typeEnv, List.of(whileStmt.getBody()));
+        loopStack.pop();
     }
 
     // Map of Expression classes to functions that return their types

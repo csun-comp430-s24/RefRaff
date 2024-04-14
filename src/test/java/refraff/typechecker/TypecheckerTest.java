@@ -253,6 +253,69 @@ public class TypecheckerTest {
     }
 
     @Test
+    public void testEmptyWhileStmt() {
+        /*
+         * while (true) {
+         *
+         * }
+         */
+        Statement whileStmt = new WhileStmt(new BoolLiteralExp(true), new StmtBlock());
+
+        Program program = new Program(List.of(), List.of(), List.of(whileStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+
+    @Test
+    public void testNonEmptyWhileStmt() {
+        /*
+         * int x = 7;
+         * while (x <= 10)
+         *     x = x + 1;
+         */
+        Variable x = getVariable("x");
+        VariableExp xExp = new VariableExp(x);
+
+        Statement vardec = new VardecStmt(getIntType(), x, new IntLiteralExp(7));
+
+        Expression whileCondition = new BinaryOpExp(xExp, OperatorEnum.LESS_THAN_EQUALS, new IntLiteralExp(10));
+        Statement whileBody = new AssignStmt(x, new BinaryOpExp(xExp, OperatorEnum.PLUS, new IntLiteralExp(1)));
+
+        Statement whileStmt = new WhileStmt(whileCondition, whileBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardec, whileStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testBreakStmt() {
+        /*
+         * while (true)
+         *    break;
+         */
+        Statement whileStmt = new WhileStmt(new BoolLiteralExp(true), new BreakStmt());
+
+        Program program = new Program(List.of(), List.of(), List.of(whileStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testNestedBreakStmt() {
+        /*
+         * while (true) {
+         *     while (false)
+         *         break;
+         *    break;
+         * }
+         */
+        Statement whileInner = new WhileStmt(new BoolLiteralExp(false), new BreakStmt());
+        Statement whileOuter = new WhileStmt(new BoolLiteralExp(true), new StmtBlock(List.of(whileInner, new BreakStmt())));
+
+        Program program = new Program(List.of(), List.of(), List.of(whileOuter));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
     public void testLogicalNotExpStmt() {
         // !true;
         Expression expression = new UnaryOpExp(OperatorEnum.NOT, new BoolLiteralExp(true));
@@ -957,6 +1020,21 @@ public class TypecheckerTest {
         Statement assign = new AssignStmt(getVariable("a"), new IntLiteralExp(3));
 
         Program invalidProgram = new Program(List.of(), List.of(), List.of(vardec, assign));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testWhileStmtNonBoolConditionThrowsException() {
+        // while (7) {}
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(
+                new WhileStmt(new IntLiteralExp(7), new StmtBlock())));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testBreakStmtNotInLoopThrowsException() {
+        // break;
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(new BreakStmt()));
         testThrowsTypecheckerException(invalidProgram);
     }
 
