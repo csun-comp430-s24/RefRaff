@@ -2,8 +2,10 @@ package refraff.typechecker;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
+import org.opentest4j.AssertionFailedError;
 import refraff.Sourced;
 import refraff.parser.*;
 import refraff.parser.struct.*;
@@ -381,48 +383,138 @@ public class TypecheckerTest {
         assertTrue(expression.getExpressionType().hasTypeEquality(new BoolType()));
     }
 
-//    @TestFactory
-//    public List<DynamicTest> testOrOp() {
-//        OperatorEnum orOp = OperatorEnum.OR;
-//
-//        return List.of(
-//
-//        )
-//        testBinOpBool(orOp, getBoolType());
-//    }
-//
-//    private List<DynamicTest> testBinOp(OperatorEnum op, Type expectedReturnType, Class<? extends Type>... allowedParamTypes) {
-//        Set<Class<? extends Type>> allowedTypesSet = new HashSet<>(List.of(allowedParamTypes));
-//
-//        return List.of(
-//                getTest(op, expectedReturnType, allowedTypesSet, IntType.class)
-//        )
-//    }
-//
-//    private static final Map<Class<? extends Type>, >
-//
-//    private DynamicTest getTest(OperatorEnum op, Type expectedReturnType, Set<Class<? extends Type>> allowedParamTypesSet,
-//                                Class<? extends Type> currentType) {
-//        List<Class<? extends Type>> fullTypeList = List.of(IntType.class, VoidType.class, BoolType.class, StructType.class);
-//
-//        if (allowedParamTypesSet.contains(currentType)) {
-//            return DynamicTest.dynamicTest("",
-//                    () -> assertThrows(AssertionError.class, () -> testFunction.apply(op, expectedReturnType)));
-//        }
-//
-//        return DynamicTest.dynamicTest("",
-//                () -> assertThrows(AssertionError.class, () -> testFunction.apply(op, expectedReturnType)));
-//    }
+    @TestFactory
+    public List<DynamicTest> testOrOp() {
+        return testBooleanOnlyBinOp(OperatorEnum.OR, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testAndOp() {
+        return testBooleanOnlyBinOp(OperatorEnum.AND, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testDoubleEqualsOp() {
+        return testBooleanIntStructBinOp(OperatorEnum.DOUBLE_EQUALS, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testNotEqualsOp() {
+        return testBooleanIntStructBinOp(OperatorEnum.NOT_EQUALS, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testLessThanOp() {
+        return testIntOnlyBinOp(OperatorEnum.LESS_THAN, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testGreaterThanOp() {
+        return testIntOnlyBinOp(OperatorEnum.GREATER_THAN, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testLessThanEqualsOp() {
+        return testIntOnlyBinOp(OperatorEnum.LESS_THAN_EQUALS, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testGreaterThanEqualsOp() {
+        return testIntOnlyBinOp(OperatorEnum.GREATER_THAN_EQUALS, getBoolType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testPlusOp() {
+        return testIntOnlyBinOp(OperatorEnum.PLUS, getIntType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testMinusOp() {
+        return testIntOnlyBinOp(OperatorEnum.MINUS, getIntType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testMultOp() {
+        return testIntOnlyBinOp(OperatorEnum.MULTIPLY, getIntType());
+    }
+
+    @TestFactory
+    public List<DynamicTest> testDivideOp() {
+        return testIntOnlyBinOp(OperatorEnum.DIVISION, getIntType());
+    }
+
+    private List<DynamicTest> testBooleanOnlyBinOp(OperatorEnum op, Type expectedType) {
+        return List.of(
+                testBinOpBool(op, expectedType),
+                failing(testBinOpInt(op, expectedType)),
+                failing(testBinOpMatchingStructType(op, expectedType)),
+                failing(testBinOpBothNullStructType(op, expectedType)),
+                failing(testBinOpNotMatchingStructType(op, expectedType)),
+                failing(testBinOpVoid(op, expectedType)),
+                failing(testBinOpMismatchedTypes(op, expectedType))
+        );
+    }
+
+    private List<DynamicTest> testIntOnlyBinOp(OperatorEnum op, Type expectedType) {
+        return List.of(
+                failing(testBinOpBool(op, expectedType)),
+                testBinOpInt(op, expectedType),
+                failing(testBinOpMatchingStructType(op, expectedType)),
+                failing(testBinOpBothNullStructType(op, expectedType)),
+                failing(testBinOpNotMatchingStructType(op, expectedType)),
+                failing(testBinOpVoid(op, expectedType)),
+                failing(testBinOpMismatchedTypes(op, expectedType))
+        );
+    }
+
+    private List<DynamicTest> testBooleanIntStructBinOp(OperatorEnum op, Type expectedType) {
+        return List.of(
+                testBinOpBool(op, expectedType),
+                testBinOpInt(op, expectedType),
+                testBinOpMatchingStructType(op, expectedType),
+                testBinOpBothNullStructType(op, expectedType),
+                failing(testBinOpNotMatchingStructType(op, expectedType)),
+                failing(testBinOpVoid(op, expectedType)),
+                failing(testBinOpMismatchedTypes(op, expectedType))
+        );
+    }
+
+    private DynamicTest failing(DynamicTest test) {
+        return DynamicTest.dynamicTest(test.getDisplayName() + " should fail",
+                () -> Assertions.assertThrows(AssertionFailedError.class, test.getExecutable()));
+    }
+
+    private DynamicTest testBinOpMismatchedTypes(OperatorEnum op, Type expectedType) {
+        // 5 <op> false
+        return testBinOp("int types", Optional.empty(), Optional.empty(), Optional.empty(), new IntLiteralExp(5), op,
+                new BoolLiteralExp(false), expectedType);
+    }
 
     private DynamicTest testBinOpInt(OperatorEnum op, Type expectedType) {
         // 5 <op> 7
-        return testBinOp(Optional.empty(), Optional.empty(), new IntLiteralExp(5), op, new IntLiteralExp(7), expectedType);
+        return testBinOp("int types", Optional.empty(), Optional.empty(), Optional.empty(), new IntLiteralExp(5), op,
+                new IntLiteralExp(7), expectedType);
     }
 
     private DynamicTest testBinOpBool(OperatorEnum op, Type expectedType) {
         // true <op> false
-        return testBinOp(Optional.empty(), Optional.empty(), new BoolLiteralExp(true), op, new BoolLiteralExp(false),
-                expectedType);
+        return testBinOp("bool types", Optional.empty(), Optional.empty(), Optional.empty(), new BoolLiteralExp(true), op,
+                new BoolLiteralExp(false), expectedType);
+    }
+
+    private DynamicTest testBinOpVoid(OperatorEnum op, Type expectedType) {
+        FunctionName functionName = getFunctionName("foo");
+
+        // foo(): void {}
+        FunctionDef functionDef = new FunctionDef(functionName, List.of(), getVoidType(), new StmtBlock());
+        Optional<List<FunctionDef>> functionDefs = Optional.of(List.of(functionDef));
+
+        // a <op> b
+        Expression firstFooCall = new FuncCallExp(functionName, new CommaExp(List.of()));
+        Expression secondFooCall = new FuncCallExp(functionName, new CommaExp(List.of()));
+
+        return testBinOp("void types", Optional.empty(), functionDefs, Optional.empty(),
+                firstFooCall, op, secondFooCall, expectedType);
     }
 
     private DynamicTest testBinOpMatchingStructType(OperatorEnum op, Type expectedType) {
@@ -446,7 +538,8 @@ public class TypecheckerTest {
         VariableExp aExp = new VariableExp(a);
         VariableExp bExp = new VariableExp(b);
 
-        return testBinOp(structDefs, precedingStatements, aExp, op, bExp, expectedType);
+        return testBinOp("matching struct type", structDefs, Optional.empty(), precedingStatements,
+                aExp, op, bExp, expectedType);
     }
 
     private DynamicTest testBinOpNotMatchingStructType(OperatorEnum op, Type expectedType) {
@@ -474,16 +567,21 @@ public class TypecheckerTest {
         VariableExp aExp = new VariableExp(a);
         VariableExp bExp = new VariableExp(b);
 
-        return testBinOp(structDefs, precedingStatements, aExp, op, bExp, expectedType);
+        return testBinOp("not matching struct type", structDefs, Optional.empty(), precedingStatements,
+                aExp, op, bExp, expectedType);
     }
 
     private DynamicTest testBinOpBothNullStructType(OperatorEnum op, Type expectedType) {
-        return testBinOp(Optional.empty(), Optional.empty(), getNullExp(), op, getNullExp(), expectedType);
+        return testBinOp("null structs", Optional.empty(), Optional.empty(), Optional.empty(),
+                getNullExp(), op, getNullExp(), expectedType);
     }
 
-    private DynamicTest testBinOp(Optional<List<StructDef>> optionalStructDefs, Optional<List<Statement>> precedingStatements,
-                           Expression leftExpression, OperatorEnum op, Expression rightExpression, Type expectedType) {
+    private DynamicTest testBinOp(String testName, Optional<List<StructDef>> optionalStructDefs,
+                                  Optional<List<FunctionDef>> optionalFunctionDefs,
+                                  Optional<List<Statement>> precedingStatements, Expression leftExpression,
+                                  OperatorEnum op, Expression rightExpression, Type expectedType) {
         List<StructDef> structDefs = optionalStructDefs.orElse(List.of());
+        List<FunctionDef> functionDefs = optionalFunctionDefs.orElse(List.of());
 
         Expression expression = new BinaryOpExp(leftExpression, op, rightExpression);
         Statement statement = new ExpressionStmt(expression);
@@ -491,13 +589,14 @@ public class TypecheckerTest {
         List<Statement> statements = new ArrayList<>(precedingStatements.orElse(List.of()));
         statements.add(statement);
 
-        Program program = new Program(structDefs, List.of(), statements);
-        testDoesNotThrowTypecheckerException(program);
+        Program program = new Program(structDefs, functionDefs, statements);
 
-        return DynamicTest.dynamicTest("",
-                () -> assertTrue(expectedType.hasTypeEquality(expression.getExpressionType())));
+        return DynamicTest.dynamicTest(op.name() + ": " + testName,
+                () -> {
+                    testDoesNotThrowTypecheckerException(program);
+                    assertTrue(expectedType.hasTypeEquality(expression.getExpressionType()));
+                });
     }
-
 
     @Test
     public void testExpWithBinOpExp() {
@@ -632,6 +731,52 @@ public class TypecheckerTest {
 
         Program program = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
         testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionCallWithOverloadFindsCorrectSignature() {
+        /*
+         * func alwaysTrue(): bool {
+         *   return true;
+         * }
+         *
+         * func alwaysTrue(int num): bool {
+         *   return true;
+         * }
+         *
+         * alwaysTrue();
+         * alwaysTrue(3);
+         */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody);
+
+        Expression boolTrue2 = new BoolLiteralExp(true);
+        Statement returnStmtTrue2 = new ReturnStmt(boolTrue2);
+        StmtBlock funcBody2 = new StmtBlock(List.of(returnStmtTrue2));
+        Param param = new Param(getIntType(), getVariable("num"));
+        FunctionDef funcDef2 = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                List.of(param),
+                getBoolType(),
+                funcBody2);
+
+        Expression alwaysTrueCall1 = new FuncCallExp(getFunctionName("alwaysTrue"), new CommaExp(List.of()));
+        Statement alwaysTrueCall1Statement = new ExpressionStmt(alwaysTrueCall1);
+
+        Expression alwaysTrueCall2 = new FuncCallExp(getFunctionName("alwaysTrue"), new CommaExp(List.of(new IntLiteralExp(3))));
+        Statement alwaysTrueCall2Statement = new ExpressionStmt(alwaysTrueCall2);
+
+        Program program = new Program(List.of(), List.of(funcDef, funcDef2),
+                List.of(alwaysTrueCall1Statement, alwaysTrueCall2Statement));
+        testDoesNotThrowTypecheckerException(program);
+
     }
 
     @Test
@@ -901,6 +1046,16 @@ public class TypecheckerTest {
         Statement statement = new ExpressionStmt(expression);
 
         Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(statement));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructAllocExpWithNoDefinedStructThrowsException() {
+        // foo();
+        Expression structAllocExp = new StructAllocExp(getStructType("foo"), new StructActualParams(List.of()));
+        Statement structAllocExpStatement = new ExpressionStmt(structAllocExp);
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(structAllocExpStatement));
         testThrowsTypecheckerException(invalidProgram);
     }
 
@@ -1239,6 +1394,40 @@ public class TypecheckerTest {
                 funcBody2);
 
         Program invalidProgram = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testFunctionCallWithTooFewParamsThrowsException() {
+        /*
+         * func foo(int bar): void {}
+         * foo();
+         */
+        FunctionName foo = new FunctionName("foo");
+        FunctionDef fooDef = new FunctionDef(foo, List.of(new Param(getIntType(), getVariable("bar"))),
+                getVoidType(), new StmtBlock());
+
+        Expression fooFunctionCallNoParams = new FuncCallExp(foo, new CommaExp(List.of()));
+        Statement fooFunctionCallExp = new ExpressionStmt(fooFunctionCallNoParams);
+
+        Program invalidProgram = new Program(List.of(), List.of(fooDef), List.of(fooFunctionCallExp));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testFunctionCallWithWrongParamTypeThrowsException() {
+        /*
+         * func foo(int bar): void {}
+         * foo(false);
+         */
+        FunctionName foo = new FunctionName("foo");
+        FunctionDef fooDef = new FunctionDef(foo, List.of(new Param(getIntType(), getVariable("bar"))),
+                getVoidType(), new StmtBlock());
+
+        Expression fooFunctionCallNoParams = new FuncCallExp(foo, new CommaExp(List.of(new BoolLiteralExp(false))));
+        Statement fooFunctionCallExp = new ExpressionStmt(fooFunctionCallNoParams);
+
+        Program invalidProgram = new Program(List.of(), List.of(fooDef), List.of(fooFunctionCallExp));
         testThrowsTypecheckerException(invalidProgram);
     }
 

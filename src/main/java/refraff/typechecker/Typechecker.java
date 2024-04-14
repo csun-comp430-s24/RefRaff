@@ -410,11 +410,11 @@ public class Typechecker {
             throws TypecheckerException {
         String beingParsed = "return statement";
         // Get the first type's class
-        Class<? extends Type> returnType = returnTypes.get(0).getClass();
+        Type returnType = returnTypes.get(0);
 
         // Check that this doesn't conflict with the other return types
         for (Type type : returnTypes) {
-            if (!type.getClass().equals(returnType)) {
+            if (!type.hasTypeEquality(returnType)) {
                 // Throw error if there is more than one return type
                 // throwTypecheckerExceptionOnMismatchedTypes(beingParsed, parent, 
                 //         firstType, type, returnTypes.get(0));
@@ -487,8 +487,8 @@ public class Typechecker {
     );
 
     // Returns true if the arguments (commaExpList) types match the param list types
-    public boolean argsMatchSignature(final List<Expression> commaExpList, final List<Param> paramList, 
-            final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+    public boolean argsMatchSignature(final List<Expression> commaExpList, final List<Param> paramList,
+                                                  final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
         // If the arg list and param list are not the same size
         if (commaExpList.size() != paramList.size()) {
             return false;
@@ -498,10 +498,11 @@ public class Typechecker {
             // Get the argument's type
             Type argType = typecheckExp(commaExpList.get(i), typeEnv);
             // If an arg type doesn't match a param type, return false
-            if (!argType.getClass().equals(paramList.get(i).getType().getClass())) {
+            if (!argType.hasTypeEquality(paramList.get(i).getType())) {
                 return false;
             }
         }
+
         // All of the types match, return true
         return true;
     }
