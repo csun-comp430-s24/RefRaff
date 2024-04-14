@@ -316,6 +316,60 @@ public class TypecheckerTest {
     }
 
     @Test
+    public void testIfStmt() {
+        /*
+         * int x = 2;
+         * if (true)
+         *     x = 4;
+         */
+        Variable x = getVariable("x");
+
+        Statement vardec = new VardecStmt(getIntType(), x, new IntLiteralExp(2));
+
+        Statement ifBody = new AssignStmt(x, new IntLiteralExp(4));
+        Statement ifStmt = new IfElseStmt(new BoolLiteralExp(true), ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardec, ifStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testIfElseStmt() {
+        /*
+         * int x = 2;
+         * if (true)
+         *     x = 4;
+         * else
+         *     x = 7;
+         */
+        Variable x = getVariable("x");
+
+        Statement vardec = new VardecStmt(getIntType(), x, new IntLiteralExp(2));
+
+        Statement ifBody = new AssignStmt(x, new IntLiteralExp(4));
+        Statement elseBody = new AssignStmt(x, new IntLiteralExp(7));
+        Statement ifStmt = new IfElseStmt(new BoolLiteralExp(true), ifBody, elseBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardec, ifStmt));
+        testDoesNotThrowTypecheckerException(program);
+
+    }
+
+    @Test
+    public void testPrintlnStmtWithInt() {
+        // println(4);
+        Program program = new Program(List.of(), List.of(), List.of(new PrintlnStmt(new IntLiteralExp(4))));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testPrintlnStmtWithBool() {
+        // println(true);
+        Program program = new Program(List.of(), List.of(), List.of(new PrintlnStmt(new BoolLiteralExp(true))));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
     public void testLogicalNotExpStmt() {
         // !true;
         Expression expression = new UnaryOpExp(OperatorEnum.NOT, new BoolLiteralExp(true));
@@ -1039,13 +1093,55 @@ public class TypecheckerTest {
     }
 
     @Test
+    public void testIfElseWithNonBooleanConditionThrowsException() {
+        // if (7) {}
+        IfElseStmt ifElseStmt = new IfElseStmt(new IntLiteralExp(7), new StmtBlock());
+
+        Program invalidProgram = new Program(List.of(), List.of(), List.of(ifElseStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testPrintlnStmtWithVoidThrowsException() {
+        /*
+         * func foo(): void {}
+         * println(foo());
+         */
+        FunctionName foo = getFunctionName("foo");
+
+        FunctionDef fooDef = new FunctionDef(foo, List.of(), getVoidType(), new StmtBlock());
+        Statement printlnStmt = new PrintlnStmt(new FuncCallExp(foo, new CommaExp(List.of())));
+
+        Program invalidProgram = new Program(List.of(), List.of(fooDef), List.of(printlnStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testPrintlnStmtWithStructThrowsException() {
+        /*
+         * struct A {}
+         * println(new A {});
+         */
+        StructName a = getStructName("A");
+        StructType aType = getStructType("A");
+
+        StructDef structDef = new StructDef(a, List.of());
+        StructAllocExp allocationExp = new StructAllocExp(aType, new StructActualParams(List.of()));
+        Statement printlnStmt = new PrintlnStmt(allocationExp);
+
+        Program invalidProgram = new Program(List.of(structDef), List.of(), List.of(printlnStmt));
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
     public void testIntVarAssignedBoolThrowsException() {
         /*
          * int foo = 6;
          * bool bar = true;
          * foo = bar;
          * 
-         * What is this Python? I think not!
+         * What is this, Python? I think not!
+         * Certified good one ^
          */
 
         Statement intVardecStmt = new VardecStmt(

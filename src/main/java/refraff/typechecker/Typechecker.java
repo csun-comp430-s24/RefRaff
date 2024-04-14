@@ -327,18 +327,37 @@ public class Typechecker {
         typecheckExp(castExpStmt.getExpression(), typeEnv);
     }
 
-    public void typecheckIfElseStmt(final Statement ifElseStmt, final Map<Standardized<Variable>, Type> typeEnv)
+    public void typecheckIfElseStmt(final Statement stmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        IfElseStmt ifElseStmt = (IfElseStmt) stmt;
+        Expression condition = ifElseStmt.getCondition();
+
+        // Typecheck the condition and if statement body
+        throwTypecheckerExceptionOnNonBooleanType("if statement", stmt, condition, typecheckExp(condition, typeEnv));
+        typecheckStatements(typeEnv, List.of(ifElseStmt.getIfBody()));
+
+        if (ifElseStmt.getElseBody().isEmpty()) {
+            return;
+        }
+
+        // Typecheck the else body, if it exists
+        typecheckStatements(typeEnv, List.of(ifElseStmt.getElseBody().get()));
     }
 
-    public void typecheckPrintlnStmt(final Statement printLnStmt, final Map<Standardized<Variable>, Type> typeEnv)
+    public void typecheckPrintlnStmt(final Statement stmt, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
-        throw new TypecheckerException("Not implemented yet!");
-        // Type test = new VoidType();
-        // return test;
+        PrintlnStmt printlnStmt = (PrintlnStmt) stmt;
+        Expression toPrint = printlnStmt.getExpression();
+
+        Type toPrintType = typecheckExp(toPrint, typeEnv);
+
+        if (toPrintType instanceof BoolType || toPrintType instanceof IntType) {
+            return;
+        }
+
+        // If structs or void are here, throw an exception
+        // In the future, we should support println with structs!
+        throwTypecheckerException("println statement", printlnStmt, toPrint, "println is only defined for ints and bools");
     }
 
     public Type typecheckReturnStmt(final Statement returnStmt, final Map<Standardized<Variable>, Type> typeEnv)
@@ -351,7 +370,7 @@ public class Typechecker {
 
         // If it doesn't exist, return voidtype
         if (optionalExp.isEmpty()) {
-            return new VoidType();
+            return VOID_TYPE;
         } else {
             // Otherwise, typecheck the expression and return the type
             return typecheckExp(optionalExp.get(), typeEnv);
@@ -379,7 +398,7 @@ public class Typechecker {
 
         // If the return types list is empty, return void type
         if (functionBodyTypes.isEmpty()) {
-            return new VoidType();
+            return VOID_TYPE;
         } else {
             // Otherwise, check that the return types don't conflict, and return
             return validateReturnTypes(functionBodyTypes, stmtBlock);
@@ -515,7 +534,7 @@ public class Typechecker {
 
         // If we got here, the arguments don't match any signatures, so throw an exception
         throwTypecheckerException(beingParsed, funcCallExp, funcName, funcWhereWeAre + " argument list does not match param types");
-        return new VoidType(); // This'll never be reached because of the exception. But it won't compile without this?
+        return VOID_TYPE; // This'll never be reached because of the exception. But it won't compile without this?
     }
 
     public Type typecheckParenExp(final Expression parenExp, final Map<Standardized<Variable>, Type> typeEnv)
@@ -595,6 +614,7 @@ public class Typechecker {
 
     private static final BoolType BOOL_TYPE = Node.setNodeSource(new BoolType(), "bool");
     private static final IntType INT_TYPE = Node.setNodeSource(new IntType(), "int");
+    private static final VoidType VOID_TYPE = Node.setNodeSource(new VoidType(), "void");
 
     // Map of Enums to the types they can operate on
     private static final Map<OperatorEnum, List<Type>> OP_TO_OPERAND_TYPE = new HashMap<>() {{
