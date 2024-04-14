@@ -1,0 +1,42 @@
+struct Node {
+  int value;
+  Node rest;
+}
+
+func length(Node list): int {
+  int retval = 0;
+  while (list != null) {
+     retval = retval + 1;
+     list = list.rest;
+  }
+  return retval;
+}
+
+func printLength(Node list): void {
+    println(length(list));
+}
+
+func equals(Node list1, Node list2): bool {
+    while (list1 != null && list2 != null)
+        if (list1.value != list2.value)
+            return false;
+
+    return list1 == null && list2 == null;
+}
+
+Node list =
+  new Node {
+    value: 0,
+    rest: new Node {
+      value: 1,
+      rest: new Node {
+        value: 2,
+        rest: null
+      }
+    }
+  };
+
+Node list2 = null;
+
+printLength(list);
+println(equals(list, list2));

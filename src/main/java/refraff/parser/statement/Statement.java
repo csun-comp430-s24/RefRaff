@@ -4,14 +4,10 @@ import refraff.parser.AbstractSyntaxTreeNode;
 
 public abstract class Statement extends AbstractSyntaxTreeNode {
     
-    private static final String TYPE_DESCRIPTOR = "Statement";
+    private static final String NODE_TYPE_DESCRIPTOR = " statement";
 
-    public Statement(String parsedValue) {
-        super(parsedValue);
+    public Statement(String statementDescriptor) {
+        super(statementDescriptor + NODE_TYPE_DESCRIPTOR);
     }
 
-    @Override
-    public String getNodeTypeDescriptor() {
-        return TYPE_DESCRIPTOR;
-    }
 }

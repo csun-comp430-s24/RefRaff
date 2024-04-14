@@ -4,22 +4,33 @@ import refraff.parser.AbstractSyntaxTreeNode;
 import refraff.parser.expression.Expression;
 import refraff.parser.Variable;
 
+import java.util.Objects;
+
 public class StructActualParam extends AbstractSyntaxTreeNode {
-        
-    private static final String TYPE = "parameter";
-    private static final String TYPE_DESCRIPTOR = "struct actual parameter";
+
+    private static final String NODE_TYPE_DESCRIPTOR = "struct actual parameter";
 
     public final Variable var;
     public final Expression exp;
 
     public StructActualParam(Variable var, Expression exp) {
-        super(TYPE);
+        super(NODE_TYPE_DESCRIPTOR);
+
         this.var = var;
         this.exp = exp;
     }
 
     @Override
-    public String getNodeTypeDescriptor() {
-        return TYPE_DESCRIPTOR;
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), var, exp);
     }
+
+    @Override
+    public boolean equals(Object other) {
+        return super.equals(other)
+                && other instanceof StructActualParam otherStructActualParam
+                && Objects.equals(var, otherStructActualParam.var)
+                && Objects.equals(exp, otherStructActualParam.exp);
+    }
+
 }

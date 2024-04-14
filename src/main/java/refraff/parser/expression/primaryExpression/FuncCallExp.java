@@ -3,15 +3,18 @@ package refraff.parser.expression.primaryExpression;
 import refraff.parser.function.CommaExp;
 import refraff.parser.function.FunctionName;
 
+import java.util.Objects;
+
 public class FuncCallExp extends PrimaryExpression {
         
-    private static final String FUNC_CALL_EXP = "function call expression";
+    private static final String NODE_TYPE_DESCRIPTOR = "function call";
 
     private final FunctionName funcName;
     private final CommaExp commaExp;
 
     public FuncCallExp(FunctionName funcName, CommaExp commaExp) {
-        super(FUNC_CALL_EXP);   // Should I stringify the expression or something?
+        super(NODE_TYPE_DESCRIPTOR);
+
         this.funcName = funcName;
         this.commaExp = commaExp;
 
@@ -25,4 +28,16 @@ public class FuncCallExp extends PrimaryExpression {
         return commaExp;
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), getFuncName(), getCommaExp());
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return super.equals(other)
+                && other instanceof FuncCallExp otherFuncCallExp
+                && Objects.equals(getFuncName(), otherFuncCallExp.getFuncName())
+                && Objects.equals(getCommaExp(), otherFuncCallExp.getCommaExp());
+    }
 }

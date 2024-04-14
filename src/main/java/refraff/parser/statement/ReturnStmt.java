@@ -2,11 +2,12 @@ package refraff.parser.statement;
 
 import refraff.parser.expression.Expression;
 
+import java.util.Objects;
 import java.util.Optional;
 
 public class ReturnStmt extends Statement {
 
-    private static final String RETURN_FORMAT = "return %s;";
+    private static final String NODE_TYPE_DESCRIPTOR = "return";
 
     private final Optional<Expression> returnValue;
 
@@ -15,7 +16,7 @@ public class ReturnStmt extends Statement {
     }
 
     public ReturnStmt(Expression expression) {
-        super(String.format(RETURN_FORMAT, expression == null ? "" : expression.getParsedValue()));
+        super(NODE_TYPE_DESCRIPTOR);
 
         this.returnValue = Optional.ofNullable(expression);
     }
@@ -26,12 +27,14 @@ public class ReturnStmt extends Statement {
 
     @Override
     public int hashCode() {
-        return returnValue.hashCode();
+        return Objects.hash(super.hashCode(), returnValue);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof ReturnStmt otherReturn && returnValue.equals(otherReturn.returnValue);
+        return super.equals(other)
+                && other instanceof ReturnStmt otherReturn
+                && Objects.equals(getReturnValue(), otherReturn.getReturnValue());
     }
 
 }

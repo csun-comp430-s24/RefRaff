@@ -2,14 +2,16 @@ package refraff.parser.statement;
 
 import refraff.parser.expression.Expression;
 
+import java.util.Objects;
+
 public class ExpressionStmt extends Statement {
 
-    private static final String EXPRESSION_FORMAT = "%s;";
+    private static final String NODE_TYPE_DESCRIPTOR = "expression";
 
     private final Expression expression;
 
     public ExpressionStmt(Expression expression) {
-        super(expression.getParsedValue());
+        super(NODE_TYPE_DESCRIPTOR);
 
         this.expression = expression;
     }
@@ -20,11 +22,13 @@ public class ExpressionStmt extends Statement {
 
     @Override
     public int hashCode() {
-        return expression.hashCode();
+        return Objects.hash(super.hashCode(), getExpression());
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof ExpressionStmt otherExpressionStmt && expression.equals(otherExpressionStmt.expression);
+        return super.equals(other)
+                && other instanceof ExpressionStmt otherExpressionStmt
+                && Objects.equals(getExpression(), otherExpressionStmt.getExpression());
     }
 }

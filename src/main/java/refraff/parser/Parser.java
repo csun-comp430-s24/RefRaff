@@ -5,6 +5,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.AbstractMap.SimpleImmutableEntry;
 
+import refraff.Source;
+import refraff.Sourced;
 import refraff.parser.function.*;
 import refraff.parser.statement.*;
 import refraff.parser.struct.*;
@@ -18,10 +20,10 @@ import refraff.tokenizer.*;
 
 public class Parser {
     
-    public final Token[] tokens;
+    public final List<Sourced<Token>> sourcedTokens;
 
-    public Parser(final Token[] tokens) {
-        this.tokens = tokens;
+    public Parser(final List<Sourced<Token>> sourcedTokens) {
+        this.sourcedTokens = sourcedTokens;
     }
 
     // Returns an optional token or emtpy if we've reached the end of tokens
@@ -29,8 +31,8 @@ public class Parser {
         // If we somehow go below position 0, we did something REAL bad in the parser
         assert(position >= 0);
 
-        if (position < tokens.length) {
-            return Optional.of(tokens[position]);
+        if (position < sourcedTokens.size()) {
+            return Optional.of(sourcedTokens.get(position).getValue());
         } else {
             return Optional.empty();
         }
@@ -66,15 +68,22 @@ public class Parser {
     }
 
     private void throwParserException(String beingParsed, String expected, int position) throws ParserException {
-        final String exceptionMessage = "Error parsing %s: expected %s but received: %s";
+        final String exceptionMessage = "Error parsing %s at %s: expected %s but received: %s";
         String actualTokenValue = getToken(position).map(Token::toString).orElse("none");
+        String linePosition;
+        if (position >= sourcedTokens.size()) {
+            linePosition = "end of file";
+        } else {
+            linePosition = sourcedTokens.get(position).getSource().toPositionString();
+        }
 
-        String formattedExceptionMessage = String.format(exceptionMessage, beingParsed, expected, actualTokenValue);
+        String formattedExceptionMessage = String.format(exceptionMessage, beingParsed, linePosition, expected,
+                actualTokenValue);
         throw new ParserMalformedException(formattedExceptionMessage);
     }
 
     // Attempts to parse token array
-    public static Program parseProgram(Token[] tokens) throws ParserException {
+    public static Program parseProgram(List<Sourced<Token>> tokens) throws ParserException {
         final Parser parser = new Parser(tokens);
         final ParseResult<Program> program = parser.parseProgram(0);
         return program.result;
@@ -99,7 +108,7 @@ public class Parser {
         currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
         
-        return new ParseResult<>(new Program(structDefs, functionDefs, statements), currentPosition);
+        return getSourcedParseResult(new Program(structDefs, functionDefs, statements), position, currentPosition);
     }
 
     /**
@@ -194,11 +203,10 @@ public class Parser {
         currentPosition += 1;
 
         // Return the variable declaration
-        return Optional.of(
-            new ParseResult<>(
+        return getOptionalSourcedParseResult(
                 new StructDef(structName, params),
+                position,
                 currentPosition
-            )
         );
     }
 
@@ -225,11 +233,10 @@ public class Parser {
         currentPosition = var.nextPosition;
 
         // Return the variable declaration
-        return Optional.of(
-            new ParseResult<>(
+        return getOptionalSourcedParseResult(
                 new Param(type.result, var.result),
+                position,
                 currentPosition
-            )
         );
     }
 
@@ -247,12 +254,12 @@ public class Parser {
 
         // Throw an exception if no function name identifier
         throwParserExceptionOnUnexpected(functionDefinition, IdentifierToken.class, "a function name", currentPosition);
-        FunctionName functionName = new FunctionName(getToken(currentPosition).get().getTokenizedValue());
+        FunctionName functionName = getSourcedNode(currentPosition, (token) -> new FunctionName(token.getTokenizedValue()));
 
         currentPosition += 1;
 
         // Create the function name, update error message for this function
-        final String functionDefinitionWithName = functionDefinition + " for function " + functionName.getParsedValue();
+        final String functionDefinitionWithName = functionDefinition + " for function " + functionName.functionName;
 
         // Ensure we have a left paren (begin function params)
         throwParserExceptionOnUnexpected(functionDefinitionWithName, LeftParenToken.class, "(", currentPosition);
@@ -291,7 +298,7 @@ public class Parser {
         currentPosition = parsedStatementBlock.nextPosition;
 
         FunctionDef functionDef = new FunctionDef(functionName, functionParams, functionReturnType, functionBody);
-        return Optional.of(new ParseResult<>(functionDef, currentPosition));
+        return getOptionalSourcedParseResult(functionDef, position, currentPosition);
     }
 
     // comma_param ::= [param (`,` param)*]
@@ -348,11 +355,10 @@ public class Parser {
         throwParserExceptionOnEmptyOptional("struct actual param", optionalExp, "an expression", currentPosition);
 
         // Create struct actual param and return
-        return Optional.of(
-            new ParseResult<>(
-                new StructActualParam(optionalVar.get().result, optionalExp.get().result), 
+        return getOptionalSourcedParseResult(
+                new StructActualParam(optionalVar.get().result, optionalExp.get().result),
+                position,
                 optionalExp.get().nextPosition
-            )
         );
     }
 
@@ -360,30 +366,39 @@ public class Parser {
     public ParseResult<StructActualParams> parseStructActualParams(final int position) throws ParserException {
         final String structParamString = "struct actual params";
         int currentPosition = position;
+
         // Create a Struct Actual Param list
         List<StructActualParam> listOfActualParams = new ArrayList<>();
 
-        // Try to parse an actual param - there doesn't have to be one, I think
+        // Try to parse an actual param - there doesn't have to be one
         Optional<ParseResult<StructActualParam>> optionalStructActParam = parseStructActualParam(currentPosition);
-        if (!optionalStructActParam.isEmpty()) {
-            // If there is one, add it to the list
-            currentPosition = optionalStructActParam.get().nextPosition;
-            listOfActualParams.add(optionalStructActParam.get().result);
-            // While there's a comma next
-            while (isExpectedToken(currentPosition, CommaToken.class)) {
-                currentPosition += 1;
-                // Parse another param, add it to the param list - there has to be one now
-                optionalStructActParam = parseStructActualParam(currentPosition);
-                throwParserExceptionOnEmptyOptional(structParamString, optionalStructActParam, 
+        if (optionalStructActParam.isEmpty()) {
+            // If we have no params, then we don't need to source this result (nothing to source)
+            return new ParseResult<>(new StructActualParams(listOfActualParams), currentPosition);
+        }
+
+        // If there is one, add it to the list
+        listOfActualParams.add(optionalStructActParam.get().result);
+        currentPosition = optionalStructActParam.get().nextPosition;
+
+        // While there's a comma next
+        while (isExpectedToken(currentPosition, CommaToken.class)) {
+            currentPosition += 1;
+
+            // Parse another param, add it to the param list - there has to be one now
+            optionalStructActParam = parseStructActualParam(currentPosition);
+            throwParserExceptionOnEmptyOptional(structParamString, optionalStructActParam,
                     "struct actual param", currentPosition);
-                listOfActualParams.add(optionalStructActParam.get().result);
-                currentPosition = optionalStructActParam.get().nextPosition;
-            }
+
+            listOfActualParams.add(optionalStructActParam.get().result);
+            currentPosition = optionalStructActParam.get().nextPosition;
         }
         
         // Create struct actual params with list and return
-        return new ParseResult<StructActualParams>(
-            new StructActualParams(listOfActualParams), currentPosition
+        return getSourcedParseResult(
+                new StructActualParams(listOfActualParams),
+                position,
+                currentPosition
         );
     }
 
@@ -455,8 +470,9 @@ public class Parser {
                 continue;
             }
 
-            // Downcast the parsed statement result to just being a statement
             ParseResult<? extends Statement> realResult = optionalParseResult.get();
+
+            // Downcast the parsed statement result to just being a statement (and our statement is already sourced)
             ParseResult<Statement> statementResult = new ParseResult<>(realResult.result, realResult.nextPosition);
 
             // Return the downcasted version
@@ -496,12 +512,10 @@ public class Parser {
         currentPosition = assign.nextPosition;
 
         // Return the variable declaration
-        return Optional.of(
-            new ParseResult<>(
-                new VardecStmt(type.result, assign.result.variable, 
-                                assign.result.expression),
+        return getOptionalSourcedParseResult(
+                new VardecStmt(type.result, assign.result.variable, assign.result.expression),
+                position,
                 currentPosition
-            )
         );
     }
 
@@ -545,11 +559,10 @@ public class Parser {
         currentPosition += 1;
 
         // Return the assignment statement
-        return Optional.of(
-            new ParseResult<>(
+        return getOptionalSourcedParseResult(
                 new AssignStmt(var.result, exp.result),
+                position,
                 currentPosition
-            )
         );
     }
 
@@ -577,7 +590,7 @@ public class Parser {
 
         // [`else` stmt]: if we don't hit an else, then just return the if statement so far
         if (!isExpectedToken(currentPosition, ElseToken.class)) {
-            return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody), currentPosition));
+            return getOptionalSourcedParseResult(new IfElseStmt(condition, ifBody), position, currentPosition);
         }
 
         currentPosition += 1;
@@ -588,7 +601,7 @@ public class Parser {
         Statement elseBody = parsedElseBody.result;
         currentPosition = parsedElseBody.nextPosition;
 
-        return Optional.of(new ParseResult<>(new IfElseStmt(condition, ifBody, elseBody), currentPosition));
+        return getOptionalSourcedParseResult(new IfElseStmt(condition, ifBody, elseBody), position, currentPosition);
     }
 
     // Parses `(` exp `)` in the context of a statement: so this is NOT a paren expression
@@ -605,6 +618,7 @@ public class Parser {
         throwParserExceptionOnUnexpected(where, RightParenToken.class, ")", currentPosition);
         currentPosition += 1;
 
+        // Expression has already been sourced by now
         return new ParseResult<>(expression, currentPosition);
     }
 
@@ -631,7 +645,7 @@ public class Parser {
         currentPosition = parsedBodyResult.nextPosition;
 
         WhileStmt whileStmt = new WhileStmt(condition, body);
-        return Optional.of(new ParseResult<>(whileStmt, currentPosition));
+        return getOptionalSourcedParseResult(whileStmt, position, currentPosition);
     }
 
     // `break` `;`
@@ -646,7 +660,7 @@ public class Parser {
         throwParserExceptionOnNoSemicolon("break statement", currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new BreakStmt(), currentPosition));
+        return getOptionalSourcedParseResult(new BreakStmt(), position, currentPosition);
     }
 
     // `println` `(` exp `)` `;`
@@ -667,7 +681,7 @@ public class Parser {
         throwParserExceptionOnNoSemicolon(printlnStatement, currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new PrintlnStmt(expression), currentPosition));
+        return getOptionalSourcedParseResult(new PrintlnStmt(expression), position, currentPosition);
     }
 
     // `return` [exp] `;`
@@ -693,7 +707,7 @@ public class Parser {
         throwParserExceptionOnNoSemicolon("return statement", currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new ReturnStmt(returnValue), currentPosition));
+        return getOptionalSourcedParseResult(new ReturnStmt(returnValue), position, currentPosition);
     }
 
     // `{` stmt* `}`
@@ -711,7 +725,7 @@ public class Parser {
         throwParserExceptionOnUnexpected("statement body", RightBraceToken.class, "}", currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new StmtBlock(blockBody), currentPosition));
+        return getOptionalSourcedParseResult(new StmtBlock(blockBody), position, currentPosition);
     }
 
     // exp `;`
@@ -739,7 +753,7 @@ public class Parser {
         throwParserExceptionOnNoSemicolon("expression statement", currentPosition);
         currentPosition += 1;
 
-        return Optional.of(new ParseResult<>(new ExpressionStmt(expression), currentPosition));
+        return getOptionalSourcedParseResult(new ExpressionStmt(expression), position, currentPosition);
     }
 
     private final static Map<Token, OperatorEnum> TOKEN_TO_OP = Map.ofEntries(
@@ -795,7 +809,7 @@ public class Parser {
 
             // Create binary op expression
             Expression binOpExp = new BinaryOpExp(returnValue.get().result, op, rightExp.get().result);
-            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, rightExp.get().nextPosition));
+            returnValue = getOptionalSourcedParseResult(binOpExp, position, rightExp.get().nextPosition);
             currentPosition = returnValue.get().nextPosition;
         }
 
@@ -852,7 +866,7 @@ public class Parser {
             throwParserExceptionOnEmptyOptional("add expression", rightAddExp, "an expression", currentPosition);
             // Create binary operator, wrap in expression parse result
             BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightAddExp.get().result);
-            returnValue = Optional.of(new ParseResult<Expression>(binOpExp, rightAddExp.get().nextPosition));
+            returnValue = getOptionalSourcedParseResult(binOpExp, position, rightAddExp.get().nextPosition);
             currentPosition = returnValue.get().nextPosition;
         }
         return returnValue;
@@ -885,7 +899,7 @@ public class Parser {
             throwParserExceptionOnEmptyOptional("dot expression", dotExp, "an expression", currentPosition);
             // Create a not unary expression, wrap in expression optional
             UnaryOpExp unaryOpExp = new UnaryOpExp(OperatorEnum.NOT, dotExp.get().result);
-            returnValue = Optional.of(new ParseResult<Expression>(unaryOpExp, dotExp.get().nextPosition));
+            returnValue = getOptionalSourcedParseResult(unaryOpExp, position, dotExp.get().nextPosition);
         } else {
             // Return a dot expression as an expression
             returnValue = parseDotExp(currentPosition);
@@ -913,7 +927,7 @@ public class Parser {
             throwParserExceptionOnEmptyOptional(dotExpString, variable, "a variable", currentPosition);
             // Create dot operator, wrap in expression parse result
             DotExp dotExp = new DotExp(returnValue.get().result, variable.get().result);
-            returnValue = Optional.of(new ParseResult<Expression>(dotExp, variable.get().nextPosition));
+            returnValue = getOptionalSourcedParseResult(dotExp, position, variable.get().nextPosition);
             currentPosition = returnValue.get().nextPosition;
         }
         return returnValue;
@@ -924,7 +938,6 @@ public class Parser {
             IntLiteralToken.class, (token) -> new IntLiteralExp(Integer.parseInt(token.getTokenizedValue())),
             TrueToken.class, (token) -> new BoolLiteralExp(true),
             FalseToken.class, (token) -> new BoolLiteralExp(false),
-            IdentifierToken.class, (token) -> new VariableExp(token.getTokenizedValue()),
             NullToken.class, (token) -> new NullExp()
     );
 
@@ -954,7 +967,11 @@ public class Parser {
         // Then try to parse int, bool, var or null
         if (TOKEN_TO_PRIMARY.containsKey(tokenClass)) {
             Expression exp = TOKEN_TO_PRIMARY.get(tokenClass).apply(token);
-            return Optional.of(new ParseResult<>(exp, position + 1));
+            return getOptionalSourcedParseResult(exp, position, position + 1);
+        }
+
+        if (isExpectedToken(position, IdentifierToken.class)) {
+            return parseVariableExpression(position);
         }
 
         // Then try to parse struct allocation
@@ -971,6 +988,16 @@ public class Parser {
 
         // We could not find a matching primary expression, and what even could it be?
         throw new ParserNoElementFoundException("primary expression");
+    }
+
+    private Optional<ParseResult<Expression>> parseVariableExpression(final int position) throws ParserException {
+        Optional<ParseResult<Variable>> optionalParsedVar = parseVar(position);
+        ParseResult<Variable> parsedVarResult = optionalParsedVar.get();
+
+        Expression expression = new VariableExp(parsedVarResult.result);
+        expression.setSource(parsedVarResult.result.getSource());
+
+        return Optional.of(new ParseResult<>(expression, parsedVarResult.nextPosition));
     }
 
     // `new` structname `{` struct_actual_params `}`
@@ -1008,11 +1035,10 @@ public class Parser {
             currentPosition += 1;
 
             // Create and return struct alloc
-            return Optional.of(
-                new ParseResult<Expression>(
+            return getOptionalSourcedParseResult(
                     new StructAllocExp(structType, structActParams.result),
+                    position,
                     currentPosition
-                )
             );
         }
         // Otherwise, return empty to try something else
@@ -1040,11 +1066,10 @@ public class Parser {
             throwParserExceptionOnUnexpected(funcCallString, RightParenToken.class, "right paren )", currentPosition);
             currentPosition += 1;
             // return function call
-            return Optional.of(
-                new ParseResult<Expression>(
+            return getOptionalSourcedParseResult(
                     new FuncCallExp(optionalFuncName.get().result, commaExp.result),
+                    position,
                     currentPosition
-                )
             );
         }
         // return empty if not function call
@@ -1078,12 +1103,12 @@ public class Parser {
         }
 
         // Create struct actual params with list and return
-        return new ParseResult<CommaExp>(new CommaExp(listOfExp), currentPosition);
+        return getSourcedParseResult(new CommaExp(listOfExp), position, currentPosition);
     }
 
     // `(` exp `)`
     public Optional<ParseResult<Expression>> parseParenExp(final int position) throws ParserException {
-        String parenExpString = "primary parenthesitized expression";
+        String parenExpString = "primary parenthesized expression";
 
         if (!isExpectedToken(position, LeftParenToken.class)) {
             return Optional.empty();
@@ -1103,7 +1128,7 @@ public class Parser {
 
         // Return the Expression
         Expression parenExp = new ParenExp(optionalExpression.get().result);
-        return Optional.of(new ParseResult<Expression>(parenExp, currentPosition));
+        return getOptionalSourcedParseResult(parenExp, position, currentPosition);
     }
 
     // Try to parse a function name
@@ -1117,10 +1142,11 @@ public class Parser {
         // If this is an identifier
         if (token instanceof IdentifierToken) {
             // Create a new Optional ParseResult for a Function Name
-            return Optional.of(
-                    new ParseResult<>(
+            return getOptionalSourcedParseResult(
                             new FunctionName(token.getTokenizedValue()),
-                            position + 1));
+                            position,
+                            position + 1
+            );
         }
 
         return Optional.empty();
@@ -1137,11 +1163,10 @@ public class Parser {
         // If this is an identifier
         if (token instanceof IdentifierToken) {
             // Create a new Optional ParseResult for a Variable
-            return Optional.of(
-                new ParseResult<>(
+            return getOptionalSourcedParseResult(
                     new Variable(token.getTokenizedValue()),
+                    position,
                     position + 1
-                )
             );
         }
 
@@ -1152,8 +1177,7 @@ public class Parser {
     private static final Map<Class<? extends Token>, Function<Token, Type>> TOKEN_CLASS_TO_TYPE = Map.of(
             IntToken.class, (token) -> new IntType(),
             BoolToken.class, (token) -> new BoolType(),
-            VoidToken.class, (token) -> new VoidType(),
-            IdentifierToken.class, (token) -> new StructType(new StructName(token.getTokenizedValue()))
+            VoidToken.class, (token) -> new VoidType()
     );
 
     // type ::= 'int' | 'bool' | 'void' | structname
@@ -1161,6 +1185,12 @@ public class Parser {
         final Optional<Token> maybeToken = getToken(position);
         if (maybeToken.isEmpty()) {
             return Optional.empty();
+        }
+
+        // Explicitly handle identifiers to source both the struct name and struct type
+        if (isExpectedToken(position, IdentifierToken.class)) {
+            StructName structName = getSourcedNode(position, token -> new StructName(token.getTokenizedValue()));
+            return getOptionalSourcedParseResult(new StructType(structName), position, position + 1);
         }
 
         Token token = maybeToken.get();
@@ -1171,7 +1201,45 @@ public class Parser {
         }
 
         Type type = TOKEN_CLASS_TO_TYPE.get(tokenClass).apply(token);
-        return Optional.of(new ParseResult<>(type, position + 1));
+        return getOptionalSourcedParseResult(type, position, position + 1);
+    }
+
+    private <T extends AbstractSyntaxTreeNode> T setSource(T t,
+                                                           int inclusiveStartPosition,
+                                                           int exclusiveEndPosition) {
+        List<Source> tokenSources = new ArrayList<>();
+        for (int i = inclusiveStartPosition; i < exclusiveEndPosition; i++) {
+            tokenSources.add(sourcedTokens.get(i).getSource());
+        }
+
+        Source combinedTokenSources = Source.fromSources(tokenSources);
+        t.setSource(combinedTokenSources);
+
+        return t;
+    }
+
+    private <T extends AbstractSyntaxTreeNode> ParseResult<T> getSourcedParseResult(T t,
+                                                                                    int inclusiveStartPosition,
+                                                                                    int exclusiveEndPosition) {
+        setSource(t, inclusiveStartPosition, exclusiveEndPosition);
+        return new ParseResult<>(t, exclusiveEndPosition);
+    }
+
+    private <T extends AbstractSyntaxTreeNode> Optional<ParseResult<T>> 
+            getOptionalSourcedParseResult(T t,
+                                          int inclusiveStartPosition,
+                                          int exclusiveEndPosition) {
+        return Optional.of(getSourcedParseResult(t, inclusiveStartPosition, exclusiveEndPosition));
+    }
+
+    private <T extends AbstractSyntaxTreeNode> T getSourcedNode(int position, Function<Token, T> parseFunction) {
+        Sourced<Token> sourcedToken = sourcedTokens.get(position);
+        Token token = sourcedToken.getValue();
+
+        T node = parseFunction.apply(token);
+        node.setSource(sourcedToken.getSource());
+
+        return node;
     }
 
 }

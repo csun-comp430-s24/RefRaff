@@ -1,8 +1,11 @@
 package refraff.parser.statement;
 
 import java.util.List;
+import java.util.Objects;
 
 public class StmtBlock extends Statement {
+
+    private static final String NODE_TYPE_DESCRIPTOR = "block";
 
     private final List<Statement> blockBody;
 
@@ -11,7 +14,7 @@ public class StmtBlock extends Statement {
     }
 
     public StmtBlock(List<Statement> blockBody) {
-        super(String.valueOf(blockBody.hashCode()));
+        super(NODE_TYPE_DESCRIPTOR);
 
         this.blockBody = blockBody;
     }
@@ -22,12 +25,14 @@ public class StmtBlock extends Statement {
 
     @Override
     public int hashCode() {
-        return blockBody.hashCode();
+        return Objects.hash(super.hashCode(), blockBody);
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof StmtBlock otherBlock && blockBody.equals(otherBlock.getBlockBody());
+        return super.equals(other)
+                && other instanceof StmtBlock otherBlock
+                && Objects.equals(getBlockBody(), otherBlock.getBlockBody());
     }
 
 }

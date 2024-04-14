@@ -1,7 +1,11 @@
 package refraff.tokenizer;
 
+import refraff.Source;
+import refraff.SourcePosition;
+import refraff.Sourced;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
+import refraff.util.Pair;
 
 import java.util.*;
 import java.util.function.Function;
@@ -99,13 +103,19 @@ public class Tokenizer {
 
     private int tokenizerPosition = 0;
 
+    private SourcePosition previousPosition;
+    private SourcePosition currentPosition;
+
     public Tokenizer(String input) {
         this.input = input;
         this.inputLength = input.length();
+
+        this.previousPosition = SourcePosition.DEFAULT_SOURCE_POSITION;
+        this.currentPosition = previousPosition;
     }
 
-    public List<Token> tokenize() throws TokenizerException {
-        List<Token> tokens = new ArrayList<>();
+    public List<Sourced<Token>> tokenize() throws TokenizerException {
+        List<Sourced<Token>> tokens = new ArrayList<>();
         boolean alreadySkippedWhitespace = false;
 
         while (!inputOutOfBounds()) {
@@ -119,28 +129,30 @@ public class Tokenizer {
             alreadySkippedWhitespace = false;
 
             // Try and tokenize symbols
-            Optional<Token> optionalSymbolToken = tryTokenizeSymbol();
+            Optional<Sourced<Token>> optionalSymbolToken = tryTokenizeSymbol();
             if (optionalSymbolToken.isPresent()) {
                 tokens.add(optionalSymbolToken.get());
                 continue;
             }
 
             // Try to tokenize reserved word or identifier
-            Optional<Token> optionalReservedWordOrIdentifier = tryTokenizeReservedOrIdentifier();
+            Optional<Sourced<Token>> optionalReservedWordOrIdentifier = tryTokenizeReservedOrIdentifier();
             if (optionalReservedWordOrIdentifier.isPresent()) {
                 tokens.add(optionalReservedWordOrIdentifier.get());
                 continue;
             }
 
             // Try and tokenize IntLiteral
-            Optional<Token> optionalIntLiteralToken = tryTokenizeIntLiteral();
+            Optional<Sourced<Token>> optionalIntLiteralToken = tryTokenizeIntLiteral();
             if (optionalIntLiteralToken.isPresent()) {
                 tokens.add(optionalIntLiteralToken.get());
                 continue;
             }
 
             // If we cannot match any whitespace or token by now, throw an exception
-            throw new TokenizerException("Could not tokenize '" + input.substring(tokenizerPosition) + "'");
+            String errorMessage = "Tokenizer error at %s: could not tokenize starting at `%s`";
+            throw new TokenizerException(String.format(errorMessage, currentPosition.toString(),
+                    input.substring(tokenizerPosition)));
         }
 
         return tokens;
@@ -167,10 +179,68 @@ public class Tokenizer {
 
         // Get the matched string and change our position to immediately after the end of the match
         String matched = matcher.group();
+
+        // If we parsed a blank whitespace character, return it now to not affect our position
+        if (matched.isEmpty()) {
+            return Optional.of(matched);
+        }
+
         this.tokenizerPosition = matcher.end();
+
+        // Update our previous and current line and column numbers
+        this.previousPosition = currentPosition;
+        int additionalLines = getNewLines(matched);
+
+        // Start calculating our current position
+        int currentLinePosition = currentPosition.getLinePosition() + additionalLines;
+        int currentColumnPosition = currentPosition.getColumnPosition();
+
+        // If we have additional lines here, then reset the column head to be at the start of the last line
+        if (additionalLines > 0) {
+            currentColumnPosition = SourcePosition.STARTING_COLUMN_POSITION;
+        }
+
+        // Add the length of the last processed line to our current column position
+        String lastLine = matched.lines().reduce("", (a, e) -> e);
+        currentColumnPosition += lastLine.length();
+
+        this.currentPosition = new SourcePosition(currentLinePosition, currentColumnPosition);
 
         // Return our matched string
         return Optional.of(matched);
+    }
+
+    private int getNewLines(String matched) {
+        // If we're not dealing with whitespace, we can never have a newline
+        if (!matched.isBlank()) {
+            return 0;
+        }
+
+        int newLines = 0;
+        boolean hasPrevCarriageReturn = false;
+
+        // https://docs.oracle.com/javase/7/docs/api/java/util/regex/Pattern.html#lt
+        for (char c : matched.toCharArray()) {
+            if (hasPrevCarriageReturn && c != '\n') {
+                newLines++;
+                hasPrevCarriageReturn = false;
+                break;
+            }
+
+            switch (c) {
+                case '\r':
+                    hasPrevCarriageReturn = true;
+                    break;
+                case '\n':
+                case '\u0085':
+                case '\u2028':
+                case '\u2029':
+                    newLines++;
+                    break;
+            }
+        }
+
+        return newLines;
     }
 
     private boolean skipWhitespace() {
@@ -179,11 +249,11 @@ public class Tokenizer {
     }
 
     // Tries to tokenize mapped tokens
-    public Optional<Token> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
+    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
         return tryTokenize(pattern, tokenMap::get);
     }
 
-    public Optional<Token> tryTokenize(Pattern pattern, Function<String, Token> stringToTokenFunction) {
+    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Function<String, Token> stringToTokenFunction) {
         Optional<String> optionalMatchedString = findMatchingPattern(pattern);
 
         // If we did not find a match for our token, return an empty optional
@@ -195,21 +265,25 @@ public class Tokenizer {
         String matchedToken = optionalMatchedString.get();
         Token token = stringToTokenFunction.apply(matchedToken);
 
-        return Optional.of(token);
+        // Create the source for the line/column position for our token
+        Source source = new Source(matchedToken, previousPosition, currentPosition);
+        Sourced<Token> sourcedToken = new Sourced<>(source, token);
+
+        return Optional.of(sourcedToken);
     }
 
-    public Optional<Token> tryTokenizeSymbol() {
+    public Optional<Sourced<Token>> tryTokenizeSymbol() {
         return tryTokenize(SYMBOL_PATTERN, SYMBOL_TO_TOKEN);
     }
 
-    public Optional<Token> tryTokenizeReservedOrIdentifier() {
+    public Optional<Sourced<Token>> tryTokenizeReservedOrIdentifier() {
         return tryTokenize(
                 IDENTIFIER_PATTERN,
                 token -> RESERVED_TO_TOKEN.getOrDefault(token, new IdentifierToken(token))
         );
     }
 
-    public Optional<Token> tryTokenizeIntLiteral() {
+    public Optional<Sourced<Token>> tryTokenizeIntLiteral() {
         return tryTokenize(INT_LITERAL_PATTERN, IntLiteralToken::new);
     }
     

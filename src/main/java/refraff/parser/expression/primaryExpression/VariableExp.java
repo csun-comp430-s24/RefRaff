@@ -1,17 +1,35 @@
 package refraff.parser.expression.primaryExpression;
 
+import refraff.parser.Variable;
+
+import java.util.Objects;
 
 public class VariableExp extends PrimaryExpression {
 
-    private final String name; // I don't know if we need this
+    private static final String NODE_TYPE_DESCRIPTOR = "variable";
+
+    private final Variable var;
     
-    public VariableExp(String name) {
-        super(name);
+    public VariableExp(Variable var) {
+        super(NODE_TYPE_DESCRIPTOR);
 
-        this.name = name;
+        this.var = var;
     }
 
-    public String getName() {
-        return name;
+    public Variable getVar() {
+        return var;
     }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), getVar());
+    }
+
+    @Override
+    public boolean equals(Object other) {
+        return super.equals(other)
+                && other instanceof VariableExp otherVariableExp
+                && Objects.equals(getVar(), otherVariableExp.getVar());
+    }
+
 }

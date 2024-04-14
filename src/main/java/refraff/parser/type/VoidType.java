@@ -2,10 +2,10 @@ package refraff.parser.type;
 
 public class VoidType extends Type {
 
-    private static final String VOID_TYPE = "void";
+    private static final String NODE_TYPE_DESCRIPTOR = "void type";
 
     public VoidType() {
-        super(VOID_TYPE);
+        super(NODE_TYPE_DESCRIPTOR);
     }
 
 }
