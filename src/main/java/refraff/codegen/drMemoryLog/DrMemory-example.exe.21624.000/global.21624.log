@@ -1,0 +1,106 @@
+Dr. Memory version 2.6.0 build 0 built on Sep 21 2023 17:48:48
+start time: 3710493:14:46.533 == 21:14:46.533 04/16/2024
+Recorded 124 suppression(s) from default C:\Program Files (x86)\Dr. Memory\bin\suppress-default.txt
+Using system call file C:\Users\gilya\Desktop\School\COMP 430 Compilers\RefRaff\src\main\java\refraff\codegen\drMemoryLog\symcache\syscalls_wow64.txt
+Syscall mismatch detected.  Running on unknown kernel version!
+WARNING: duplicate entry added to name2num_table: WOWCLEANUP
+new thread #0 id=21832
+
+module load event: "example.exe" 0x00400000-0x00412000 modid: 1 C:\Users\gilya\Desktop\School\COMP 430 Compilers\RefRaff\src\main\java\refraff\codegen\generatedCode\example.exe
+
+module load event: "dynamorio.dll" 0x67ae0000-0x67c56000 modid: 2 C:\Program Files (x86)\Dr. Memory\dynamorio\lib32\release\dynamorio.dll
+
+module load event: "drmemorylib.dll" 0x73800000-0x73a52000 modid: 3 C:\Program Files (x86)\Dr. Memory\bin\release\drmemorylib.dll
+
+module load event: "KERNELBASE.dll" 0x756f0000-0x7592a000 modid: 4 C:\WINDOWS\System32\KERNELBASE.dll
+
+module load event: "KERNEL32.dll" 0x75c20000-0x75d10000 modid: 5 C:\WINDOWS\System32\KERNEL32.DLL
+
+module load event: "msvcrt.dll" 0x77640000-0x776ff000 modid: 6 C:\WINDOWS\System32\msvcrt.dll
+WARNING: unable to load symbols for C:\WINDOWS\System32\msvcrt.dll
+WARNING: new/delete has no local wrapper => disabling mismatch detection for msvcrt.dll
+WARNING: new/delete has no local wrapper => disabling mismatch detection for msvcrt.dll
+WARNING: new/delete has no local wrapper => disabling mismatch detection for msvcrt.dll
+WARNING: new == new[] => disabling mismatch detection for msvcrt.dll
+WARNING: new/delete has no local wrapper => disabling mismatch detection for msvcrt.dll
+WARNING: new/delete has no local wrapper => disabling mismatch detection for msvcrt.dll
+
+module load event: "ntdll.dll" 0x77820000-0x779c4000 modid: 7 C:\WINDOWS\SYSTEM32\ntdll.dll
+WARNING: unhandled system calls found
+
+NEW THREAD: main thread 21832
+
+
+Error #1: UNINITIALIZED READ: reading register eax
+# 0 KERNELBASE.dll!FindNextFileW  (0x7580bfee <KERNELBASE.dll+0x11bfee>) modid:4
+# 1 KERNELBASE.dll!FindNextFileA  (0x7580e8b4 <KERNELBASE.dll+0x11e8b4>) modid:4
+# 2 .text       (0x0040370a <example.exe+0x370a>) modid:1
+# 3 __mingw_glob (0x004030c2 <example.exe+0x30c2>) modid:1
+# 4 _setargv    (0x00401590 <example.exe+0x1590>) modid:1
+# 5 .text       (0x004011ef <example.exe+0x11ef>) modid:1
+# 6 ntdll.dll!__RtlUserThreadStart (0x77887c5e <ntdll.dll+0x67c5e>) modid:7
+Note: @0:00:00.560 in thread 21832
+Note: instruction: cmp    %eax $0x0000001a
+	error end
+
+Error #2: UNINITIALIZED READ: reading register eax
+# 0 KERNELBASE.dll!FindNextFileW  (0x7580c01b <KERNELBASE.dll+0x11c01b>) modid:4
+# 1 KERNELBASE.dll!FindNextFileA  (0x7580e8b4 <KERNELBASE.dll+0x11e8b4>) modid:4
+# 2 .text       (0x0040370a <example.exe+0x370a>) modid:1
+# 3 __mingw_glob (0x004030c2 <example.exe+0x30c2>) modid:1
+# 4 _setargv    (0x00401590 <example.exe+0x1590>) modid:1
+# 5 .text       (0x004011ef <example.exe+0x11ef>) modid:1
+# 6 ntdll.dll!__RtlUserThreadStart (0x77887c5e <ntdll.dll+0x67c5e>) modid:7
+Note: @0:00:00.560 in thread 21832
+Note: instruction: data16 mov    %cx -> 0x00000234(%ebx,%eax,2)
+	error end
+
+Error #3: UNINITIALIZED READ: reading register eax
+# 0 KERNELBASE.dll!FindNextFileW  (0x7580bf47 <KERNELBASE.dll+0x11bf47>) modid:4
+# 1 KERNELBASE.dll!FindNextFileA  (0x7580e8b4 <KERNELBASE.dll+0x11e8b4>) modid:4
+# 2 .text       (0x0040370a <example.exe+0x370a>) modid:1
+# 3 __mingw_glob (0x004030c2 <example.exe+0x30c2>) modid:1
+# 4 _setargv    (0x00401590 <example.exe+0x1590>) modid:1
+# 5 .text       (0x004011ef <example.exe+0x11ef>) modid:1
+# 6 ntdll.dll!__RtlUserThreadStart (0x77887c5e <ntdll.dll+0x67c5e>) modid:7
+Note: @0:00:00.565 in thread 21832
+Note: instruction: test   %eax %eax
+	error end
+
+DUPLICATE ERROR COUNTS:
+	Error #   1:      3
+	Error #   2:      3
+
+SUPPRESSIONS USED:
+	     1x: default i#1324 mingw runtime
+	     6x: default i#960 CRT mismatch
+
+ERRORS FOUND:
+      0 unique,     0 total unaddressable access(es)
+      3 unique,     7 total uninitialized access(es)
+      0 unique,     0 total invalid heap argument(s)
+      0 unique,     0 total GDI usage error(s)
+      0 unique,     0 total handle leak(s)
+      0 unique,     0 total warning(s)
+      0 unique,     0 total,      0 byte(s) of leak(s)
+      0 unique,     0 total,      0 byte(s) of possible leak(s)
+ERRORS IGNORED:
+     73 ignored assumed-innocuous system leak(s)
+      6 unique,     6 total,   4495 byte(s) of still-reachable allocation(s)
+         (re-run with "-show_reachable" for details)
+Details: C:\Users\gilya\Desktop\School\COMP 430 Compilers\RefRaff\src\main\java\refraff\codegen\drMemoryLog\DrMemory-example.exe.21624.000\results.txt
+
+DUPLICATE POTENTIAL ERROR COUNTS:
+
+POTENTIAL ERRORS FOUND:
+      0 unique,     0 total potential unaddressable access(es)
+      0 unique,     0 total potential uninitialized access(es)
+      0 unique,     0 total potential invalid heap argument(s)
+      0 unique,     0 total potential GDI usage error(s)
+      0 unique,     0 total potential handle leak(s)
+      0 unique,     0 total potential warning(s)
+      0 unique,     0 total,      0 byte(s) of potential leak(s)
+      0 unique,     0 total,      0 byte(s) of potential possible leak(s)
+Details: C:\Users\gilya\Desktop\School\COMP 430 Compilers\RefRaff\src\main\java\refraff\codegen\drMemoryLog\DrMemory-example.exe.21624.000\potential_errors.txt
+Exiting @0:00:00.750 in thread 21832
+LOG END

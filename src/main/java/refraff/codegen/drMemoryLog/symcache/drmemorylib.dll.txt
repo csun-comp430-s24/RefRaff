@@ -1,0 +1,4 @@
+Dr. Memory symbol cache version 16
+       141,2404864,131078,131078,0,1695318740,2433024
+1
+Concurrency::details::Security::EncodePointer,0x0

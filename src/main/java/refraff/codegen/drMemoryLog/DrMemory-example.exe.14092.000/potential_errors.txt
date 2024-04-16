@@ -1,0 +1,5 @@
+Dr. Memory version 2.6.0 build 0 built on Sep 21 2023 17:48:48
+Dr. Memory errors that are likely to be false positives, for pid 14092: "example.exe"
+These errors matched the blocklist ',C:\WINDOWS*.d??' for 4 frames.
+Run with -lib_blocklist_frames 0 to treat these as regular errors.
+If these are all false positives and your focus is unaddressable errors, consider running with -light to skip all uninitialized reads and leaks for higher performance.
