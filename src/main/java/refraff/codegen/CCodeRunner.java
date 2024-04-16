@@ -95,18 +95,16 @@ public class CCodeRunner {
             File logDir = new File(drMemLogDir.toString());
             logDir.mkdirs();
 
-            // Clear logs from any previous runs
+            // Clear logs from any previous runs (just to reduce clutter)
             clearDirectory(logDir);
 
             // Run the program with Dr. Memory
-            // ProcessBuilder runBuilder = new ProcessBuilder(
-            // "cmd", "/c", "drmemory.exe", "-logdir", drMemLogDir.toString(), "-batch",
-            // "--", executable.toString(), "&", "exit");
             ProcessBuilder runBuilder = new ProcessBuilder(
                     "drmemory.exe", "-logdir", drMemLogDir.toString(), "-batch", "--", executable.toString());
             runBuilder.directory(new File(currentWorkingDir.toString()));
 
-            // Redirect Dr. Memory output to files (Dr. Memory creates files with)
+            // Redirect Dr. Memory output to files (Dr. Memory dynamically names directories, and it's
+            // easier to get at the files if we name them)
             File outputFile = new File(drMemLogDir.toString(), "drmemory_output.txt");
             File memoryReportFile = new File(drMemLogDir.toString(), "drmemory_report.txt");
 
@@ -126,22 +124,41 @@ public class CCodeRunner {
 
     private static void checkLeakReport(Path drMemLogDir) throws CodegenException {
         File memoryReportFile = new File(drMemLogDir.toString(), "drmemory_report.txt");
+
         try (BufferedReader reader = new BufferedReader(new FileReader(memoryReportFile))) {
             // Go through the report and find the lines with the leak information
             String line;
+            
             while ((line = reader.readLine()) != null) {
-                if (line.contains("byte(s) of leak(s)")) {
-                    System.out.println("Leak info: " + line.trim());
-                    // Check if the number is not 1
-                }
-                if (line.contains("byte(s) of possible leak(s)")) {
-                    System.out.println("Possible leak info: " + line.trim());
-                    // Check if the number is not 1
+                if (line.contains("byte(s) of leak(s)") || line.contains("byte(s) of possible leak(s)")) {
+                    int numLeaks = getNumLeaks(line);
+                    // If the number of leaks is not 0, throw exception
+                    if (numLeaks > 0) {
+                        throw new CodegenException("Generated code contains memory leaks:\n" + line);
+                    }
                 }
             }
         } catch (IOException e) {
             throw new CodegenException("Could not read memory report");
         }
+    }
+
+    // Returns the unique number of leaks from the Dr. Memory report
+    private static int getNumLeaks(String leakLine) throws CodegenException {
+        // Split string by spaces
+        String[] parts = leakLine.split("\\s+");
+
+        // Find the index of "~~Dr.M~~" and get the next element
+        for (int i = 0; i < parts.length; i++) {
+            if (parts[i].equals("~~Dr.M~~")) {
+                // The next string contains the unique number of leaks
+                if (i + 1 < parts.length) {
+                    return Integer.parseInt(parts[i + 1]);
+                }
+            }
+        }
+        // If we got this far, something's wrong
+        throw new CodegenException("Could not parse Dr. Memory report, line: " + leakLine);
     }
 
     // Clear the log directory before running the newly generated file

@@ -1,6 +1,0 @@
-Dr. Memory version 2.6.0 build 0 built on Sep 21 2023 17:48:48
-Windows version: WinVer=105;Rel=2009;Build=19045;Edition=Core
-Dr. Memory results for pid 14092: "example.exe"
-Application cmdline: ""C:\Users\gilya\Desktop\School\COMP 430 Compilers\RefRaff\src\main\java\refraff\codegen\generatedCode\example""
-Recorded 124 suppression(s) from default C:\Program Files (x86)\Dr. Memory\bin\suppress-default.txt
-System call information is missing for this operating system: WinVer=105;Rel=2009;Build=19045;Edition=Core. Restarting to trigger auto-generation of system call information. Re-run with -ignore_kernel to attempt to continue instead.

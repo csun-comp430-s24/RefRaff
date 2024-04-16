@@ -44,11 +44,10 @@ public class CodegenTest {
         testThrowsCodegenException("example_no_compile.c", "example_no_compile", expectedOutput);
     }
 
-    @Ignore
     @Test
     public void testCodeRunnerRunningCodeWithMemoryLeakThrows() {
         // example_leak.c doesn't free malloc-ed stuff
-        String expectedOutput = "42";
+        String expectedOutput = "";
         testThrowsCodegenException("example_leak.c", "example_leak", expectedOutput);
     }
 }
