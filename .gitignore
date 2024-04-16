@@ -36,3 +36,4 @@ build/
 
 ### Dr Memory ###
 **/src/test/**/testDrMemoryLog/*
+**/src/java/**/drMemoryLog/*
