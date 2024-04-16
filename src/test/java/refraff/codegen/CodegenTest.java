@@ -14,6 +14,6 @@ public class CodegenTest {
     @Test
     public void testCodeRunnerRunsExampleCFile() {
         // Run the code runner with the example input
-        assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput());
+        assertDoesNotThrow(() -> TestCCodeRunner.runAndCaptureOutput());
     }
 }
