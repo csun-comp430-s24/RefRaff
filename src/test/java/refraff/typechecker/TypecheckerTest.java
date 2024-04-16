@@ -23,7 +23,6 @@ import refraff.util.ResourceUtil;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.*;
-import java.util.function.BiFunction;
 
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
