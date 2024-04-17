@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
 
 import refraff.parser.*;
 import refraff.parser.struct.*;
@@ -183,11 +185,17 @@ public class Codegen {
     }
 
     private void generateBreakStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        BreakStmt breakStmt = (BreakStmt)stmt;
+
+        addIndentedString("break;\n");
     }
 
     private void generateExpStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        ExpressionStmt expStmt = (ExpressionStmt)stmt;
+
+        indentLine(currentIndentCount);
+        generateExpression(expStmt.getExpression());
+        addSemicolonNewLine();
     }
 
     private void generateIfElseStmt(final Statement stmt) throws CodegenException {
@@ -206,6 +214,17 @@ public class Codegen {
         currentIndentCount -= 1;
         // Add closing brace
         addIndentedString("}\n");
+
+        // Add an else if there is one
+        Optional<Statement> optionalElseBody = ifElseStmt.getElseBody();
+        if (!optionalElseBody.isEmpty()) {
+            addIndentedString("else\n");
+            addIndentedString("{\n");
+            currentIndentCount += 1;
+            generateStatements(List.of(optionalElseBody.get()));
+            currentIndentCount -= 1;
+            addIndentedString("}\n");
+        }
     }
 
     private void generatePrintlnStmt(final Statement stmt) throws CodegenException {
@@ -217,7 +236,9 @@ public class Codegen {
     }
 
     private void generateStmtBlock(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        StmtBlock stmtBlock = (StmtBlock)stmt;
+
+        generateStatements(stmtBlock.getBlockBody());
     }
 
     private void generateVardecStmt(final Statement stmt) throws CodegenException {
@@ -233,11 +254,32 @@ public class Codegen {
     }
 
     private void generateWhileStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        WhileStmt whileStmt = (WhileStmt)stmt;
+
+        addIndentedString("while (");
+        generateExpression(whileStmt.getCondition());
+        addString(")\n");
+        addIndentedString("{\n");
+        currentIndentCount += 1;
+        // generate statement(s)
+        generateStatements(List.of(whileStmt.getBody()));
+        // Subtract from the indentation
+        currentIndentCount -= 1;
+        // Add closing brace
+        addIndentedString("}\n");
     }
 
+    private static final Map<Class<? extends Type>, Function<Type, String>> TYPE_TO_STR = Map.of(
+        BoolType.class, (Type type) -> "int", // All bools literals are converted to ints as well
+        IntType.class, (Type type) -> "int",
+        StructType.class, (Type type) -> type.toString(),
+        VoidType.class, (Type type) -> "void"
+    );
+
     private void generateType(final Type type) throws CodegenException {
-        addString(type.toString());
+        // Get the types's class
+        Class<? extends Type> typeClass = type.getClass();
+        addString(TYPE_TO_STR.get(typeClass).apply(type));
     }
 
     // Map of Expression classes to their generator functions
@@ -289,7 +331,11 @@ public class Codegen {
     }
 
     private void generateParenExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        ParenExp parenExp = (ParenExp)exp;
+
+        addString("(");
+        generateExpression(parenExp.getExp());
+        addString(")");
     }
 
     private void generateStructAllocExp(final Expression exp) throws CodegenException {
@@ -297,11 +343,17 @@ public class Codegen {
     }
 
     private void generateVarExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        VariableExp variableExp = (VariableExp)exp;
+
+        generateVariable(variableExp.getVar());
     }
 
     private void generateBinOpExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        BinaryOpExp binOpExp = (BinaryOpExp)exp;
+
+        generateExpression(binOpExp.getLeftExp());
+        addString(" " + binOpExp.getOp().getSymbol() + " ");
+        generateExpression(binOpExp.getRightExp());
     }
 
     private void generateDotExp(final Expression exp) throws CodegenException {
@@ -309,7 +361,10 @@ public class Codegen {
     }
 
     private void generateUnaryOpExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        UnaryOpExp UnaryOpExp = (UnaryOpExp)exp;
+
+        addString(UnaryOpExp.getOp().getSymbol());
+        generateExpression(UnaryOpExp.getExp());
     }
 
     // I don't know if I need this one? Is this one function too deep, lol

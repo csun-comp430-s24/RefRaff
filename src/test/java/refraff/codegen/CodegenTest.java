@@ -126,6 +126,63 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
 
+    @Test
+    public void testCodegenWithIfElseStmt() {
+        /*
+         * if (true) {
+         *   int foo = 6;
+         * } else {
+         *   int foo = 0;
+         * }
+         */
+
+        Statement ifBody = new VardecStmt(
+            getIntType(),
+            getVariable("foo"),
+            new IntLiteralExp(6));
+        Statement elseBody = new VardecStmt(
+            getIntType(),
+            getVariable("foo"),
+            new IntLiteralExp(0));
+        Expression condition = new BoolLiteralExp(true);
+        Statement ifElseStmt = new IfElseStmt(condition, ifBody, elseBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifElseStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithWhileStmt() {
+        /*
+         * int foo = 3;
+         * while (foo > 0) {
+         *   foo = foo - 1;
+         * }
+         */
+
+        Statement vardecStmt = new VardecStmt(
+                getIntType(),
+                getVariable("foo"),
+                new IntLiteralExp(6));
+
+        Expression guard = new BinaryOpExp(
+            new VariableExp(getVariable("foo")),
+            OperatorEnum.GREATER_THAN,
+            new IntLiteralExp(0));
+
+        Expression assignExp = new BinaryOpExp(
+                new VariableExp(getVariable("foo")),
+                OperatorEnum.MINUS,
+                new IntLiteralExp(1)); 
+
+        Statement body = new AssignStmt(getVariable("foo"), assignExp);
+
+        Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(body)));
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
 
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String executionFile, String expectedOutput) {
