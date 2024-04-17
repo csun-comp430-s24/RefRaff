@@ -22,7 +22,7 @@ public class Codegen {
     private final Program program;
     private final Path generatedCodePath;
     private BufferedWriter writer;
-    private int currentIndent;
+    private int currentIndentCount;
 
     private Codegen(Program program) {
         this.program = program;
@@ -62,6 +62,7 @@ public class Codegen {
             writer.write("#include <stdio.h>\n\n"
                          + "int main()\n"
                          + "{\n");
+            currentIndentCount += 1;
         } catch (IOException e) {
             throw new CodegenException("Error in writing space");
         }
@@ -70,6 +71,7 @@ public class Codegen {
     private void addEndingBoilerPlate() throws CodegenException {
         try {
             writer.write("}\n");
+            currentIndentCount -= 1; // For symmetry
         } catch (IOException e) {
             throw new CodegenException("Error in writing space");
         }
@@ -78,6 +80,16 @@ public class Codegen {
     // Adds the specified string to the open file
     private void addString(String str) throws CodegenException {
         try {
+            writer.write(str);
+        } catch (IOException e) {
+            throw new CodegenException("Error in writing space");
+        }
+    }
+
+    // Adds the specified string to the open file
+    private void addIndentedString(String str) throws CodegenException {
+        try {
+            indentLine(currentIndentCount);
             writer.write(str);
         } catch (IOException e) {
             throw new CodegenException("Error in writing space");
@@ -110,16 +122,16 @@ public class Codegen {
         }
     }
 
-    // Indents the specified number of times, then add next string
+    // Indents the specified number of times
     // I don't know if this will be useful yet
-    private void indentLine(int numIndents, String line) throws CodegenException {
+    private void indentLine(int numIndents) throws CodegenException {
         try {
             for (int i = 0; i < numIndents; i++) {
+                // We can change this to spaces if that's your preference
                 writer.write("\t");
             }
-            writer.write(line);
         } catch (IOException e) {
-            throw new CodegenException("Error in writing indented line: " + line);
+            throw new CodegenException("Error in indenting line");
         }
     }
 
@@ -161,7 +173,13 @@ public class Codegen {
     }
 
     private void generateAssignStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        AssignStmt assignStmt = (AssignStmt) stmt;
+
+        indentLine(currentIndentCount);
+        generateVariable(assignStmt.getVariable());
+        addString(" = ");
+        generateExpression(assignStmt.getExpression());
+        addSemicolonNewLine();
     }
 
     private void generateBreakStmt(final Statement stmt) throws CodegenException {
@@ -173,7 +191,21 @@ public class Codegen {
     }
 
     private void generateIfElseStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        IfElseStmt ifElseStmt = (IfElseStmt)stmt;
+
+        // Add if and condition and opening brace
+        addIndentedString("if (");
+        generateExpression(ifElseStmt.getCondition());
+        addString(")\n");
+        addIndentedString("{\n");
+        // Add to the indentation
+        currentIndentCount += 1;
+        // generate statement(s)
+        generateStatements(List.of(ifElseStmt.getIfBody()));
+        // Subtract from the indentation
+        currentIndentCount -= 1;
+        // Add closing brace
+        addIndentedString("}\n");
     }
 
     private void generatePrintlnStmt(final Statement stmt) throws CodegenException {
@@ -191,6 +223,7 @@ public class Codegen {
     private void generateVardecStmt(final Statement stmt) throws CodegenException {
         VardecStmt vardecStmt = (VardecStmt)stmt;
 
+        indentLine(currentIndentCount);
         generateType(vardecStmt.getType());
         addSpace();
         generateVariable(vardecStmt.getVariable());
@@ -221,57 +254,61 @@ public class Codegen {
         DotExp.class, Codegen::generateDotExp,
         UnaryOpExp.class, Codegen::generateUnaryOpExp);
 
-    private void generateExpression(final Expression expression) throws CodegenException {
+    private void generateExpression(final Expression exp) throws CodegenException {
         // Get the expression's class
-        Class<? extends Expression> expClass = expression.getClass();
+        Class<? extends Expression> expClass = exp.getClass();
 
         if (!EXP_TO_GEN_FUNC.containsKey(expClass)) {
             throw new UnsupportedOperationException("Map did not contain mapping function for: " + expClass);
         }
 
         // Generate the expression
-        EXP_TO_GEN_FUNC.get(expClass).apply(this, expression);
+        EXP_TO_GEN_FUNC.get(expClass).apply(this, exp);
     }
 
-    private void generateBoolLiteralExp(final Expression expression) throws CodegenException {
-        BoolLiteralExp boolLiteralExp = (BoolLiteralExp)expression;
-        addString(boolLiteralExp.toString());
+    private void generateBoolLiteralExp(final Expression exp) throws CodegenException {
+        BoolLiteralExp boolLiteralExp = (BoolLiteralExp) exp;
+        if (boolLiteralExp.getValue()) {
+            addString("1");
+        } else {
+            addString("0");
+        }
     }
 
-    private void generateIntLiteralExp(final Expression expression) throws CodegenException {
-        IntLiteralExp intLiteralExp = (IntLiteralExp)expression;
+    private void generateIntLiteralExp(final Expression exp) throws CodegenException {
+        IntLiteralExp intLiteralExp = (IntLiteralExp) exp;
         addString(intLiteralExp.toString());
     }
 
-    private void generateNullExp(final Expression expression) throws CodegenException {
+    private void generateNullExp(final Expression exp) throws CodegenException {
         addString("null");
     }
 
-    private void generateFuncCallExp(final Expression expression) throws CodegenException {
+    private void generateFuncCallExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateParenExp(final Expression expression) throws CodegenException {
+    private void generateParenExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateStructAllocExp(final Expression expression) throws CodegenException {
+    private void generateStructAllocExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateVarExp(final Expression expression) throws CodegenException {
+    private void generateVarExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateBinOpExp(final Expression expression) throws CodegenException {
+    private void generateBinOpExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateDotExp(final Expression expression) throws CodegenException {
+    private void generateDotExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 
-    private void generateUnaryOpExp(final Expression expression) throws CodegenException {
+    private void generateUnaryOpExp(final Expression exp) throws CodegenException {
         throw new CodegenException("Not implemented yet");
     }
 

@@ -19,6 +19,14 @@ public class AssignStmt extends Statement {
         this.expression = expression;
     }
 
+    public Variable getVariable() {
+        return variable;
+    }
+
+    public Expression getExpression() {
+        return expression;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), variable, expression);

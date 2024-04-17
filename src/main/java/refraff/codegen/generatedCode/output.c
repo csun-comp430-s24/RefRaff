@@ -2,5 +2,5 @@
 
 int main()
 {
-int foo = 6;
+	int foo = 6;
 }

@@ -72,7 +72,7 @@ public class CodegenTest {
     }
 
     @Test
-    public void testCodegenWithAssignment() {
+    public void testCodegenWithVardec() {
         /*
          * int foo = 6;
          */
@@ -82,6 +82,46 @@ public class CodegenTest {
                 new IntLiteralExp(6));
 
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithAssignment() {
+        /*
+         * int foo = 6;
+         * foo = 0;
+         */
+        Statement vardecStmt = new VardecStmt(
+                getIntType(),
+                getVariable("foo"),
+                new IntLiteralExp(6));
+
+        Statement assignStmt = new AssignStmt(
+                getVariable("foo"),
+                new IntLiteralExp(0));
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, assignStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithIfStmt() {
+        /*
+         * if (true) {
+         *   int foo = 6;
+         * }
+         */
+
+        Statement ifBody = new VardecStmt(
+            getIntType(),
+            getVariable("foo"),
+            new IntLiteralExp(6)
+        );
+        Expression condition = new BoolLiteralExp(true);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
         String expectedOutput = "";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
