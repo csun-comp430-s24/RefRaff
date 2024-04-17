@@ -154,6 +154,42 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithStructAllocExp() {
+        /*
+         * struct B {
+         *     A a;
+         * }
+         *
+         * struct A {}
+         *
+         * B b = new B { a: null };
+         */
+
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(getStructType("A"), getVariable("a"))
+        ));
+        StructDef structDefA = new StructDef(getStructName("A"), List.of());
+
+        Expression allocExp = new StructAllocExp(getStructType("B"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement allocStatement = new VardecStmt(getStructType("B"), getVariable("b"), allocExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement));
+        testProgramGeneratesAndDoesNotThrow(program, "");
+    }
+
+    @Test
+    public void testCodegenWithExpressionStmt() {
+        /*
+         * 3;
+         */
+        Statement expressionStatement = new ExpressionStmt(new IntLiteralExp(3));
+
+        Program program = new Program(List.of(), List.of(), List.of(expressionStatement));
+        testProgramGeneratesAndDoesNotThrow(program, "");
+    }
+
+    @Test
     public void testCodegenWithVardec() {
         /*
          * int foo = 6;
@@ -362,6 +398,27 @@ public class CodegenTest {
         Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
         String expectedOutput = "17";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenDotExp() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))
+        ));
+
+        Statement vardecA = new VardecStmt(getStructType("A"), getVariable("a"), getNullExp());
+
+        Expression dotExp = new DotExp(new VariableExp(getVariable("a")), getVariable("a"));
+        Statement dotExpStatement = new ExpressionStmt(dotExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
+        testProgramGeneratesAndDoesNotThrow(program, "");
     }
 
     @Test

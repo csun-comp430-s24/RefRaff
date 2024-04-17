@@ -12,11 +12,9 @@ import java.util.function.Function;
 import refraff.parser.*;
 import refraff.parser.struct.*;
 import refraff.parser.type.*;
-import refraff.typechecker.Standardized;
 import refraff.parser.function.*;
 import refraff.parser.expression.*;
 import refraff.parser.expression.primaryExpression.*;
-import refraff.parser.operator.OperatorEnum;
 import refraff.parser.statement.*;
 
 public class Codegen {
@@ -40,14 +38,14 @@ public class Codegen {
         // We could directly supply the System.getProperty("user.dir"); in the main function
         // But we should be able to specify where the output is going to go
         new Codegen(program, directory).generateProgram();
-    } 
+    }
 
     private void generateProgram() throws CodegenException {
         try {
             writer = new BufferedWriter(new FileWriter(generatedCodePath.toString()));
             
             // Add boilerplate
-            addBeginningBoilerPlate();
+            addImports();
 
             // Generate struct definitions
             generateStructDefs(program.getStructDefs());
@@ -59,6 +57,7 @@ public class Codegen {
             addString("int main()");
             addNewLine();
             addString("{");
+            addNewLine();
 
             // Add the program's statements to the entry point
             currentIndentCount += 1;
@@ -75,9 +74,13 @@ public class Codegen {
         } 
     }
 
-    private void addBeginningBoilerPlate() throws CodegenException {
+    private void addImports() throws CodegenException {
         addString("#include <stdio.h>");
         addNewLine();
+
+        addString("#include <stdlib.h>");
+        addNewLine();
+
         addNewLine();
     }
 
@@ -176,11 +179,13 @@ public class Codegen {
             // Add this struct to the back of the queue, if we need to code generate another struct first
             if (hasNonGeneratedStructDependencies) {
                 queueOfUnprocessedStructs.offer(structDef);
-                break;
+                continue;
             }
 
             // Otherwise, just code gen it and add it to our list of already code generated structs
             generateStructDef(structDef);
+            generateStructAllocationFunction(structDef);
+
             alreadyCodeGeneratedStructNames.add(currentStructName);
         }
     }
@@ -223,6 +228,82 @@ public class Codegen {
         addString(structName);
         addSemicolonNewLine();
 
+        addNewLine();
+    }
+
+    private String getStructAllocationFunctionName(StructType structType) {
+        String structName = structType.getStructName().get().getName();
+
+        // Return a function named: refraff_<STRUCT_NAME>_alloc
+        return "refraff_" + structName + "_alloc";
+    }
+
+    private void generateStructAllocationFunction(StructDef structDef) throws CodegenException {
+        /*
+         * Generates a function to allocate new structs on the heap:
+         *
+         * <STRUCT_NAME>* refraff_<STRUCT_NAME>_alloc(<PARAMS>)
+         * {
+         *      <STRUCT_NAME>* newStruct = malloc(sizeof(struct <STRUCT_NAME>));
+         *      newStruct->[FIELD_1] = [PARAM_1];
+         *      newStruct->[FIELD_2] = [PARAM_2];
+         *      ...
+         *      return newStruct;
+         * }
+         */
+        StructType structType = new StructType(structDef.getStructName());
+
+        generateType(structType);
+        addSpace();
+        addString(getStructAllocationFunctionName(structType));
+        addString("(");
+
+        // Comma separate the parameters into the new function
+        for (int i = 0; i < structDef.getParams().size(); i++) {
+            Param param = structDef.getParams().get(i);
+
+            generateType(param.getType());
+            addSpace();
+            generateVariable(param.getVariable());
+
+            if (i != structDef.getParams().size() - 1) {
+                addString(", ");
+            }
+        }
+
+        addString(")");
+        addNewLine();
+
+        addString("{");
+        addNewLine();
+
+        currentIndentCount += 1;
+
+        final String mallocFormat = "%1$s* newStruct = malloc(sizeof(struct %1$s));";
+
+        indentLine(currentIndentCount);
+        addString(String.format(mallocFormat, structDef.getStructName().getName()));
+        addNewLine();
+        addNewLine();
+
+        final String fieldInitializationFormat = "newStruct->%1$s = %1$s;";
+
+        for (Param param : structDef.getParams()) {
+            indentLine(currentIndentCount);
+            addString(String.format(fieldInitializationFormat, param.getVariable().getName()));
+            addNewLine();
+        }
+
+        addNewLine();
+        indentLine(currentIndentCount);
+        addString("return newStruct;");
+        addNewLine();
+
+        currentIndentCount -= 1;
+
+        addString("}");
+
+        addNewLine();
         addNewLine();
     }
 
@@ -361,8 +442,8 @@ public class Codegen {
     private static final Map<Class<? extends Type>, Function<Type, String>> TYPE_TO_STR = Map.of(
         BoolType.class, (Type type) -> "int", // All bools literals are converted to ints as well
         IntType.class, (Type type) -> "int",
-        // convert the struct name to the pointer representation (e.g. type for 'struct foo' => foo* in C)
-        StructType.class, (Type type) -> ((StructType) type).getStructName().get().structName + "*",
+        // convert the struct name to the pointer representation (e.g. type for 'struct foo' => `struct foo*` in C)
+        StructType.class, (Type type) -> "struct " + ((StructType) type).getStructName().get().structName + "*",
         VoidType.class, (Type type) -> "void"
     );
 
@@ -413,7 +494,7 @@ public class Codegen {
     }
 
     private void generateNullExp(final Expression exp) throws CodegenException {
-        addString("null");
+        addString("NULL");
     }
 
     private void generateFuncCallExp(final Expression exp) throws CodegenException {
@@ -429,7 +510,30 @@ public class Codegen {
     }
 
     private void generateStructAllocExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        StructAllocExp structAllocExp = (StructAllocExp) exp;
+
+        // This method is going to make a call to the generated function for struct allocation in C
+        // This will make our life easier trying to inline struct allocations
+
+        String allocationFunctionName = getStructAllocationFunctionName(structAllocExp.getStructType());
+
+        // The format will look like:
+        // <ALLOCATION_FUNCTION_NAME>(<FIELD_1>, <FIELD_2>, ...)
+
+        addString(allocationFunctionName);
+        addString("(");
+
+        List<StructActualParam> structParams = structAllocExp.getParams().params;
+        for (int i = 0; i < structParams.size(); i++) {
+            StructActualParam param = structParams.get(i);
+            generateExpression(param.exp);
+
+            if (i != structParams.size() - 1) {
+                addString(", ");
+            }
+        }
+
+        addString(")");
     }
 
     private void generateVarExp(final Expression exp) throws CodegenException {
