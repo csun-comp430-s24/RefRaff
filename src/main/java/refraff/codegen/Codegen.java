@@ -48,14 +48,27 @@ public class Codegen {
             
             // Add boilerplate
             addBeginningBoilerPlate();
+
             // Generate struct definitions
-            // generateStructDefs(program.getStructDefs());
+            generateStructDefs(program.getStructDefs());
+
             // Generate function definitions
             // generateFunctionDefs(program.getFunctionDefs());
-            // Generate statements
+
+            // Generate the main function entry point
+            addString("int main()");
+            addNewLine();
+            addString("{");
+
+            // Add the program's statements to the entry point
+            currentIndentCount += 1;
             generateStatements(program.getStatements());
-        
-            addEndingBoilerPlate();
+            currentIndentCount -= 1;
+
+            // Close the main method
+            addNewLine();
+            addString("}");
+
             writer.close();
         } catch (IOException e) {
             throw new CodegenException("Error in writing to file: " + e.getMessage());
@@ -63,23 +76,9 @@ public class Codegen {
     }
 
     private void addBeginningBoilerPlate() throws CodegenException {
-        try {   
-            writer.write("#include <stdio.h>\n\n"
-                         + "int main()\n"
-                         + "{\n");
-            currentIndentCount += 1;
-        } catch (IOException e) {
-            throw new CodegenException("Error in writing space");
-        }
-    }
-
-    private void addEndingBoilerPlate() throws CodegenException {
-        try {
-            writer.write("}\n");
-            currentIndentCount -= 1; // For symmetry
-        } catch (IOException e) {
-            throw new CodegenException("Error in writing space");
-        }
+        addString("#include <stdio.h>");
+        addNewLine();
+        addNewLine();
     }
 
     // Adds the specified string to the open file
@@ -205,22 +204,25 @@ public class Codegen {
         addString(structName);
         addNewLine();
         addString("{");
+        addNewLine();
 
         currentIndentCount += 1;
 
         for (Param param : structDef.getParams()) {
             indentLine(currentIndentCount);
+
             generateType(param.getType());
+            addSpace();
             generateVariable(param.getVariable());
+            addSemicolonNewLine();
         }
 
         currentIndentCount -= 1;
 
-        addNewLine();
         addString("} ");
         addString(structName);
+        addSemicolonNewLine();
 
-        addNewLine();
         addNewLine();
     }
 
@@ -360,7 +362,7 @@ public class Codegen {
         BoolType.class, (Type type) -> "int", // All bools literals are converted to ints as well
         IntType.class, (Type type) -> "int",
         // convert the struct name to the pointer representation (e.g. type for 'struct foo' => foo* in C)
-        StructType.class, (Type type) -> ((StructType) type).getStructName().map(name -> name + "*").get(),
+        StructType.class, (Type type) -> ((StructType) type).getStructName().get().structName + "*",
         VoidType.class, (Type type) -> "void"
     );
 
