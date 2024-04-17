@@ -1,6 +1,7 @@
 package refraff.codegen;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -24,17 +25,21 @@ public class Codegen {
     private BufferedWriter writer;
     private int currentIndentCount;
 
-    private Codegen(Program program) {
+    private Codegen(Program program, File directory) {
         this.program = program;
-        // Get the working directory
-        String currentWorkingDir = System.getProperty("user.dir");
-        // Make a path for the generated file
-        generatedCodePath = Paths.get(
-            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", "output.c");
+        this.generatedCodePath = Paths.get(directory.getPath(), "output.c");
+//
+//        // Get the working directory
+//        String currentWorkingDir = System.getProperty("user.dir");
+//        // Make a path for the generated file
+//        generatedCodePath = Paths.get(
+//            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", "output.c");
     }
 
-    public static void generateProgram(Program program) throws CodegenException {
-        new Codegen(program).generateProgram();
+    public static void generateProgram(Program program, File directory) throws CodegenException {
+        // We could directly supply the System.getProperty("user.dir"); in the main function
+        // But we should be able to specify where the output is going to go
+        new Codegen(program, directory).generateProgram();
     } 
 
     private void generateProgram() throws CodegenException {

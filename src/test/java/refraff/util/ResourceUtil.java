@@ -1,10 +1,13 @@
 package refraff.util;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.Scanner;
 
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class ResourceUtil {
 
@@ -31,6 +34,17 @@ public class ResourceUtil {
         });
 
         return stringBuffer.toString();
+    }
+
+    public static void copyResourceFile(String filePath, File copyDestination) {
+        File sourceFile = new File(TEST_DIRECTORY, filePath);
+        assertTrue("Input file " + filePath + " does not exist in " + TEST_DIRECTORY, sourceFile.exists());
+
+        try {
+            Files.copy(sourceFile.toPath(), copyDestination.toPath());
+        } catch (IOException ex) {
+            fail(ex);
+        }
     }
 
     public static String readProgramInputFile() {

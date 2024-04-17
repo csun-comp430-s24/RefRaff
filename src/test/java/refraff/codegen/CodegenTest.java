@@ -1,13 +1,14 @@
 package refraff.codegen;
 
-import org.junit.Ignore;
-import org.junit.Test;
-
 import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
+import java.io.File;
 import java.util.List;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.CleanupMode;
+import org.junit.jupiter.api.io.TempDir;
 import refraff.parser.*;
 import refraff.parser.struct.*;
 import refraff.parser.type.*;
@@ -16,6 +17,7 @@ import refraff.parser.expression.*;
 import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
 import refraff.parser.statement.*;
+import refraff.util.ResourceUtil;
 
 public class CodegenTest {
     
@@ -52,32 +54,49 @@ public class CodegenTest {
     private FunctionName getFunctionName(String name) {
         return Node.setNodeSource(new FunctionName(name), name);
     }
+
+    private File copyCodeGenResourceFile(File toCopyDirectory, String resourceFileName) {
+        File copyDestination = new File(toCopyDirectory, resourceFileName);
+        ResourceUtil.copyResourceFile("codegen/" + resourceFileName, copyDestination);
+
+        return copyDestination;
+    }
     
     // Test valid inputs
-    private void testGeneratedFileDoesNotThrow(String cSourceFile, String executionFile, String expectedOutput) {
-        assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+    private void testGeneratedFileDoesNotThrow(File directory, String resourceFile, String expectedOutput) {
+        File sourceFile = new File(directory, resourceFile);
+        assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput(directory, sourceFile, expectedOutput));
     }
 
-    private void testGeneratedFileDoesNotThrowOrLeakMemory(String cSourceFile, String executionFile, String expectedOutput) {
-        assertDoesNotThrow(() -> CCodeRunner.runWithDrMemoryAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+    private void testGeneratedFileDoesNotThrowOrLeakMemory(File directory, String resourceFile, String expectedOutput) {
+        File sourceFile = new File(directory, resourceFile);
+        assertDoesNotThrow(() -> CCodeRunner.runWithDrMemoryAndCaptureOutput(directory, sourceFile, expectedOutput));
     }
 
-    private void testProgramGeneratesAndDoesNotThrow(Program program, String expectedOutput) {
-        assertDoesNotThrow(() -> Codegen.generateProgram(program));
-        testGeneratedFileDoesNotThrow("output.c", "output", expectedOutput);
+    private void testProgramGeneratesAndDoesNotThrow(Program program, File tempDir, String expectedOutput) {
+        assertDoesNotThrow(() -> Codegen.generateProgram(program, tempDir));
+        testGeneratedFileDoesNotThrow(tempDir, "output.c", expectedOutput);
     }
 
-    private void testProgramGeneratesAndDoesNotThrowOrLeak(Program program, String expectedOutput) {
-        assertDoesNotThrow(() -> Codegen.generateProgram(program));
-        testGeneratedFileDoesNotThrowOrLeakMemory("output.c", "output", expectedOutput);
+    private void testProgramGeneratesAndDoesNotThrowOrLeak(Program program, File tempDir, String expectedOutput) {
+        assertDoesNotThrow(() -> Codegen.generateProgram(program, tempDir));
+        testGeneratedFileDoesNotThrowOrLeakMemory(tempDir, "output.c", expectedOutput);
     }
+
+    // A temporary directory that is created for each individual test
+    // CleanupMode.ON_SUCCESS will leave the directory open, so you can inspect the temporary directory for debugging.
+    // The CleanupMode can be changed for debugging purposes: https://junit.org/junit5/docs/5.9.1/api/org.junit.jupiter.api/org/junit/jupiter/api/io/CleanupMode.html
+    @TempDir(cleanup = CleanupMode.ON_SUCCESS)
+    File tempDir;
 
     @Test
     public void testCodeRunnerRunsExampleCFile() {
         // Run the code runner with the example input
         String expectedOutput = "42";
+
         // assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput("example.c", "example", expectedOutput));
-        testGeneratedFileDoesNotThrow("example.c", "example", expectedOutput);
+        copyCodeGenResourceFile(tempDir, "example.c");
+        testGeneratedFileDoesNotThrow(tempDir, "example.c", expectedOutput);
     }
 
     @Test
@@ -92,7 +111,7 @@ public class CodegenTest {
 
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -112,7 +131,7 @@ public class CodegenTest {
 
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, assignStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -132,7 +151,7 @@ public class CodegenTest {
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -157,7 +176,7 @@ public class CodegenTest {
         Statement ifElseStmt = new IfElseStmt(condition, ifBody, elseBody);
         Program program = new Program(List.of(), List.of(), List.of(ifElseStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -189,7 +208,7 @@ public class CodegenTest {
         Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(body)));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -233,7 +252,7 @@ public class CodegenTest {
         Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(countDown, ifStmt)));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -245,7 +264,7 @@ public class CodegenTest {
 
         Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
         String expectedOutput = "6";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -288,7 +307,7 @@ public class CodegenTest {
 
         Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
         String expectedOutput = "17";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -310,7 +329,7 @@ public class CodegenTest {
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
         String expectedOutput = "3";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     @Test
@@ -331,38 +350,47 @@ public class CodegenTest {
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
         String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program, tempDir, expectedOutput);
     }
 
     // Test invalid inputs
-    private void testGeneratedFileThrowsCodegenException(String cSourceFile, String executionFile, String expectedOutput) {
+    private void testGeneratedFileThrowsCodegenException(File directory, String cSourceFile, String expectedOutput) {
+        File sourceFile = new File(directory, cSourceFile);
         assertThrows(CodegenException.class,
-                () -> CCodeRunner.runAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+                () -> CCodeRunner.runAndCaptureOutput(directory, sourceFile, expectedOutput));
     }
 
-    private void testGeneratedFileThrowsCodegenExceptionForMemoryLeak(String cSourceFile, String executionFile, String expectedOutput) {
+    private void testGeneratedFileThrowsCodegenExceptionForMemoryLeak(File directory, String cSourceFile, String expectedOutput) {
+        File sourceFile = new File(directory, cSourceFile);
         assertThrows(CodegenMemoryLeakException.class,
-                () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+                () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(directory, sourceFile, expectedOutput));
     }
 
     @Test
     public void testCodeRunnerDoesNotMatchExpectedOutputThrows() {
         // example.c will output 42
         String expectedOutput = "24";
-        testGeneratedFileThrowsCodegenException("example.c", "example", expectedOutput);
+
+        copyCodeGenResourceFile(tempDir, "example.c");
+        testGeneratedFileThrowsCodegenException(tempDir, "example.c", expectedOutput);
     }
 
     @Test
     public void testCodeRunnerMissingSemiColonThrows() {
         // example_no_compile.c is missing a semi colon and won't compile
         String expectedOutput = "15";
-        testGeneratedFileThrowsCodegenException("example_no_compile.c", "example_no_compile", expectedOutput);
+
+        copyCodeGenResourceFile(tempDir, "example_no_compile.c");
+        testGeneratedFileThrowsCodegenException(tempDir, "example_no_compile.c", expectedOutput);
     }
 
     @Test
     public void testCodeRunnerRunningCodeWithMemoryLeakThrows() {
         // example_leak.c doesn't free malloc-ed stuff
         String expectedOutput = "";
-        testGeneratedFileThrowsCodegenExceptionForMemoryLeak("example_leak.c", "example_leak", expectedOutput);
+
+        copyCodeGenResourceFile(tempDir, "example_leak.c");
+        testGeneratedFileThrowsCodegenExceptionForMemoryLeak(tempDir, "example_leak.c", expectedOutput);
     }
+
 }

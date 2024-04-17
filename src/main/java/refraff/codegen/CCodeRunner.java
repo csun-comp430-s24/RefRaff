@@ -13,42 +13,27 @@ import java.nio.file.Paths;
 // output the expected output, or has memory leaks
 public class CCodeRunner {
 
-    public static void runAndCaptureOutput(String cSourceFile, String cExecutableFile, String expectedOutput) throws CodegenException {
-        // Get the current working directory
-        String currentWorkingDir = System.getProperty("user.dir");
-
+    public static void runAndCaptureOutput(File directory, File sourceFile, String expectedOutput) throws CodegenException {
         // Create file paths
-        Path sourceFile = Paths.get(
-            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cSourceFile);
-        Path executable = Paths.get(
-            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cExecutableFile);
-        Path drMemLogDir = Paths.get(
-            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "drMemoryLog");
+        Path sourcePath = sourceFile.toPath();
+        Path executable = Paths.get(directory.getPath(), "codegen_output");
 
-        compileCCode(sourceFile, executable);
+        compileCCode(sourcePath, executable);
 
         // Run code and compare to expected
         runExecutable(executable, expectedOutput);
     }
 
-    public static void runWithDrMemoryAndCaptureOutput(String cSourceFile, String cExecutableFile, String expectedOutput) throws CodegenException {
-        // TODO: Refactor
-        // Get the current working directory
-        String currentWorkingDir = System.getProperty("user.dir");
-
+    public static void runWithDrMemoryAndCaptureOutput(File directory, File sourceFile, String expectedOutput) throws CodegenException {
         // Create file paths
-        Path sourceFile = Paths.get(
-                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cSourceFile);
-        Path executable = Paths.get(
-                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cExecutableFile);
-        Path drMemLogDir = Paths.get(
-                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "drMemoryLog");
+        Path executable = Paths.get(directory.getPath(), "codegen_output");
+        Path drMemLogDir = Paths.get(directory.getPath(), "drMemoryLog");
 
         // Run and capture the output of the file, like normally
-        runAndCaptureOutput(cSourceFile, cExecutableFile, expectedOutput);
+        runAndCaptureOutput(directory, sourceFile, expectedOutput);
 
         // Run the compiled program with the Dr. Memory command line tool
-        runWithDrMemory(currentWorkingDir, executable, drMemLogDir);
+        runWithDrMemory(directory, executable, drMemLogDir);
 
         // Check the log created by Dr. Memory to see if there were any memory leaks
         checkLeakReport(drMemLogDir);
@@ -105,7 +90,7 @@ public class CCodeRunner {
 
     }
 
-    public static void runWithDrMemory(String currentWorkingDir, Path executable, Path drMemLogDir)
+    public static void runWithDrMemory(File directory, Path executable, Path drMemLogDir)
             throws CodegenException {
         try {
             // Make sure log file exists
@@ -118,7 +103,7 @@ public class CCodeRunner {
             // Run the program with Dr. Memory
             ProcessBuilder runBuilder = new ProcessBuilder(
                     "drmemory.exe", "-logdir", drMemLogDir.toString(), "-batch", "--", executable.toString());
-            runBuilder.directory(new File(currentWorkingDir.toString()));
+            runBuilder.directory(directory);
 
             // Redirect Dr. Memory output to files (Dr. Memory dynamically names directories, and it's
             // easier to get at the files if we name them)
