@@ -228,7 +228,11 @@ public class Codegen {
     }
 
     private void generatePrintlnStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        PrintlnStmt printlnStmt = (PrintlnStmt)stmt;
+
+        addIndentedString("printf(\"%d\", ");
+        generateExpression(printlnStmt.getExpression());
+        addString(");\n");
     }
 
     private void generateReturnStmt(final Statement stmt) throws CodegenException {

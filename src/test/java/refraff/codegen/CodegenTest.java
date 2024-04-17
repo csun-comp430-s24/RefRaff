@@ -227,6 +227,103 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
 
+    @Test
+    public void testCodegenWithPrintln() {
+        /*
+         * println(6);
+         */
+        Statement printLnStmt = new PrintlnStmt(new IntLiteralExp(6));
+
+        Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
+        String expectedOutput = "6";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithMathmaticalExp() {
+        /*
+         * println(4 + 3 * 7 / 4 - 1 + 9);
+         */
+
+        Expression divideExp = new BinaryOpExp(
+            new IntLiteralExp(7),
+            OperatorEnum.DIVISION,
+            new IntLiteralExp(4)
+        );
+
+        Expression multExp = new BinaryOpExp(
+            new IntLiteralExp(3),
+            OperatorEnum.MULTIPLY,
+            divideExp
+        );
+
+        Expression addExp = new BinaryOpExp(
+            new IntLiteralExp(1),
+            OperatorEnum.PLUS,
+            new IntLiteralExp(9)
+        );
+
+        Expression minusExp = new BinaryOpExp(
+            multExp,
+            OperatorEnum.MINUS,
+            addExp
+        );
+        
+        Expression mathExp = new BinaryOpExp(
+            new IntLiteralExp(4),
+            OperatorEnum.PLUS,
+            minusExp
+        );
+        
+        Statement printLnStmt = new PrintlnStmt(mathExp);
+
+        Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
+        String expectedOutput = "17";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithOrExpCondition() {
+        /*
+         * This should print because `6 || 0` should evaluate to 1
+         *
+         * if (6 || 0) {
+         *   println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition = new BinaryOpExp(
+            new IntLiteralExp(6),
+            OperatorEnum.OR,
+            new IntLiteralExp(0)
+        );
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        String expectedOutput = "3";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithAndExpCondition() {
+        /*
+         * This should not print because `6 && 0` should evaluate to 0
+         *
+         * if (6 && 0) {
+         *   println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(6),
+                OperatorEnum.AND,
+                new IntLiteralExp(0));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
 
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String executionFile, String expectedOutput) {
