@@ -175,7 +175,7 @@ public class CodegenTest {
         Statement allocStatement = new VardecStmt(getStructType("B"), getVariable("b"), allocExp);
 
         Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement));
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "");
     }
 
     @Test
