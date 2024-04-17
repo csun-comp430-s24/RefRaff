@@ -190,6 +190,23 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithStmtBlock() {
+        /*
+         * {
+         *   3;
+         *   7;
+         * }
+         */
+        Statement expressionStatement1 = new ExpressionStmt(new IntLiteralExp(3));
+        Statement expressionStatement2 = new ExpressionStmt(new IntLiteralExp(7));
+
+        StmtBlock stmtBlock = new StmtBlock(List.of(expressionStatement1, expressionStatement2));
+
+        Program program = new Program(List.of(), List.of(), List.of(stmtBlock));
+        testProgramGeneratesAndDoesNotThrow(program, "");
+    }
+
+    @Test
     public void testCodegenWithVardec() {
         /*
          * int foo = 6;

@@ -402,13 +402,31 @@ public class Codegen {
     }
 
     private void generateReturnStmt(final Statement stmt) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        ReturnStmt returnStmt = (ReturnStmt) stmt;
+
+        addString("return");
+
+        if (returnStmt.getReturnValue().isPresent()) {
+            addSpace();
+            generateExpression(returnStmt.getReturnValue().get());
+        }
+
+        addSemicolonNewLine();
     }
 
     private void generateStmtBlock(final Statement stmt) throws CodegenException {
         StmtBlock stmtBlock = (StmtBlock)stmt;
 
+        indentLine(currentIndentCount);
+        addString("{");
+        addNewLine();
+
+        currentIndentCount += 1;
         generateStatements(stmtBlock.getBlockBody());
+        currentIndentCount -= 1;
+
+        indentLine(currentIndentCount);
+        addString("}");
     }
 
     private void generateVardecStmt(final Statement stmt) throws CodegenException {
