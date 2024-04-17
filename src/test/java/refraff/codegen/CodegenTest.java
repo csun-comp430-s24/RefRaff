@@ -71,7 +71,6 @@ public class CodegenTest {
         testGeneratedFileDoesNotThrow("example.c", "example", expectedOutput);
     }
 
-    @Ignore // Not implemented yet
     @Test
     public void testCodegenWithAssignment() {
         /*

@@ -25,6 +25,16 @@ public class StructType extends Type {
         return optionalStructName.isEmpty();
     }
 
+    // This is used in the code generator - by then I don't think that struct name can be null?
+    // But I'm not sure if there's a safer way to handle this
+    @Override
+    public String toString() {
+        if (!this.isNullStruct()) {
+            return optionalStructName.get().getName();
+        }
+        else return "";
+    }
+
     @Override
     public boolean shouldThrowOnAssignment() {
         return false;
