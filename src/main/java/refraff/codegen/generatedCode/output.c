@@ -6,5 +6,9 @@ int main()
 	while (foo > 0)
 	{
 		foo = foo - 1;
+		if (foo == 1)
+		{
+			break;
+		}
 	}
 }

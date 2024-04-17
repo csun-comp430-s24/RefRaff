@@ -163,7 +163,7 @@ public class CodegenTest {
         Statement vardecStmt = new VardecStmt(
                 getIntType(),
                 getVariable("foo"),
-                new IntLiteralExp(6));
+                new IntLiteralExp(3));
 
         Expression guard = new BinaryOpExp(
             new VariableExp(getVariable("foo")),
@@ -178,6 +178,50 @@ public class CodegenTest {
         Statement body = new AssignStmt(getVariable("foo"), assignExp);
 
         Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(body)));
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
+        String expectedOutput = "";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithBreakStmt() {
+        /*
+         * int foo = 4;
+         * while (foo > 0) {
+         *   foo = foo - 1;
+         *   if (foo == 1) {
+         *     break;
+         *   }
+         * }
+         */
+
+        Statement vardecStmt = new VardecStmt(
+                getIntType(),
+                getVariable("foo"),
+                new IntLiteralExp(4));
+
+        Expression guard = new BinaryOpExp(
+                new VariableExp(getVariable("foo")),
+                OperatorEnum.GREATER_THAN,
+                new IntLiteralExp(0));
+
+        Expression assignExp = new BinaryOpExp(
+                new VariableExp(getVariable("foo")),
+                OperatorEnum.MINUS,
+                new IntLiteralExp(1));
+
+        Statement countDown = new AssignStmt(getVariable("foo"), assignExp);
+
+        Expression condition = new BinaryOpExp(
+            new VariableExp(getVariable("foo")),
+            OperatorEnum.DOUBLE_EQUALS,
+            new IntLiteralExp(1));
+
+        Statement breakStmt = new BreakStmt();
+
+        Statement ifStmt = new IfElseStmt(condition, breakStmt);
+
+        Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(countDown, ifStmt)));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
         String expectedOutput = "";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
