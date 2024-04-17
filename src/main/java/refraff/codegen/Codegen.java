@@ -5,9 +5,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 import refraff.parser.*;
@@ -138,7 +136,87 @@ public class Codegen {
     }
 
     private void generateStructDefs(List<StructDef> structDefs) throws CodegenException {
-        throw new CodegenException("Struct Defs not implemented yet");
+        // Struct definitions were allowed to be used in any order in the typechecker, but order matters in C
+        // So we're going to re-order them according to dependencies, first
+
+
+        Queue<StructDef> queueOfUnprocessedStructs = new ArrayDeque<>(structDefs);
+        Set<String> alreadyCodeGeneratedStructNames = new HashSet<>();
+
+        while (!queueOfUnprocessedStructs.isEmpty()) {
+            StructDef structDef = queueOfUnprocessedStructs.poll();
+            String currentStructName = structDef.getStructName().getName();
+
+            boolean hasNonGeneratedStructDependencies = false;
+
+            for (Param param : structDef.getParams()) {
+                if (param.getType() instanceof StructType paramStructType) {
+                    String paramStructName = paramStructType.getStructName().get().getName();
+
+                    // If we have a recursive struct, we don't care about the order for this
+                    if (paramStructName.equals(currentStructName)) {
+                        continue;
+                    }
+
+                    // Otherwise, we need to make sure that the struct that this struct depends on, is already generated
+                    if (alreadyCodeGeneratedStructNames.contains(paramStructName)) {
+                        continue;
+                    }
+
+                    // We don't have a dependent struct already generated here! So we need to generate that one first
+                    hasNonGeneratedStructDependencies = true;
+                    break;
+                }
+            }
+
+            // Add this struct to the back of the queue, if we need to code generate another struct first
+            if (hasNonGeneratedStructDependencies) {
+                queueOfUnprocessedStructs.offer(structDef);
+                break;
+            }
+
+            // Otherwise, just code gen it and add it to our list of already code generated structs
+            generateStructDef(structDef);
+            alreadyCodeGeneratedStructNames.add(currentStructName);
+        }
+    }
+
+    private void generateStructDef(StructDef structDef) throws CodegenException {
+        /*
+         * typedef struct <STRUCT_NAME>
+         * {
+         *     <PARAM_TYPE_1> <PARAM_NAME>;
+         *      .
+         *      .
+         *      .
+         * } <STRUCT_NAME>
+         *
+         * This format allows for using STRUCT_NAME as a type, rather than needing to use struct <STRUCT_NAME>*
+         */
+
+        String structName = structDef.getStructName().getName();
+
+        addString("typedef struct ");
+        addString(structName);
+        addNewLine();
+        addString("{");
+
+        currentIndentCount += 1;
+
+        for (Param param : structDef.getParams()) {
+            indentLine(currentIndentCount);
+            generateType(param.getType());
+            generateVariable(param.getVariable());
+        }
+
+        currentIndentCount -= 1;
+
+        addNewLine();
+        addString("} ");
+        addString(structName);
+
+        addNewLine();
+        addNewLine();
     }
 
     private void generateFunctionDefs(List<FunctionDef> functionDefs) throws CodegenException {
@@ -276,7 +354,8 @@ public class Codegen {
     private static final Map<Class<? extends Type>, Function<Type, String>> TYPE_TO_STR = Map.of(
         BoolType.class, (Type type) -> "int", // All bools literals are converted to ints as well
         IntType.class, (Type type) -> "int",
-        StructType.class, (Type type) -> type.toString(),
+        // convert the struct name to the pointer representation (e.g. type for 'struct foo' => foo* in C)
+        StructType.class, (Type type) -> ((StructType) type).getStructName().map(name -> name + "*").get(),
         VoidType.class, (Type type) -> "void"
     );
 
@@ -361,7 +440,12 @@ public class Codegen {
     }
 
     private void generateDotExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        DotExp dotExp = (DotExp) exp;
+
+        // Structs will always be pointers, so we need the `->` operator instead of the `.` operator
+        generateExpression(dotExp.getLeftExp());
+        addString("->");
+        generateVariable(dotExp.getRightVar());
     }
 
     private void generateUnaryOpExp(final Expression exp) throws CodegenException {

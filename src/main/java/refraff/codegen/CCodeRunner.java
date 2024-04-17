@@ -29,6 +29,23 @@ public class CCodeRunner {
 
         // Run code and compare to expected
         runExecutable(executable, expectedOutput);
+    }
+
+    public static void runWithDrMemoryAndCaptureOutput(String cSourceFile, String cExecutableFile, String expectedOutput) throws CodegenException {
+        // TODO: Refactor
+        // Get the current working directory
+        String currentWorkingDir = System.getProperty("user.dir");
+
+        // Create file paths
+        Path sourceFile = Paths.get(
+                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cSourceFile);
+        Path executable = Paths.get(
+                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", cExecutableFile);
+        Path drMemLogDir = Paths.get(
+                currentWorkingDir, "src", "main", "java", "refraff", "codegen", "drMemoryLog");
+
+        // Run and capture the output of the file, like normally
+        runAndCaptureOutput(cSourceFile, cExecutableFile, expectedOutput);
 
         // Run the compiled program with the Dr. Memory command line tool
         runWithDrMemory(currentWorkingDir, executable, drMemLogDir);
@@ -134,7 +151,7 @@ public class CCodeRunner {
                     int numLeaks = getNumLeaks(line);
                     // If the number of leaks is not 0, throw exception
                     if (numLeaks > 0) {
-                        throw new CodegenException("Generated code contains memory leaks:\n" + line);
+                        throw new CodegenMemoryLeakException("Generated code contains memory leaks:\n" + line);
                     }
                 }
             }

@@ -58,9 +58,18 @@ public class CodegenTest {
         assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
     }
 
+    private void testGeneratedFileDoesNotThrowOrLeakMemory(String cSourceFile, String executionFile, String expectedOutput) {
+        assertDoesNotThrow(() -> CCodeRunner.runWithDrMemoryAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+    }
+
     private void testProgramGeneratesAndDoesNotThrow(Program program, String expectedOutput) {
         assertDoesNotThrow(() -> Codegen.generateProgram(program));
         testGeneratedFileDoesNotThrow("output.c", "output", expectedOutput);
+    }
+
+    private void testProgramGeneratesAndDoesNotThrowOrLeak(Program program, String expectedOutput) {
+        assertDoesNotThrow(() -> Codegen.generateProgram(program));
+        testGeneratedFileDoesNotThrowOrLeakMemory("output.c", "output", expectedOutput);
     }
 
     @Test
@@ -331,6 +340,11 @@ public class CodegenTest {
                 () -> CCodeRunner.runAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
     }
 
+    private void testGeneratedFileThrowsCodegenExceptionForMemoryLeak(String cSourceFile, String executionFile, String expectedOutput) {
+        assertThrows(CodegenMemoryLeakException.class,
+                () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(cSourceFile, executionFile, expectedOutput));
+    }
+
     @Test
     public void testCodeRunnerDoesNotMatchExpectedOutputThrows() {
         // example.c will output 42
@@ -349,6 +363,6 @@ public class CodegenTest {
     public void testCodeRunnerRunningCodeWithMemoryLeakThrows() {
         // example_leak.c doesn't free malloc-ed stuff
         String expectedOutput = "";
-        testGeneratedFileThrowsCodegenException("example_leak.c", "example_leak", expectedOutput);
+        testGeneratedFileThrowsCodegenExceptionForMemoryLeak("example_leak.c", "example_leak", expectedOutput);
     }
 }
