@@ -561,20 +561,27 @@ public class Typechecker {
             // Check if the arguments match the signature
             if (argsMatchSignature(castFuncCallExp.getCommaExp().getExpressions(), existingFuncDef.getParams(), typeEnv)) {
                 // If one does, return the function's return type
+                funcCallExp.setExpressionType(existingFuncDef.getReturnType());
                 return existingFuncDef.getReturnType();
             }
         }
 
         // If we got here, the arguments don't match any signatures, so throw an exception
         throwTypecheckerException(beingParsed, funcCallExp, funcName, funcWhereWeAre + " argument list does not match param types");
+        funcCallExp.setExpressionType(VOID_TYPE);
+
         return VOID_TYPE; // This'll never be reached because of the exception. But it won't compile without this?
     }
 
     public Type typecheckParenExp(final Expression parenExp, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
         ParenExp castParenExp = (ParenExp)parenExp;
+
         // Get expression in the parentheses, typecheck that
-        return typecheckExp(castParenExp.getExp(), typeEnv);
+        Type type = typecheckExp(castParenExp.getExp(), typeEnv);
+        castParenExp.setExpressionType(type);
+
+        return type;
     }
 
     public Type typecheckStructAllocExp(final Expression exp, final Map<Standardized<Variable>, Type> typeEnv)
@@ -641,8 +648,11 @@ public class Typechecker {
             throws TypecheckerException {
         VariableExp variableExp = (VariableExp) expression;
 
-        return throwTypecheckerExceptionOnVariableNotExists("variable expression", variableExp, variableExp.getVar(),
-                typeEnv);
+        Type type = throwTypecheckerExceptionOnVariableNotExists("variable expression", variableExp,
+                variableExp.getVar(), typeEnv);
+        variableExp.setExpressionType(type);
+
+        return type;
     }
 
     private static final BoolType BOOL_TYPE = Node.setNodeSource(new BoolType(), "bool");
@@ -827,6 +837,8 @@ public class Typechecker {
         }
 
         Type type = EXP_TO_TYPE_FUNC.get(expClass).apply(this, exp, typeEnv);
+        exp.setExpressionType(type);
+
         return type;
     }
 

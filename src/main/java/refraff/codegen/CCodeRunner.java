@@ -13,24 +13,24 @@ import java.nio.file.Paths;
 // output the expected output, or has memory leaks
 public class CCodeRunner {
 
-    public static void runAndCaptureOutput(File directory, File sourceFile, String expectedOutput) throws CodegenException {
+    public static void runAndCaptureOutput(File directory, File sourceFile, String... expectedLines) throws CodegenException {
         // Create file paths
         Path sourcePath = sourceFile.toPath();
         Path executable = Paths.get(directory.getPath(), "codegen_output");
 
         compileCCode(sourcePath, executable);
 
-        // Run code and compare to expected
-        runExecutable(executable, expectedOutput);
+        // Run code and compare to the lines we expect to be printed
+        runExecutable(executable, String.join("\n", expectedLines));
     }
 
-    public static void runWithDrMemoryAndCaptureOutput(File directory, File sourceFile, String expectedOutput) throws CodegenException {
+    public static void runWithDrMemoryAndCaptureOutput(File directory, File sourceFile, String... expectedLines) throws CodegenException {
         // Create file paths
         Path executable = Paths.get(directory.getPath(), "codegen_output");
         Path drMemLogDir = Paths.get(directory.getPath(), "drMemoryLog");
 
         // Run and capture the output of the file, like normally
-        runAndCaptureOutput(directory, sourceFile, expectedOutput);
+        runAndCaptureOutput(directory, sourceFile, expectedLines);
 
         // Run the compiled program with the Dr. Memory command line tool
         runWithDrMemory(directory, executable, drMemLogDir);

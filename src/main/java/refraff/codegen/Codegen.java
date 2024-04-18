@@ -51,7 +51,7 @@ public class Codegen {
             generateStructDefs(program.getStructDefs());
 
             // Generate function definitions
-            // generateFunctionDefs(program.getFunctionDefs());
+            generateFunctionDefs(program.getFunctionDefs());
 
             // Generate the main function entry point
             addString("int main()");
@@ -65,7 +65,6 @@ public class Codegen {
             currentIndentCount -= 1;
 
             // Close the main method
-            addNewLine();
             addString("}");
 
             writer.close();
@@ -89,7 +88,7 @@ public class Codegen {
         try {
             writer.write(str);
         } catch (IOException e) {
-            throw new CodegenException("Error in writing space");
+            throw new CodegenException("Error in writing string");
         }
     }
 
@@ -99,7 +98,7 @@ public class Codegen {
             indentLine(currentIndentCount);
             writer.write(str);
         } catch (IOException e) {
-            throw new CodegenException("Error in writing space");
+            throw new CodegenException("Error in writing indented string");
         }
     }
 
@@ -116,7 +115,7 @@ public class Codegen {
         try {
             writer.write(";\n");
         } catch (IOException e) {
-            throw new CodegenException("Error in writing new line");
+            throw new CodegenException("Error in writing semi-colon and new line");
         }
     }
 
@@ -198,7 +197,7 @@ public class Codegen {
          *      .
          *      .
          *      .
-         * } <STRUCT_NAME>
+         * } <STRUCT_NAME>;
          *
          * This format allows for using STRUCT_NAME as a type, rather than needing to use struct <STRUCT_NAME>*
          */
@@ -238,6 +237,20 @@ public class Codegen {
         return "refraff_" + structName + "_alloc";
     }
 
+    private void generateCommaSeparatedParams(List<Param> params) throws CodegenException {
+        for (int i = 0; i < params.size(); i++) {
+            Param param = params.get(i);
+
+            generateType(param.getType());
+            addSpace();
+            generateVariable(param.getVariable());
+
+            if (i != params.size() - 1) {
+                addString(", ");
+            }
+        }
+    }
+
     private void generateStructAllocationFunction(StructDef structDef) throws CodegenException {
         /*
          * Generates a function to allocate new structs on the heap:
@@ -256,21 +269,10 @@ public class Codegen {
         generateType(structType);
         addSpace();
         addString(getStructAllocationFunctionName(structType));
-        addString("(");
 
         // Comma separate the parameters into the new function
-        for (int i = 0; i < structDef.getParams().size(); i++) {
-            Param param = structDef.getParams().get(i);
-
-            generateType(param.getType());
-            addSpace();
-            generateVariable(param.getVariable());
-
-            if (i != structDef.getParams().size() - 1) {
-                addString(", ");
-            }
-        }
-
+        addString("(");
+        generateCommaSeparatedParams(structDef.getParams());
         addString(")");
         addNewLine();
 
@@ -308,7 +310,33 @@ public class Codegen {
     }
 
     private void generateFunctionDefs(List<FunctionDef> functionDefs) throws CodegenException {
-        throw new CodegenException("Function Defs not implemented yet");
+        for (FunctionDef functionDef : functionDefs) {
+            generateFunctionDef(functionDef);
+        }
+    }
+
+    private void generateFunctionDef(FunctionDef functionDef) throws CodegenException {
+        /*
+         * <RETURN_TYPE> <FUNCTION_NAME>(<FUNCTION_PARAMS>)
+         * {
+         *      <FUNCTION_BODY>
+         * }
+         *
+         *
+         */
+
+        generateType(functionDef.getReturnType());
+        addSpace();
+        addString(functionDef.getFunctionName().getName());
+
+        addString("(");
+        generateCommaSeparatedParams(functionDef.getParams());
+        addString(")");
+
+        generateStmtBlock(functionDef.getFunctionBody());
+
+        addNewLine();
+        addNewLine();
     }
 
     // Map of statements to their codegenerating functions functions
@@ -372,13 +400,14 @@ public class Codegen {
         generateExpression(ifElseStmt.getCondition());
         addString(")\n");
         addIndentedString("{\n");
+
         // Add to the indentation
         currentIndentCount += 1;
         // generate statement(s)
         generateStatements(List.of(ifElseStmt.getIfBody()));
         // Subtract from the indentation
         currentIndentCount -= 1;
-        // Add closing brace
+
         addIndentedString("}\n");
 
         // Add an else if there is one
@@ -396,15 +425,37 @@ public class Codegen {
     private void generatePrintlnStmt(final Statement stmt) throws CodegenException {
         PrintlnStmt printlnStmt = (PrintlnStmt)stmt;
 
-        addIndentedString("printf(\"%d\", ");
+        String formatString = null;
+        Type expressionType = printlnStmt.getExpression().getExpressionType();
+
+        // We want to print booleans as "true" or "false" and integers as integers
+        if (expressionType instanceof BoolType) {
+            formatString = "%s";
+        } else if (expressionType instanceof IntType) {
+            formatString = "%d";
+        }
+
+        // Throw a runtime exception if we ever encounter something we don't expect
+        assert(formatString != null);
+
+        addIndentedString("printf(\"");
+        addString(formatString);
+        addString("\\n\", ");
+
         generateExpression(printlnStmt.getExpression());
+
+        // If we have our boolean already printed, use ternary operator to print "true" or "false" instead
+        if (expressionType instanceof BoolType) {
+            addString(" ? \"true\" : \"false\"");
+        }
+
         addString(");\n");
     }
 
     private void generateReturnStmt(final Statement stmt) throws CodegenException {
         ReturnStmt returnStmt = (ReturnStmt) stmt;
 
-        addString("return");
+        addIndentedString("return");
 
         if (returnStmt.getReturnValue().isPresent()) {
             addSpace();
@@ -427,6 +478,7 @@ public class Codegen {
 
         indentLine(currentIndentCount);
         addString("}");
+        addNewLine();
     }
 
     private void generateVardecStmt(final Statement stmt) throws CodegenException {
@@ -447,14 +499,17 @@ public class Codegen {
         addIndentedString("while (");
         generateExpression(whileStmt.getCondition());
         addString(")\n");
-        addIndentedString("{\n");
+
+        // Braces aren't needed here, as braces will be included if it is a statement block
+        // or not included if there is a singular statement; including them will created a doubly nested
+        // statement block in the code
+
+        // Add to the indentation
         currentIndentCount += 1;
         // generate statement(s)
         generateStatements(List.of(whileStmt.getBody()));
         // Subtract from the indentation
         currentIndentCount -= 1;
-        // Add closing brace
-        addIndentedString("}\n");
     }
 
     private static final Map<Class<? extends Type>, Function<Type, String>> TYPE_TO_STR = Map.of(
@@ -515,8 +570,40 @@ public class Codegen {
         addString("NULL");
     }
 
+    private <T> void generateCommaSeparatedExpressions(List<T> list, Function<T,
+            Expression> getExpression) throws CodegenException {
+        // <EXP_1>, <EXP_2>, ...
+
+        for (int i = 0; i < list.size(); i++) {
+            T t = list.get(i);
+            generateExpression(getExpression.apply(t));
+
+            if (i != list.size() - 1) {
+                addString(", ");
+            }
+        }
+    }
+
+    private <T> void generateNamedFunctionCall(String functionName, List<T> params,
+                                               Function<T, Expression> getParamExpression) throws CodegenException {
+        // The format will look like:
+        // <FUNCTION_NAME>(<EXP_1>, <EXP_2>, ...)
+
+        addString(functionName);
+
+        addString("(");
+        generateCommaSeparatedExpressions(params, getParamExpression);
+        addString(")");
+    }
+
     private void generateFuncCallExp(final Expression exp) throws CodegenException {
-        throw new CodegenException("Not implemented yet");
+        FuncCallExp funcCallExp = (FuncCallExp) exp;
+
+        // Generate a function call with comma separated expression parameters
+        generateNamedFunctionCall(
+                funcCallExp.getFuncName().getName(),
+                funcCallExp.getCommaExp().getExpressions(),
+                Function.identity());
     }
 
     private void generateParenExp(final Expression exp) throws CodegenException {
@@ -534,24 +621,7 @@ public class Codegen {
         // This will make our life easier trying to inline struct allocations
 
         String allocationFunctionName = getStructAllocationFunctionName(structAllocExp.getStructType());
-
-        // The format will look like:
-        // <ALLOCATION_FUNCTION_NAME>(<FIELD_1>, <FIELD_2>, ...)
-
-        addString(allocationFunctionName);
-        addString("(");
-
-        List<StructActualParam> structParams = structAllocExp.getParams().params;
-        for (int i = 0; i < structParams.size(); i++) {
-            StructActualParam param = structParams.get(i);
-            generateExpression(param.exp);
-
-            if (i != structParams.size() - 1) {
-                addString(", ");
-            }
-        }
-
-        addString(")");
+        generateNamedFunctionCall(allocationFunctionName, structAllocExp.getParams().params, structParam -> structParam.exp);
     }
 
     private void generateVarExp(final Expression exp) throws CodegenException {

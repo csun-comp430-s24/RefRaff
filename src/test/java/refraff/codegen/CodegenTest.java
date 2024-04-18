@@ -5,11 +5,13 @@ import static org.junit.Assert.fail;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
+import refraff.Sourced;
 import refraff.parser.*;
 import refraff.parser.struct.*;
 import refraff.parser.type.*;
@@ -18,6 +20,11 @@ import refraff.parser.expression.*;
 import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.operator.OperatorEnum;
 import refraff.parser.statement.*;
+import refraff.tokenizer.Token;
+import refraff.tokenizer.Tokenizer;
+import refraff.tokenizer.TokenizerException;
+import refraff.typechecker.Typechecker;
+import refraff.typechecker.TypecheckerException;
 import refraff.util.ResourceUtil;
 
 public class CodegenTest {
@@ -64,24 +71,24 @@ public class CodegenTest {
     }
     
     // Test valid inputs
-    private void testGeneratedFileDoesNotThrow(String resourceFile, String expectedOutput) {
+    private void testGeneratedFileDoesNotThrow(String resourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, resourceFile);
-        assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput(tempDirectory, sourceFile, expectedOutput));
+        assertDoesNotThrow(() -> CCodeRunner.runAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
     }
 
-    private void testGeneratedFileDoesNotThrowOrLeakMemory(String resourceFile, String expectedOutput) {
+    private void testGeneratedFileDoesNotThrowOrLeakMemory(String resourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, resourceFile);
-        assertDoesNotThrow(() -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedOutput));
+        assertDoesNotThrow(() -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
     }
 
-    private void testProgramGeneratesAndDoesNotThrow(Program program, String expectedOutput) {
+    private void testProgramGeneratesAndDoesNotThrow(Program program, String... expectedLines) {
         assertDoesNotThrow(() -> Codegen.generateProgram(program, tempDirectory));
-        testGeneratedFileDoesNotThrow("output.c", expectedOutput);
+        testGeneratedFileDoesNotThrow("output.c", expectedLines);
     }
 
-    private void testProgramGeneratesAndDoesNotThrowOrLeak(Program program, String expectedOutput) {
+    private void testProgramGeneratesAndDoesNotThrowOrLeak(Program program, String... expectedLines) {
         assertDoesNotThrow(() -> Codegen.generateProgram(program, tempDirectory));
-        testGeneratedFileDoesNotThrowOrLeakMemory("output.c", expectedOutput);
+        testGeneratedFileDoesNotThrowOrLeakMemory("output.c", expectedLines);
     }
 
     // A temporary directory that is created for each individual test
@@ -113,7 +120,7 @@ public class CodegenTest {
         ));
 
         Program program = new Program(List.of(structDef), List.of(), List.of());
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -131,7 +138,7 @@ public class CodegenTest {
         ));
 
         Program program = new Program(List.of(structDefA, structDefB), List.of(), List.of());
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -150,7 +157,71 @@ public class CodegenTest {
         StructDef structDefA = new StructDef(getStructName("A"), List.of());
 
         Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of());
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
+    }
+
+    @Test
+    public void testCodegenWithFunctionDefCallAndPrint1() {
+        /*
+         *  func alwaysTrue(): bool {
+         *       return true;
+         *  }
+         *
+         *  println(alwaysTrue());
+         */
+
+        Expression boolTrue = new BoolLiteralExp(true);
+        Statement returnStmtTrue = new ReturnStmt(boolTrue);
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmtTrue));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("alwaysTrue"),
+                new ArrayList<Param>(),
+                getBoolType(),
+                funcBody
+        );
+
+        // Unfortunately, we'll need to manually set the expression type when printing - since we're not doing so through the typechecker
+        Expression alwaysTrueCall = new FuncCallExp(getFunctionName("alwaysTrue"), new CommaExp(List.of()));
+        alwaysTrueCall.setExpressionType(getBoolType());
+
+        Statement println = new PrintlnStmt(alwaysTrueCall);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of(println));
+        testProgramGeneratesAndDoesNotThrow(program, "true");
+    }
+
+    @Test
+    public void testCodegenWithFunctionDefCallAndPrint2() {
+        /*
+         *  func sum(int a, int b): int {
+         *       return a + b;
+         *  }
+         *
+         *  println(sum(3, 2));
+         */
+
+        Expression add = new BinaryOpExp(new VariableExp(getVariable("a")), OperatorEnum.PLUS, new VariableExp(getVariable("b")));
+        add.setExpressionType(getIntType());
+
+        Statement returnStmt = new ReturnStmt(add);
+
+        StmtBlock funcBody = new StmtBlock(List.of(returnStmt));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("sum"),
+                List.of(new Param(getIntType(), getVariable("a")), new Param(getIntType(), getVariable("b"))),
+                getIntType(),
+                funcBody
+        );
+
+        // Unfortunately, we'll need to manually set the expression type when printing - since we're not doing so through the typechecker
+        Expression sumCall = new FuncCallExp(getFunctionName("sum"),
+                new CommaExp(List.of(new IntLiteralExp(3), new IntLiteralExp(2))));
+        sumCall.setExpressionType(getIntType());
+
+        Statement println = new PrintlnStmt(sumCall);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of(println));
+        testProgramGeneratesAndDoesNotThrow(program, "5");
     }
 
     @Test
@@ -175,7 +246,7 @@ public class CodegenTest {
         Statement allocStatement = new VardecStmt(getStructType("B"), getVariable("b"), allocExp);
 
         Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement));
-        testProgramGeneratesAndDoesNotThrowOrLeak(program, "");
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
     @Test
@@ -186,7 +257,7 @@ public class CodegenTest {
         Statement expressionStatement = new ExpressionStmt(new IntLiteralExp(3));
 
         Program program = new Program(List.of(), List.of(), List.of(expressionStatement));
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -203,7 +274,7 @@ public class CodegenTest {
         StmtBlock stmtBlock = new StmtBlock(List.of(expressionStatement1, expressionStatement2));
 
         Program program = new Program(List.of(), List.of(), List.of(stmtBlock));
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -217,8 +288,7 @@ public class CodegenTest {
                 new IntLiteralExp(6));
 
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -237,8 +307,7 @@ public class CodegenTest {
                 new IntLiteralExp(0));
 
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, assignStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -257,8 +326,7 @@ public class CodegenTest {
         Expression condition = new BoolLiteralExp(true);
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -282,8 +350,7 @@ public class CodegenTest {
         Expression condition = new BoolLiteralExp(true);
         Statement ifElseStmt = new IfElseStmt(condition, ifBody, elseBody);
         Program program = new Program(List.of(), List.of(), List.of(ifElseStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -314,8 +381,7 @@ public class CodegenTest {
 
         Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(body)));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -358,8 +424,7 @@ public class CodegenTest {
 
         Statement whileStmt = new WhileStmt(guard, new StmtBlock(List.of(countDown, ifStmt)));
         Program program = new Program(List.of(), List.of(), List.of(vardecStmt, whileStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -409,7 +474,10 @@ public class CodegenTest {
             OperatorEnum.PLUS,
             minusExp
         );
-        
+
+        // Unfortunately, we'll need to manually set the expression type when printing - since we're not doing so through the typechecker
+        mathExp.setExpressionType(getIntType());
+
         Statement printLnStmt = new PrintlnStmt(mathExp);
 
         Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
@@ -423,6 +491,9 @@ public class CodegenTest {
          * struct A {
          *   A a;
          * }
+         *
+         * A a = null;
+         * a->a;
          */
 
         StructDef structDef = new StructDef(getStructName("A"), List.of(
@@ -435,7 +506,7 @@ public class CodegenTest {
         Statement dotExpStatement = new ExpressionStmt(dotExp);
 
         Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
-        testProgramGeneratesAndDoesNotThrow(program, "");
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     @Test
@@ -477,21 +548,20 @@ public class CodegenTest {
                 new IntLiteralExp(0));
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
-        String expectedOutput = "";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+        testProgramGeneratesAndDoesNotThrow(program);
     }
 
     // Test invalid inputs
-    private void testGeneratedFileThrowsCodegenException(String cSourceFile, String expectedOutput) {
+    private void testGeneratedFileThrowsCodegenException(String cSourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, cSourceFile);
         assertThrows(CodegenException.class,
-                () -> CCodeRunner.runAndCaptureOutput(tempDirectory, sourceFile, expectedOutput));
+                () -> CCodeRunner.runAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
     }
 
-    private void testGeneratedFileThrowsCodegenExceptionForMemoryLeak(String cSourceFile, String expectedOutput) {
+    private void testGeneratedFileThrowsCodegenExceptionForMemoryLeak(String cSourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, cSourceFile);
         assertThrows(CodegenMemoryLeakException.class,
-                () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedOutput));
+                () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
     }
 
     @Test
@@ -515,10 +585,38 @@ public class CodegenTest {
     @Test
     public void testCodeRunnerRunningCodeWithMemoryLeakThrows() {
         // example_leak.c doesn't free malloc-ed stuff
-        String expectedOutput = "";
-
         copyCodeGenResourceFile(tempDirectory, "example_leak.c");
-        testGeneratedFileThrowsCodegenExceptionForMemoryLeak("example_leak.c", expectedOutput);
+        testGeneratedFileThrowsCodegenExceptionForMemoryLeak("example_leak.c");
     }
+
+    // Integration test
+
+    @Test
+    public void testCodegenRefraffProgramWithoutException() {
+        String input = ResourceUtil.readProgramInputFile();
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Program program = Parser.parseProgram(sourcedTokens);
+            Typechecker.typecheckProgram(program);
+            testProgramGeneratesAndDoesNotThrow(program, "3");
+        } catch (TokenizerException | ParserException | TypecheckerException ex) {
+            fail(ex.toString());
+        }
+    }
+
+    @Test
+    public void testCodegenRefraffProgram2WithoutException() {
+        String input = ResourceUtil.readProgram2InputFile();
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Program program = Parser.parseProgram(sourcedTokens);
+            Typechecker.typecheckProgram(program);
+            testProgramGeneratesAndDoesNotThrow(program, "3", "false");
+        } catch (TokenizerException | ParserException | TypecheckerException ex) {
+            fail(ex.toString());
+        }
+    }
+
+    // Needs integration testing with leaks (for when we start working on reference counted memory management)
 
 }
