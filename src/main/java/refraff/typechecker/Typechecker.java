@@ -46,11 +46,13 @@ public class Typechecker {
     }
 
     private void typecheckProgram() throws TypecheckerException {
-        // Create an environment map
-        Map<Standardized<Variable>, Type> typeEnv = new HashMap<>();
-        typecheckStructDefs(typeEnv);
-        typecheckFunctionDefs(typeEnv);
-        typecheckProgramStatements(typeEnv);
+        // At this point, nothing is going to be added to our type environment.
+        // Functions and structs are kept track of separately
+        typecheckStructDefs();
+        typecheckFunctionDefs();
+
+        // Typecheck our program's statements
+        typecheckProgramStatements();
     }
 
     private void throwTypecheckerExceptionOnVariableExists(String beingParsed, AbstractSyntaxTreeNode parent, Variable variable,
@@ -148,7 +150,17 @@ public class Typechecker {
         throw new TypecheckerException(builtErrorMessage);
     }
 
-    private void typecheckStructDefs(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+    /**
+     * Gets a copy of the current type environment. A copy of the type environment should be passed whenever
+     * we enter a new scope and do not want lower scopes to be added to a higher scope type environment.
+     * @param typeEnv the type environment to copy
+     * @return a copy of the current type environment
+     */
+    private Map<Standardized<Variable>, Type> copyOf(Map<Standardized<Variable>, Type> typeEnv) {
+        return new HashMap<>(typeEnv);
+    }
+
+    private void typecheckStructDefs() throws TypecheckerException {
         final String typeErrorInStructMessageFormat = "struct definition for `%s`";
     
         // Add all the structs manually before trying to parse a struct's fields (allow recursion/reference other structs)
@@ -214,7 +226,7 @@ public class Typechecker {
         throwTypecheckerException(error, parent, type, detailedErrorMessage);
     }
 
-    private void typecheckFunctionDefs(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+    private void typecheckFunctionDefs() throws TypecheckerException {
         final String typeErrorInFunctionMessageFormat = "function definition for `%s`";
 
         // Type environment for each function
@@ -250,7 +262,8 @@ public class Typechecker {
             }
 
             // Create a new type environment to check the function body
-            functionTypeEnv = new HashMap<>(typeEnv);
+            functionTypeEnv = new HashMap<>();
+
             // Add the function's parameters to the type environment
             for (Param param : funcDef.getParams()) {
                 functionTypeEnv.put(Standardized.of(param.getVariable()), param.getType());
@@ -283,8 +296,9 @@ public class Typechecker {
     );
 
     // Added because we also need to be able to check the statement block list of statements
-    private void typecheckProgramStatements(Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
-        typecheckStatements(typeEnv, program.getStatements());
+    private void typecheckProgramStatements() throws TypecheckerException {
+        // Our type environment is always empty
+        typecheckStatements(new HashMap<>(), program.getStatements());
     }
 
     private void typecheckStatements(Map<Standardized<Variable>, Type> typeEnv, List<Statement> stmts) throws TypecheckerException {
@@ -340,16 +354,16 @@ public class Typechecker {
         IfElseStmt ifElseStmt = (IfElseStmt) stmt;
         Expression condition = ifElseStmt.getCondition();
 
-        // Typecheck the condition and if statement body
+        // Typecheck the condition and if statement body, and treating it as a lower level scope needing a copy
         throwTypecheckerExceptionOnNonBooleanType("if statement", stmt, condition, typecheckExp(condition, typeEnv));
-        typecheckStatements(typeEnv, List.of(ifElseStmt.getIfBody()));
+        typecheckStatements(copyOf(typeEnv), List.of(ifElseStmt.getIfBody()));
 
         if (ifElseStmt.getElseBody().isEmpty()) {
             return;
         }
 
-        // Typecheck the else body, if it exists
-        typecheckStatements(typeEnv, List.of(ifElseStmt.getElseBody().get()));
+        // Typecheck the else body, if it exists, and treating it as a lower level scope needing a copy
+        typecheckStatements(copyOf(typeEnv), List.of(ifElseStmt.getElseBody().get()));
     }
 
     public void typecheckPrintlnStmt(final Statement stmt, final Map<Standardized<Variable>, Type> typeEnv)
@@ -390,8 +404,9 @@ public class Typechecker {
 
     public Type typecheckFunctionBody(final Type functionReturnType, final StmtBlock functionBody,
                                       final Map<Standardized<Variable>, Type> typeEnv) throws TypecheckerException {
+        // Typecheck the function body statements and treat it as a lower level scope needing a copy
         this.withinFunctionDef = true;
-        typecheckStatements(typeEnv, functionBody.getBlockBody());
+        typecheckStatements(copyOf(typeEnv), functionBody.getBlockBody());
         this.withinFunctionDef = false;
 
         // This method won't accept keep track of returns within nested statement blocks: e.g. while
@@ -441,8 +456,9 @@ public class Typechecker {
 
     public void typecheckStmtBlock(final Statement stmtBlock, final Map<Standardized<Variable>, Type> typeEnv)
             throws TypecheckerException {
+        // Typecheck the statement block and treat it as a lower level scope needing a copy
         StmtBlock castStmtBlock = (StmtBlock)stmtBlock;
-        typecheckStatements(typeEnv, castStmtBlock.getBlockBody());
+        typecheckStatements(copyOf(typeEnv), castStmtBlock.getBlockBody());
     }
 
     public void typecheckVardecStmt(final Statement vardecStmt, final Map<Standardized<Variable>, Type> typeEnv)
@@ -477,8 +493,9 @@ public class Typechecker {
         throwTypecheckerExceptionOnNonBooleanType("while statement", whileStmt, condition,
                 typecheckExp(condition, typeEnv));
 
+        // Typecheck the while statement body and treat it as a lower level scope needing a copy
         loopStack.push(true);
-        typecheckStatements(typeEnv, List.of(whileStmt.getBody()));
+        typecheckStatements(copyOf(typeEnv), List.of(whileStmt.getBody()));
         loopStack.pop();
     }
 
