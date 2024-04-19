@@ -912,6 +912,96 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
+    // Scope tests
+
+    @Test
+    public void testFunctionDefHasOwnScopeFromProgramEntry() {
+        /*
+         *  func foo(): void {
+         *       int a = 2;
+         *  }
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("foo"),
+                List.of(),
+                getVoidType(),
+                new FunctionBody(List.of(aVardec)));
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of(aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testIfStatementHasLowerScope() {
+        /*
+         *  if (true)
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement ifStatement = new IfElseStmt(new BoolLiteralExp(true), aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testIfElseStatementHasLowerScope() {
+        /*
+         *  if (true)
+         *     int a = 2;
+         *  else
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement ifElseStatement = new IfElseStmt(new BoolLiteralExp(true), aVardec, aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifElseStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testWhileStatementHasLowerScope() {
+        /*
+         *  while (true)
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement whileStatement = new WhileStmt(new BoolLiteralExp(true), aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(whileStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStatementBlockHasLowerScope() {
+        /*
+         *  {
+         *     int a = 2;
+         *  }
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement statementBlock = new StmtBlock(List.of(aVardec));
+
+        Program program = new Program(List.of(), List.of(), List.of(statementBlock, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
 
     // Test invalid inputs
 

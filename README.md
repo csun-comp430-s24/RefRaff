@@ -174,3 +174,7 @@ Node list =
 
 println(length(list));
 ```
+
+## System Dependencies
+
+In order to run RefRaff, you will need to install gcc and DrMemory. These are used to compile the code into C and generate memory leak reports, respectively.
