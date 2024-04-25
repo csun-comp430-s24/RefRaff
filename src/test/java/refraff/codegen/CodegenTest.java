@@ -551,6 +551,221 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program);
     }
 
+    @Test
+    public void testCodegenWithNotEqualsExpCondition() {
+        /*
+         * This should only print 1
+         *
+         * if (6 != 5) {
+         *   println(1);
+         * }
+         * 
+         * if (6 != 6) {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.NOT_EQUALS,
+                new IntLiteralExp(6));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(6),
+                OperatorEnum.NOT_EQUALS,
+                new IntLiteralExp(6));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "1";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithGreaterThanExpCondition() {
+        /*
+         * This should only print 3
+         *
+         * if (7 > 6) {
+         *   println(3);
+         * }
+         * 
+         * if (3 > 6) {
+         *   println(1);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(7),
+                OperatorEnum.GREATER_THAN,
+                new IntLiteralExp(6));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(3),
+                OperatorEnum.GREATER_THAN,
+                new IntLiteralExp(6));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "3";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithLessThanExpCondition() {
+        /*
+         * This should only print 1
+         *
+         * if (3 < 4) {
+         *   println(1);
+         * }
+         * 
+         * if (4 < 3) {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(3),
+                OperatorEnum.LESS_THAN,
+                new IntLiteralExp(4));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.LESS_THAN,
+                new IntLiteralExp(3));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "1";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithGreaterThanEqualsExpCondition() {
+        /*
+         * This should only print 1 and 2
+         *
+         * if (5 >= 4) {
+         *   println(1);
+         * }
+         * 
+         * if (4 >= 4) {
+         *   println(2);
+         * }
+         * 
+         * if (4 >= 5) {
+         *   println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Statement ifBody3 = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition3 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt3 = new IfElseStmt(condition3, ifBody3);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2, ifStmt3));
+        String expectedOutput = "1\n2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithLessThanEqualsExpCondition() {
+        /*
+         * This should only print 1 and 2
+         *
+         * if (4 <= 5) {
+         *  println(1);
+         * }
+         * 
+         * if (5 <= 5) {
+         *  println(2);
+         * }
+         * 
+         * if (5 <= 4) {
+         *  println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Statement ifBody3 = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition3 = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt3 = new IfElseStmt(condition3, ifBody3);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2, ifStmt3));
+        String expectedOutput = "1\n2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenNotOperatorExp() {
+        /*
+         * bool trueBool = true;
+         * bool falseBool = !trueBool;
+         * println(falseBool);
+         */
+
+        Statement trueAssign = new VardecStmt(
+            getBoolType(),
+            getVariable("trueBool"),
+            new BoolLiteralExp(true));
+
+        Expression notTrue = new UnaryOpExp(OperatorEnum.NOT, new VariableExp(getVariable("trueBool")));
+        Statement falseAssign = new VardecStmt(
+                getBoolType(),
+                getVariable("falseBool"),
+                notTrue);
+        Expression printExp = new VariableExp(getVariable("falseBool"));
+        printExp.setExpressionType(getBoolType());
+
+        Statement falsePrint = new PrintlnStmt(printExp);
+
+        Program program = new Program(List.of(), List.of(), List.of(trueAssign, falseAssign, falsePrint));
+        String expectedOutput = "false";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, cSourceFile);

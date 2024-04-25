@@ -26,12 +26,6 @@ public class Codegen {
     private Codegen(Program program, File directory) {
         this.program = program;
         this.generatedCodePath = Paths.get(directory.getPath(), "output.c");
-//
-//        // Get the working directory
-//        String currentWorkingDir = System.getProperty("user.dir");
-//        // Make a path for the generated file
-//        generatedCodePath = Paths.get(
-//            currentWorkingDir, "src", "main", "java", "refraff", "codegen", "generatedCode", "output.c");
     }
 
     public static void generateProgram(Program program, File directory) throws CodegenException {
