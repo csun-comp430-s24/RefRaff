@@ -638,9 +638,13 @@ public class Codegen {
         addNewLine();
     }
 
-    private void generateCommaSeparatedArgs(final StructActualParams structActualParams) throws CodegenException {
+    private void generateCommaSeparatedArgs(final StructActualParams structActualParams, final List<Param> definedParams) 
+            throws CodegenException {
         List<StructActualParam> paramList = structActualParams.getStructActualParams();
         for (int i = 0; i < paramList.size(); i++) {
+            // If it's a primitive, just use the literal, otherwise, use the temporary struct variable
+            if (paramList.get(i)) // ONCE AGAIN NEED PARAMS AND ACTUAL PARAMS : (
+            indentLine(currentIndentCount);
             generateVariable(paramList.get(i).getVariable());
 
             if (i != paramList.size() - 1) {
@@ -649,14 +653,63 @@ public class Codegen {
         }
     }
 
+    private String getTempVariableName(Param param, StructDef structDef) {
+        return "_temp_" + structDef.getStructName().getName() + " " + param.getVariable().getName();
+    }
+
     // Generate a struct variable for a struct that will be assigned to a field of another struct
     // When we have multiple levels of nested structs, we can reuse this variable when creating them
-    private void generateTempStructFieldVariable(Param param) {
+    private void generateTempStructFieldVariable(Param param, StructDef structDef) throws CodegenException {
+        // <STRUCT_NAME>* temp_<variable> = NULL;
+        StructType structType = (StructType)param.getType();
+        indentLine(currentIndentCount);
+        generateType(structType);
+        addSpace();
+        getTempVariableName(param, structDef);
+        addString(" = ");
+        generateType(new VoidType());
+        addSemicolonNewLine();
+    }
+
+    private void generateSelfSimilarStructAllocCall(final StructAllocExp structAllocExp) throws CodegenException {
+        // Get structdef so we know they types of the params
+        // StructDef structDef = structNameToDef.get(structAllocExp.getStructType().getStructName());
+
+        // Get actual params
+        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
+
+        // Go through params, allocate structs
+        for (StructActualParam actualParam : structActualParams) {
+            // If this expression is a alloc expression, we need to go deeper!
+            if (actualParam.getExpression() instanceof StructAllocExp childAlloc) {
+                // If this is the same struct type as the parent, then continue with this recursive function
+                if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
+                    generateSelfSimilarStructAllocCall(childAlloc);
+                } else {
+                    // Otherwise, we may have to make new temporary variable for possible struct fields, call other function generator
+                    generateStructAllocFunctionCalls(childAlloc);
+                }
+            }
+        }
+
+        // Then go through the params again, and call create on this type
+        // for (StructActualParam actualParam : structActualParams) {
+        //     indentLine(currentIndentCount);
+        //     addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
+        // }
         
+
+        // Then create call for this type
+        addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
+        addString("(");
+        // PROBABLY CAN"T USE THIS FUNCTION
+        generateCommaSeparatedArgs(structAllocExp.getParams());
+
+        addString(")");
     }
 
     private void generateStructAllocFunctionCalls(final StructAllocExp structAllocExp) throws CodegenException {
-        // Get structdef so we know they types of the params
+        // Get structdef so we know they types of the params (just realized I can get this from the actual param's expressions - I'll fix that)
         StructDef structDef = structNameToDef.get(structAllocExp.getStructType().getStructName());
         // Get params (for types)
         List<Param> params = structDef.getParams();
@@ -665,10 +718,8 @@ public class Codegen {
         for (Param param: params) {
             // If this param is a struct
             if (param.getType() instanceof StructType structType) {
-                generateTempStructFieldVariable(param);
+                generateTempStructFieldVariable(param, structDef);
             }
-            // generateType(structType);
-            addSpace();
         }
 
         // Get actual params
@@ -678,11 +729,13 @@ public class Codegen {
         // First just try with singly nested
         
         // Go through params
-        for (StructActualParam param: structActualParams.getStructActualParams()) {
+        for (StructActualParam actualParam: structActualParams) {
             // We can ignore the primitive params because all of their information is there (although, is it fine to 
             // allow a mathematical expression here?)
-            // But if it's a struct, we need to allocate the struct, then after we assign it to the
-            // outermost struct, we need to get rid of the variable? Or do we because it will go out of scope anyway?
+            // But if it's a struct, we need to allocate that, then assign it to this struct
+            if (actualParam.getExpression() instanceof StructAllocExp alloc) {
+                // then what. we would like to check deeper
+            }
         }
 
         // We have to get all of the information for the last, outer most struct allocation first
@@ -717,8 +770,7 @@ public class Codegen {
                 // If it's assigning an existing struct, we have to retain it
                 // BY ADDING THE RETAIN FUNCTION HERE
             } else if (vardecStmt.getExpression() instanceof NullExp) {
-                // This is not possible at the moment because of the typechecker (I think)
-                // But should it be?
+ 
             }
         } else {
             // Otherwise, it's any primitive type
