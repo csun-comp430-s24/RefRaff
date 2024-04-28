@@ -1,38 +1,41 @@
 package refraff.codegen;
 
-import java.util.ArrayList;
 import java.util.EmptyStackException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
+
+import refraff.parser.type.StructType;
 
 // Keeps track of the struct variables that were declared in each scope
 public class StructScopeManager {
-    private Stack<ArrayList<String>> scopeStack = new Stack<>();
+    private Stack<Map<String, StructType>> scopeStack = new Stack<>();
 
     public void enterScope() {
-        scopeStack.push(new ArrayList<>());
+        scopeStack.push(new HashMap<String, StructType>());
     }
 
-    public void declareStructVariable(String newStructVariable) throws CodegenException {
+    public void declareStructVariable(String newStructVariable, StructType structType) throws CodegenException {
         try {
-            ArrayList<String> currentScope = scopeStack.peek();
-            currentScope.add(newStructVariable);
+            Map<String, StructType> currentScope = scopeStack.peek();
+            currentScope.put(newStructVariable, structType);
         } catch (EmptyStackException e) {
             throw new CodegenException("Tried to add a variable to the current scope, but scope stack was empty");
         }
     }
 
-    public ArrayList<String> getCurrentScopeStructs() throws CodegenException {
+    public Map<String, StructType> getCurrentScopeStructs() throws CodegenException {
         try {
-            ArrayList<String> currentScope = scopeStack.peek();
+            Map<String, StructType> currentScope = scopeStack.peek();
             return currentScope;
         } catch (EmptyStackException e) {
             throw new CodegenException("Tried to get current scope, but scope stack was empty");
         }
     }
 
-    public ArrayList<String> exitScope() throws CodegenException {
+    public Map<String, StructType> exitScope() throws CodegenException {
         try {
-            ArrayList<String> currentScope = scopeStack.pop();
+            Map<String, StructType> currentScope = scopeStack.pop();
             return currentScope;
         } catch (EmptyStackException e) {
             throw new CodegenException("Tried to exit scope, but scope stack was empty");
