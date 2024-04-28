@@ -162,30 +162,28 @@ public class Typechecker {
 
     private void typecheckStructDefs() throws TypecheckerException {
         final String typeErrorInStructMessageFormat = "struct definition for `%s`";
-    
-        // Add all the structs manually before trying to parse a struct's fields (allow recursion/reference other structs)
+        // Require the struct defs to be in-order at compile time, prevent cyclical struct definitions (not allowed in C)
         // Map all the struct definitions names to their AST definitions
         for (StructDef structDef : program.getStructDefs()) {
+
             StructName structName = structDef.getStructName();
             Standardized<StructName> standardizedStructName = Standardized.of(structName);
-            
-            // If we don't already have a struct definition defined, add it to the map
-            if (!structNameToDef.containsKey(standardizedStructName)) {
-                structNameToDef.put(standardizedStructName, structDef);
+
+            // If we don't already have this struct definition defined, add it to the map
+            if (structNameToDef.containsKey(standardizedStructName)) {
+                String stringStructName = structName.getName();
+                throwTypecheckerException(String.format(typeErrorInStructMessageFormat, stringStructName),
+                        structDef, structName, "struct type `" + stringStructName + "` has already been defined");
+
                 continue;
             }
-            
-            String stringStructName = structName.getName();
-            throwTypecheckerException(String.format(typeErrorInStructMessageFormat, stringStructName),
-                    structDef, structName, "struct type `" + stringStructName + "` has already been defined");
-        }
-        
-        for (StructDef structDef : program.getStructDefs()) {
-            final String typeErrorInStructMessage = "struct definition for `" + structDef.getStructName().structName + "`";
-            // Add struct def variable
 
+            structNameToDef.put(standardizedStructName, structDef);
+
+            final String typeErrorInStructMessage = "struct definition for `" + structDef.getStructName().structName + "`";
             Set<Standardized<Variable>> standardizedVariables = new HashSet<>();
 
+            // Add struct def variables
             for (Param param : structDef.getParams()) {
                 // If we add a variable, and it already exists, we have a duplicate
                 if (!standardizedVariables.add(Standardized.of(param.variable))) {
@@ -194,7 +192,7 @@ public class Typechecker {
                 }
 
                 // Else, check that all variable declarations for the struct do not: have a return type of void
-                // and that any struct name does exist
+                // and that their struct name already exists
                 final String onVariableDeclaration = typeErrorInStructMessage + " on parameter `" +
                         param.variable.getName() + "` declaration";
                 typecheckTypeNotVoidAndStructNameMustExist(onVariableDeclaration, structDef, param.getType());

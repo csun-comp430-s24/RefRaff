@@ -542,10 +542,12 @@ public class TypecheckerTest {
     }
 
     private DynamicTest testBinOpNotMatchingStructType(OperatorEnum op, Type expectedType) {
+        // struct A { }
         StructName aStructName = getStructName("A");
         StructType aStructType = getStructType("A");
         StructDef aStructDef = new StructDef(aStructName, List.of());
 
+        // struct B { }
         StructName bStructName = getStructName("B");
         StructType bStructType = getStructType("B");
         StructDef bStructDef = new StructDef(bStructName, List.of());
@@ -1066,6 +1068,24 @@ public class TypecheckerTest {
         ));
 
         Program invalidProgram = new Program(List.of(invalidStructDef), List.of(), List.of());
+        testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testStructDefWithOutOfOrderDeclarationThrowsException() {
+        /*
+         * struct A {
+         *   B b;
+         * }
+         *
+         * struct B { }
+         */
+        StructDef invalidStructDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("B"), getVariable("b"))
+        ));
+        StructDef bStructDef = new StructDef(getStructName("B"), List.of());
+
+        Program invalidProgram = new Program(List.of(invalidStructDef, bStructDef), List.of(), List.of());
         testThrowsTypecheckerException(invalidProgram);
     }
 
