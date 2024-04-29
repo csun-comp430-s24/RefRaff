@@ -68,11 +68,11 @@ public class CCodeRunner {
         try {
             // Run the compiled C program
             Process run = Runtime.getRuntime().exec(executable.toString());
-            BufferedReader reader = new BufferedReader(new InputStreamReader(run.getInputStream()));
+            BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
 
             String line;
             StringBuilder output = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
+            while ((line = outputReader.readLine()) != null) {
                 output.append(line + "\n");
             }
 

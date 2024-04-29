@@ -157,7 +157,7 @@ public class CodegenTest {
         StructDef structDefA = new StructDef(getStructName("A"), List.of());
 
         Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of());
-        testProgramGeneratesAndDoesNotThrow(program);
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
     @Test
@@ -248,6 +248,178 @@ public class CodegenTest {
         Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement));
         testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
+
+    @Test
+    public void testCodegenWithAStructReassignment() {
+        /*
+         * struct B {
+         *   A a;
+         * }
+         *
+         * struct A {}
+         *
+         * B b = new B { a: null };
+         * B b2 = b;
+         */
+
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+        StructDef structDefA = new StructDef(getStructName("A"), List.of());
+
+        Expression allocExp = new StructAllocExp(getStructType("B"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement allocStatement = new VardecStmt(getStructType("B"), getVariable("b"), allocExp);
+
+        Expression assignExp = new VariableExp(getVariable("b"));
+        Statement reassignStmt = new VardecStmt(getStructType("B"), getVariable("b2"), assignExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement, reassignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenWithASameAndDifferentStructFields() {
+        /*
+         * This should print 2
+         *
+         * struct B {
+         *   int num;
+         *   B b;
+         *   A a;
+         * }
+         *
+         * struct A {
+         *   A a;
+         * }
+         *
+         * B b = new B { 
+         *   num: 1,
+         *   b: new B {
+         *     num: 2,
+         *     b: null,
+         *     a: null
+         *   }
+         *   a: new A {
+         *     a: null
+         *   }
+         * };
+         * 
+         * B innerB = b.b;
+         * 
+         * println(innerB.num);
+         */
+
+        
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(new IntType(), getVariable("num")),
+                new Param(getStructType("B"), getVariable("b")),
+                new Param(getStructType("A"), getVariable("a"))));
+        
+        StructDef structDefA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExpA = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB2 = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("b"), getNullExp()),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("b"), allocExpB2),
+                    new StructActualParam(getVariable("a"), allocExpA))));
+        Statement vardecStmtB = new VardecStmt(getStructType("B"), getVariable("b"), allocExpB);
+
+        Expression dotExp = new DotExp(new VariableExp(getVariable("b")), getVariable("b"));
+        Statement vardecStmtInnerB = new VardecStmt(getStructType("B"), getVariable("innerB"), dotExp);
+
+        Expression innerDotExp = new DotExp(new VariableExp(getVariable("innerB")), getVariable("num"));
+        innerDotExp.setExpressionType(getIntType());
+        PrintlnStmt printlnStmt = new PrintlnStmt(innerDotExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(),
+                List.of(vardecStmtB, vardecStmtInnerB, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2");
+    }
+
+    @Test
+    public void testCodegenAbandoningVardecVariableDoesntFreeFromOtherReference() {
+        /*
+         * This should print 3
+         *
+         * struct B {
+         *   int num;
+         *   B b;
+         *   A a;
+         * }
+         *
+         * struct A {
+         *   A a;
+         * }
+         *
+         * B b = new B { 
+         *   num: 1,
+         *   b: new B {
+         *     num: 2,
+         *     b: new B {
+         *       num: 3,
+         *       b: null,
+         *       a: null
+         *     },
+         *     a: null
+         *   },
+         *   a: new A {
+         *     a: null
+         *   }
+         * };
+         * 
+         * B innerB = b.b.b;
+         * 
+         * b = null;
+         * 
+         * println(innerB.num);
+         */
+
+        
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(new IntType(), getVariable("num")),
+                new Param(getStructType("B"), getVariable("b")),
+                new Param(getStructType("A"), getVariable("a"))));
+        
+        StructDef structDefA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExpA = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB3 = new StructAllocExp(getStructType("B"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(3)),
+                        new StructActualParam(getVariable("b"), getNullExp()),
+                        new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB2 = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("b"), allocExpB3),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("b"), allocExpB2),
+                    new StructActualParam(getVariable("a"), allocExpA))));
+        Statement vardecStmtB = new VardecStmt(getStructType("B"), getVariable("b"), allocExpB);
+
+        Expression dotExp2 = new DotExp(new VariableExp(getVariable("b")), getVariable("b"));
+        Expression dotExp = new DotExp(dotExp2, getVariable("b"));
+        Statement vardecStmtInnerB = new VardecStmt(getStructType("B"), getVariable("innerB"), dotExp);
+
+        Statement assignStmt = new AssignStmt(getVariable("b"), getNullExp());
+
+        Expression innerDotExp = new DotExp(new VariableExp(getVariable("innerB")), getVariable("num"));
+        innerDotExp.setExpressionType(getIntType());
+        PrintlnStmt printlnStmt = new PrintlnStmt(innerDotExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(),
+                List.of(vardecStmtB, vardecStmtInnerB, assignStmt, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "3");
+    }
+
 
     @Test
     public void testCodegenWithExpressionStmt() {
@@ -506,7 +678,7 @@ public class CodegenTest {
         Statement dotExpStatement = new ExpressionStmt(dotExp);
 
         Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
-        testProgramGeneratesAndDoesNotThrow(program);
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
     @Test
@@ -813,7 +985,7 @@ public class CodegenTest {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
             Typechecker.typecheckProgram(program);
-            testProgramGeneratesAndDoesNotThrow(program, "3");
+            testProgramGeneratesAndDoesNotThrowOrLeak(program, "3");
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
         }
@@ -826,7 +998,7 @@ public class CodegenTest {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
             Typechecker.typecheckProgram(program);
-            testProgramGeneratesAndDoesNotThrow(program, "3", "false");
+            testProgramGeneratesAndDoesNotThrowOrLeak(program, "3", "false");
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
         }
