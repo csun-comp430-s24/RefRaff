@@ -1121,16 +1121,16 @@ public class Codegen {
         generateExpression(whileStmt.getCondition());
         addString(")\n");
 
-        // Braces aren't needed here, as braces will be included if it is a statement block
-        // or not included if there is a singular statement; including them will created a doubly nested
-        // statement block in the code
+        // I'm having it generate braces by default because if there's a single
+        // struct vardec statement, we'll be adding more retain/release function calls
+        // in the same scope
 
-        // Add to the indentation
-        currentIndentCount += 1;
         // generate statement(s)
-        generateStatements(List.of(whileStmt.getBody()));
-        // Subtract from the indentation
-        currentIndentCount -= 1;
+        if (whileStmt.getBody() instanceof StmtBlock) {
+            generateStatements(List.of(whileStmt.getBody()));
+        } else {
+            generateStatements(List.of(new StmtBlock(List.of(whileStmt.getBody()))));
+        }
     }
 
     private static final Map<Class<? extends Type>, Function<Type, String>> TYPE_TO_STR = Map.of(
