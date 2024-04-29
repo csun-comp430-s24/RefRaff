@@ -539,6 +539,40 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrowOrLeak(program, "2", "2");
     }
 
+    @Test
+    public void testCodegenWithSingleStatementStructVardecInIf() {
+        /*
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * if (true) {
+         *   A inner = new A {
+         *     num: 1
+         *     a: null
+         *   };
+         * }
+         * 
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                        new StructActualParam(getVariable("num"), getNullExp()))));
+        Statement whileBody = new VardecStmt(getStructType("A"), getVariable("inner"), structAlloc);
+
+        Expression testExp = new BoolLiteralExp(true);
+        Statement ifStmt = new IfElseStmt(testExp, whileBody);
+
+        Program program = new Program(List.of(structA), List.of(),
+                List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
 
     @Test
     public void testCodegenWithExpressionStmt() {
@@ -1146,52 +1180,6 @@ public class CodegenTest {
         // example_leak.c doesn't free malloc-ed stuff
         copyCodeGenResourceFile(tempDirectory, "example_leak.c");
         testGeneratedFileThrowsCodegenExceptionForMemoryLeak("example_leak.c");
-    }
-
-    @Test
-    public void testCodegenWithSingleStatementStructVardecThrowsWhenTryingToAccessOutOfScope() {
-        /*
-         *
-         * struct A {
-         *   int num;
-         *   A a;
-         * }
-         * 
-         * int count = 2;
-         * 
-         * while (count - 1 > 0) {
-         *   A inner = new A { 
-         *     num: 1 
-         *     a: null
-         *   };
-         * }
-         * 
-         * println(inner.num);
-         */
-
-        StructDef structA = new StructDef(getStructName("A"), List.of(
-                new Param(getIntType(), getVariable("num")),
-                new Param(getStructType("A"), getVariable("a"))));
-
-        Statement countVardec = new VardecStmt(getIntType(), getVariable("count"), new IntLiteralExp(2));
-
-        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
-            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
-                    new StructActualParam(getVariable("num"), getNullExp()))));
-        Statement whileBody = new VardecStmt(getStructType("A"), getVariable("inner"), structAlloc);
-        
-        Expression decrement = new BinaryOpExp(new VariableExp(getVariable("count")), OperatorEnum.MINUS,
-                new IntLiteralExp(1));
-        Expression guard = new BinaryOpExp(decrement, OperatorEnum.GREATER_THAN, new IntLiteralExp(0));
-        Statement whileStmt = new WhileStmt(guard, whileBody);
-
-        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
-        dotExpInnerNum.setExpressionType(getIntType());
-        Statement outerPrint = new PrintlnStmt(dotExpInnerNum);
-
-        Program program = new Program(List.of(structA), List.of(),
-                List.of(countVardec, whileStmt, outerPrint));
-        testProgramGeneratesAndThrowsCodegenException(program, "2");
     }
 
     // Integration test

@@ -1123,7 +1123,7 @@ public class Codegen {
 
         // I'm having it generate braces by default because if there's a single
         // struct vardec statement, we'll be adding more retain/release function calls
-        // in the same scope
+        // in the same scope 
 
         // generate statement(s)
         if (whileStmt.getBody() instanceof StmtBlock) {
