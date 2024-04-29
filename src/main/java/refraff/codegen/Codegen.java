@@ -600,53 +600,6 @@ public class Codegen {
      * THIS WILL BE FACTORED OUT! I'm just figuring things out
      */
 
-    // private void generateSelfSimilarStructAllocCall(final AssignStmt assignStmt) throws CodegenException {
-    //     // Get structdef so we know they types of the params
-    //     StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
-    //     StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-    //     List<Param> definedParams = structDef.getParams();
-
-    //     // Get actual params
-    //     StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
-    //     List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
-
-    //     // Go through params, allocate structs
-    //     for (int i = 0; i < structActualParams.size(); i++) {
-    //         // If this expression is a alloc expression, we need to go deeper!
-    //         if (structActualParams.get(i).getExpression() instanceof StructAllocExp childAlloc) {
-    //             // If this is the same struct type as the parent, then continue with this
-    //             // recursive function
-    //             if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
-    //                 StructType paramStructType = (StructType) definedParams.get(i).getType();
-    //                 Variable paramStructVariable = definedParams.get(i).getVariable();
-    //                 // Create a vardec to pass to the recursive function
-    //                 VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-    //                 // Send variable and allocation exp through this recursive function again to
-    //                 // allocate it first
-    //                 generateSelfSimilarStructAllocCall(childVardec);
-    //             } else {
-    //                 // Otherwise, we may have to make new temporary variable for possible struct
-    //                 // fields, call other function generator
-    //                 StructType paramStructType = (StructType) definedParams.get(i).getType();
-    //                 Variable paramStructVariable = definedParams.get(i).getVariable();
-    //                 // Create a vardec to pass to the recursive function
-    //                 VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-    //                 generateStructAllocFunctionCalls(childVardec);
-    //             }
-    //         }
-    //     }
-
-    //     // Make assignment for this temporary variable (it's already been initialized)
-    //     indentLine(currentIndentCount);
-    //     addString(getTempVariableName(assignStmt.getVariable(), structDef));
-    //     addString(" = ");
-    //     addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
-    //     addString("(");
-    //     generateCommaSeparatedArgs(assignStmt);
-    //     addString(")");
-    //     addSemicolonNewLine();
-    // }
-
     // Generate function calls for allocating new structs (recursive for nested
     // structs)
     private void generateStructAllocFunctionCalls(final AssignStmt assignStmt) throws CodegenException {
@@ -667,10 +620,6 @@ public class Codegen {
         // Get actual params
         StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
         List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
-
-        // Find the deepest struct allocation, allocate that first, and build our way
-        // out
-        // First just try with singly nested
 
         // Go through params (we'll need the defined params and the actual params for
         // this)
@@ -699,11 +648,6 @@ public class Codegen {
             }
         }
 
-        // We have to get all of the information for the last, outer most struct
-        // allocation first
-        // Which means all the nested structs and their allocations - so we can't start
-        // typing this function call yet
-        // So make a list of all of the struct params, get them together, then
         indentLine(currentIndentCount);
         generateVariable(assignStmt.getVariable());
         addString(" = ");
@@ -780,26 +724,23 @@ public class Codegen {
         addIndentedString("if (");
         generateExpression(ifElseStmt.getCondition());
         addString(")\n");
-        addIndentedString("{\n");
 
-        // Add to the indentation
-        currentIndentCount += 1;
-        // generate statement(s)
-        generateStatements(List.of(ifElseStmt.getIfBody()));
-        // Subtract from the indentation
-        currentIndentCount -= 1;
-
-        addIndentedString("}\n");
+        if (ifElseStmt.getIfBody() instanceof StmtBlock) {
+            generateStatements(List.of(ifElseStmt.getIfBody()));
+        } else {
+            generateStatements(List.of(new StmtBlock(List.of(ifElseStmt.getIfBody()))));
+        }
 
         // Add an else if there is one
         Optional<Statement> optionalElseBody = ifElseStmt.getElseBody();
         if (!optionalElseBody.isEmpty()) {
             addIndentedString("else\n");
-            addIndentedString("{\n");
-            currentIndentCount += 1;
-            generateStatements(List.of(optionalElseBody.get()));
-            currentIndentCount -= 1;
-            addIndentedString("}\n");
+            // generateStatements(List.of(optionalElseBody.get()));
+            if (ifElseStmt.getIfBody() instanceof StmtBlock) {
+                generateStatements(List.of(optionalElseBody.get()));
+            } else {
+                generateStatements(List.of(new StmtBlock(List.of(optionalElseBody.get()))));
+            }
         }
     }
 
@@ -857,7 +798,9 @@ public class Codegen {
         addNewLine();
 
         currentIndentCount += 1;
+        enterScope();
         generateStatements(stmtBlock.getBlockBody());
+        exitScope();
         currentIndentCount -= 1;
 
         indentLine(currentIndentCount);

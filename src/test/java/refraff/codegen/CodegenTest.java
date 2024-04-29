@@ -420,6 +420,61 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrowOrLeak(program, "3");
     }
 
+    @Test
+    public void testCodegenWithStructAssignmentsInIfStatementLoop() {
+        /*
+         * Should print 2, 2 and not leak
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * A outer = new A {
+         *   num: 1,
+         *   a: new A {
+         *     num: 2,
+         *     a: null
+         *   }
+         * };
+         * 
+         * if (true) {
+         *   A inner = outer.a;
+         *   println(inner.num);
+         * }
+         * 
+         * println(outer.a.num);
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+            new Param(getIntType(), getVariable("num")),
+            new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("a"), structAllocExp2))));
+        Statement outerVardec = new VardecStmt(getStructType("A"), getVariable("outer"), structAllocExp);
+
+        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
+        dotExpInnerNum.setExpressionType(getIntType());
+        Statement innerPrint = new PrintlnStmt(dotExpInnerNum);
+        Expression dotExpOuterA = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Statement innerVardec = new VardecStmt(getStructType("A"), getVariable("inner"), dotExpOuterA);
+        StmtBlock ifBody = new StmtBlock(List.of(innerVardec, innerPrint));
+        Statement ifStmt = new IfElseStmt(new BoolLiteralExp(true), ifBody);
+
+        Expression dotExpOuterA2 = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Expression dotExpDotNum = new DotExp(dotExpOuterA2, getVariable("num"));
+        dotExpDotNum.setExpressionType(getIntType());
+        Statement outerPrint = new PrintlnStmt(dotExpDotNum);
+
+        Program program = new Program(List.of(structA), List.of(), List.of(outerVardec, ifStmt, outerPrint));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2", "2");
+    }
+
 
     @Test
     public void testCodegenWithExpressionStmt() {
