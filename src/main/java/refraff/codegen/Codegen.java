@@ -73,7 +73,7 @@ public class Codegen {
 
             // TEMPORARY, REMOVE LATER
             // addString("Sleep(10000);");
-            addIndentedString("return 0;\n");
+            // addIndentedString("return 0;\n");
             currentIndentCount -= 1;
 
             // Close the main method
@@ -169,10 +169,10 @@ public class Codegen {
         addString(")");
         addSemicolonNewLine();
         // Set variable to null
-        addIndentedString(structVariable);
-        addString(" = ");
-        generateExpression(new NullExp());
-        addSemicolonNewLine();
+        // addIndentedString(structVariable);
+        // addString(" = ");
+        // generateExpression(new NullExp());
+        // addSemicolonNewLine();
     }
 
     private void exitScope() throws CodegenException {
@@ -585,10 +585,10 @@ public class Codegen {
 
     private void generateRetainFunctionCall(VardecStmt vardecStmt) throws CodegenException {
         StructType structType = structScopeManager.getStructTypeFromVariable(vardecStmt.getVariable().getName());
-        // refraff_<STRUCT_NAME>_retain(<STRUCT_COMPATIBLE_EXPRESSION>);
+        // refraff_<STRUCT_NAME>_retain(<VARIABLE_NAME>);
         addIndentedString(getRetainFunctionName(structType));
         addString("(");
-        generateExpression(vardecStmt.getExpression());
+        generateVariable(vardecStmt.getVariable());
         addString(")");
         addSemicolonNewLine();
     }
@@ -670,6 +670,17 @@ public class Codegen {
         addNewLine();
     }
 
+    // Parentheses mess up the allocation, so get rid of them
+    private AssignStmt getAssignStmtWithoutParens(AssignStmt assignStmt) {
+        if (assignStmt.getExpression() instanceof ParenExp parenExp) {
+            return getAssignStmtWithoutParens(
+                new AssignStmt(assignStmt.getVariable(), parenExp.getExp())
+            );
+        } else {
+            return assignStmt;
+        }
+    }
+
     /**
      * THIS WILL BE FACTORED OUT! I'm just figuring things out
      * *******************************************************************************************************************
@@ -684,6 +695,8 @@ public class Codegen {
             // Release whatever the variable was pointing to
             releaseStructVariable(assignStmt.getVariable().getName(), structType);
             // Assign expression to variable
+            // If the expression is in parens, get expression
+            assignStmt = getAssignStmtWithoutParens(assignStmt);
             if (assignStmt.getExpression() instanceof StructAllocExp) {
                 generateStructAllocFunctionCalls(assignStmt);
             } else {
@@ -696,7 +709,6 @@ public class Codegen {
                 generateRetainFunctionCall(assignStmt);
             }
             
-
         } else {
             indentLine(currentIndentCount);
             generateVariable(assignStmt.getVariable());
@@ -953,10 +965,14 @@ public class Codegen {
                 // Create the temporary variable if it has not been created yet
                 String tempVariableName = getTempVariableName(definedParam, structDef);
                 if (!structScopeManager.isInScope(tempVariableName)) {
-                    generateTempStructFieldVariableVardec(definedParam, structDef);
-                    structScopeManager.declareStructVariable(tempVariableName, structType);
+                    generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
+
+                    // generateTempStructFieldVariableVardec(definedParam, structDef);
+                    // structScopeManager.declareStructVariable(tempVariableName, structType);
                 } else {
                     // Otherwise, release the previous temporary variable
+                    // generateAssignStmt(new AssignStmt(new Variable(tempVariableName), new NullExp()));
+
                     releaseStructVariable(tempVariableName, structType);
                 }
             }
@@ -1090,6 +1106,16 @@ public class Codegen {
         addNewLine();
     }
 
+    // Parentheses mess up the allocation, so get rid of them
+    private VardecStmt getVardecStmtWithoutParens(VardecStmt vardecStmt) {
+        if (vardecStmt.getExpression() instanceof ParenExp parenExp) {
+            return getVardecStmtWithoutParens(
+                new VardecStmt(vardecStmt.getType(), vardecStmt.getVariable(), parenExp.getExp())
+            );
+        } else {
+            return vardecStmt;
+        }
+    }
 
     private void generateVardecStmt(final Statement stmt) throws CodegenException {
         VardecStmt vardecStmt = (VardecStmt)stmt;
@@ -1100,6 +1126,9 @@ public class Codegen {
             declareStructVariable(vardecStmt.getVariable().getName(), structType);
             // Also, we need to do something with the expression - if it's a struct (which it has to be)
             // Then  - if it's a new struct, we have to create a new one
+
+            // If the expression is in parens, get expression
+            vardecStmt = getVardecStmtWithoutParens(vardecStmt);
             if (vardecStmt.getExpression() instanceof StructAllocExp) {
                 generateStructAllocFunctionCallsFirst(vardecStmt);
             } else {
@@ -1239,12 +1268,25 @@ public class Codegen {
                 Function.identity());
     }
 
+    private Expression getExpressionWithoutParen(final Expression exp) {
+        if (exp instanceof ParenExp parenExp) {
+            return getExpressionWithoutParen(parenExp.getExp());
+        } else {
+            return exp;
+        }
+    }
+
     private void generateParenExp(final Expression exp) throws CodegenException {
         ParenExp parenExp = (ParenExp)exp;
 
-        addString("(");
-        generateExpression(parenExp.getExp());
-        addString(")");
+        // Struct alloc expression statements need to be generated without parens
+        if (getExpressionWithoutParen(exp) instanceof StructAllocExp structAllocExp) {
+            generateStructAllocExp(structAllocExp);
+        } else {
+            addString("(");
+            generateExpression(parenExp.getExp());
+            addString(")");
+        }
     }
 
     private void generateStructAllocExp(final Expression exp) throws CodegenException {
@@ -1253,8 +1295,18 @@ public class Codegen {
         // This method is going to make a call to the generated function for struct allocation in C
         // This will make our life easier trying to inline struct allocations
 
-        String allocationFunctionName = getStructAllocationFunctionName(structAllocExp.getStructType());
-        generateNamedFunctionCall(allocationFunctionName, structAllocExp.getParams().params, structParam -> structParam.exp);
+        // Right now, this is only called when a struct alloc expression is called by itself
+        // Create a vardec expression with a temporary variable. It will go nowhere and get cleaned up
+        // We could also just not generate this type of expression stmt
+        VardecStmt vardecStmt = new VardecStmt(
+            structAllocExp.getStructType(),
+            new Variable("_temp_alloc_exp_stmt"),
+            exp);
+        // vardecStmt = getVardecStmtWithoutParens(vardecStmt);
+        generateVardecStmt(vardecStmt);
+
+        // String allocationFunctionName = getStructAllocationFunctionName(structAllocExp.getStructType());
+        // generateNamedFunctionCall(allocationFunctionName, structAllocExp.getParams().params, structParam -> structParam.exp);
     }
 
     private void generateVarExp(final Expression exp) throws CodegenException {

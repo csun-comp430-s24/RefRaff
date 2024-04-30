@@ -603,6 +603,81 @@ public class CodegenTest {
     }
 
     @Test
+    public void testStructAllocInParens() {
+        /*
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a = (new A { a: null });
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testStructAllocExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         * A a;
+         * }
+         * 
+         * new A { a: null };
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement expStmt = new ExpressionStmt(structAlloc);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testStructAllocInParenExpressionInExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         * A a;
+         * }
+         * 
+         * (((new A { a: null })));
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement expStmt = new ExpressionStmt(parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
     public void testCodegenWithExpressionStmt() {
         /*
          * 3;
@@ -1212,7 +1287,7 @@ public class CodegenTest {
 
     // Integration test
 
-    // @Test
+    @Test
     public void testCodegenRefraffProgramWithoutException() {
         String input = ResourceUtil.readProgramInputFile();
         try {

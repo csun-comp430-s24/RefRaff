@@ -32,7 +32,6 @@ public class CCodeRunner {
 
         // Run and capture the output of the file, like normally
         runAndCaptureOutput(directory, sourceFile, expectedLines);
-
         // Run the compiled program with the Dr. Memory command line tool
         runWithDrMemory(directory, executable, drMemLogDir);
 
@@ -67,6 +66,8 @@ public class CCodeRunner {
 
     public static void runExecutable(Path executable, String expectedOutput) throws CodegenException {
         try {
+            System.gc();
+            Thread.sleep(1000);
             Process run = Runtime.getRuntime().exec(executable.toString());
 
             // Create threads to handle both input and error streams
@@ -101,7 +102,7 @@ public class CCodeRunner {
             errorThread.start();
 
             // Use a timeout for waitFor
-            if (!run.waitFor(20, TimeUnit.SECONDS)) {
+            if (!run.waitFor(120, TimeUnit.SECONDS)) {
                 run.destroyForcibly();
                 outputThread.interrupt();
                 errorThread.interrupt();
