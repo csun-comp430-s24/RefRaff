@@ -26,7 +26,6 @@ public class Codegen {
     private StructScopeManager structScopeManager;
 
     // This is to get the types of struct fields when instantiating from StructAllocExp that don't have that info
-    // MOVE THIS INTO THE STRUCT SCOPE MANAGER
     Map<String, StructDef> structNameToDef;
 
     private Codegen(Program program, File directory) {
@@ -168,11 +167,6 @@ public class Codegen {
         addString(structVariable);
         addString(")");
         addSemicolonNewLine();
-        // Set variable to null
-        // addIndentedString(structVariable);
-        // addString(" = ");
-        // generateExpression(new NullExp());
-        // addSemicolonNewLine();
     }
 
     private void exitScope() throws CodegenException {
@@ -238,12 +232,12 @@ public class Codegen {
         }
     }
 
-    private String getStructRefcountField(String structName) throws CodegenException {
-        return structName + "_refcount";
+    private String getStructRefcountField(StructType structType) throws CodegenException {
+        return getStructRefcountField(structType.getStructName().get().getName());
     }
 
-    private String getStructRefcountField(StructType structType) throws CodegenException {
-        return structType.getStructName().get().getName() + "_refcount";
+    private String getStructRefcountField(String structName) throws CodegenException {
+        return structName + "_refcount";
     }
 
     private void generateStructDef(StructDef structDef) throws CodegenException {
@@ -298,7 +292,7 @@ public class Codegen {
     private String getStructAllocationFunctionName(StructType structType) {
         String structName = structType.getStructName().get().getName();
 
-        // Return a function named: refraff_<STRUCT_NAME>_alloc
+        // Return a function name: refraff_<STRUCT_NAME>_alloc
         return "refraff_" + structName + "_alloc";
     }
 
@@ -323,6 +317,12 @@ public class Codegen {
          * <STRUCT_NAME>* refraff_<STRUCT_NAME>_alloc(<PARAMS>)
          * {
          *      <STRUCT_NAME>* newStruct = malloc(sizeof(struct <STRUCT_NAME>));
+         * 
+         *      if (newStruct == NULL) {
+         *          fprintf(stderr, "Failed to allocate memory!\n");
+         *          exit(EXIT_FAILURE);
+         *      }
+         * 
          *      newStruct-><STRUCT_NAME>_refcount = 1;
          *      newStruct->[FIELD_1] = [PARAM_1];
          *      newStruct->[FIELD_2] = [PARAM_2];
@@ -353,6 +353,15 @@ public class Codegen {
         addString(String.format(mallocFormat, structDef.getStructName().getName()));
         addNewLine();
         addNewLine();
+
+        // Check that struct was allocated
+        addIndentedString("if (newStruct == NULL)\n");
+        addIndentedString("\n");
+        currentIndentCount += 1;
+        addIndentedString("fprintf(stderr, \"Failed to allocate memory!\\n\");\n");
+        addIndentedString("exit(EXIT_FAILURE);\n");
+        currentIndentCount -= 1;
+        addIndentedString("}\n");
 
         // Initialize refcount
         final String refcountFieldInitializationFormat = "newStruct->%1$s = 1;";

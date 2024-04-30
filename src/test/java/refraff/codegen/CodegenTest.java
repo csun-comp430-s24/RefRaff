@@ -1242,6 +1242,8 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
 
+    
+
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, cSourceFile);
@@ -1255,9 +1257,28 @@ public class CodegenTest {
                 () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
     }
 
-    private void testProgramGeneratesAndThrowsCodegenException(Program program, String... expectedLines) {
-        assertDoesNotThrow(() -> Codegen.generateProgram(program, tempDirectory));
-        testGeneratedFileThrowsCodegenException("output.c", expectedLines);
+    @Test
+    public void structScopeManagerThrowsWhenExitingScopeOnEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        assertThrows(CodegenException.class, () -> structScopeManager.exitScope());
+    }
+
+    @Test
+    public void structScopeManagerThrowsWhenCheckingIfVariableIsInScopeOnEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        String variableName = "variableName";
+        assertThrows(CodegenException.class, () -> structScopeManager.isInScope(variableName));
+    }
+
+    @Test
+    public void structScopeManagerThrowsWhenAddingVariableToEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        String variableName = "variableName";
+        StructType structType = getStructType("structTypeName");
+        assertThrows(CodegenException.class, () -> structScopeManager.declareStructVariable(variableName, structType));
     }
 
     @Test
