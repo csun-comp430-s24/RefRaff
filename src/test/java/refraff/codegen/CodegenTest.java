@@ -540,6 +540,34 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenReassignStructVariableToNewStructAlloc() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a1 = new A { a: null };
+         * 
+         * a1 = new A { a: null };
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), allocExp);
+
+        Expression allocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement assignStmt = new AssignStmt(getVariable("a"), allocExp2);
+
+        Program program = new Program(List.of(structA), List.of(),
+                List.of(vardecStmt, assignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
     public void testCodegenWithSingleStatementStructVardecInIf() {
         /*
          *

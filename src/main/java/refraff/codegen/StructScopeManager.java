@@ -36,14 +36,23 @@ public class StructScopeManager {
         return variableToStructType.get(variableName);
     }
 
-    public Map<String, StructType> getCurrentScopeStructs() throws CodegenException {
+    public boolean isInScope(String variableName) throws CodegenException {
         try {
             Map<String, StructType> currentScope = scopeStack.peek();
-            return currentScope;
+            return currentScope.containsKey(variableName);
         } catch (EmptyStackException e) {
-            throw new CodegenException("Tried to get current scope, but scope stack was empty");
+            throw new CodegenException("Tried to add a variable to the current scope, but scope stack was empty");
         }
     }
+
+    // public Map<String, StructType> getCurrentScopeStructs() throws CodegenException {
+    //     try {
+    //         Map<String, StructType> currentScope = scopeStack.peek();
+    //         return currentScope;
+    //     } catch (EmptyStackException e) {
+    //         throw new CodegenException("Tried to get current scope, but scope stack was empty");
+    //     }
+    // }
 
     public Map<String, StructType> exitScope() throws CodegenException {
         try {

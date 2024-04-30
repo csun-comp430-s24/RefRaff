@@ -583,15 +583,21 @@ public class Codegen {
     }
 
     private void generateRetainFunctionCall(VardecStmt vardecStmt) throws CodegenException {
-        generateRetainFunctionCall(new AssignStmt(vardecStmt.getVariable(), vardecStmt.getExpression()));
+        StructType structType = structScopeManager.getStructTypeFromVariable(vardecStmt.getVariable().getName());
+        // refraff_<STRUCT_NAME>_retain(<STRUCT_COMPATIBLE_EXPRESSION>);
+        addIndentedString(getRetainFunctionName(structType));
+        addString("(");
+        generateExpression(vardecStmt.getExpression());
+        addString(")");
+        addSemicolonNewLine();
     }
 
     private void generateRetainFunctionCall(AssignStmt assignStmt) throws CodegenException {
         StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
-        // refraff_<STRUCT_NAME>_retain(<STRUCT_COMPATIBLE_EXPRESSION);
+        // refraff_<STRUCT_NAME>_retain(<VARIABLE_NAME>);
         addIndentedString(getRetainFunctionName(structType));
         addString("(");
-        generateExpression(assignStmt.getExpression());
+        generateVariable(assignStmt.getVariable());
         addString(")");
         addSemicolonNewLine();
     }
@@ -610,12 +616,7 @@ public class Codegen {
         List<Param> definedParams = structDef.getParams();
 
         // First, allocate temporary variables for each struct field
-        for (Param definedParam : definedParams) {
-            // If this param is a struct
-            if (definedParam.getType() instanceof StructType) {
-                generateTempStructFieldVariableVardec(definedParam, structDef);
-            }
-        }
+        allocateTemporaryStructVariables(definedParams, structDef);
 
         // Get actual params
         StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
@@ -941,6 +942,25 @@ public class Codegen {
         addSemicolonNewLine();
     }
 
+    private void allocateTemporaryStructVariables(List<Param> definedParams, StructDef structDef)
+            throws CodegenException {
+        // First, allocate temporary variables for each struct field
+        for (Param definedParam : definedParams) {
+            // If this param is a struct
+            if (definedParam.getType() instanceof StructType structType) {
+                // Create the temporary variable if it has not been created yet
+                String tempVariableName = getTempVariableName(definedParam, structDef);
+                if (!structScopeManager.isInScope(tempVariableName)) {
+                    generateTempStructFieldVariableVardec(definedParam, structDef);
+                    structScopeManager.declareStructVariable(tempVariableName, structType);
+                } else {
+                    // Otherwise, release the previous temporary variable
+                    releaseStructVariable(tempVariableName, structType);
+                }
+            }
+        }
+    }
+
     // Generate function calls for allocating new structs (recursive for nested structs)
     private void generateStructAllocFunctionCalls(final VardecStmt vardecStmt, final StructDef parentStructDef) throws CodegenException {
         // Get structdef so we know they types of the params
@@ -950,12 +970,7 @@ public class Codegen {
         List<Param> definedParams = structDef.getParams();
 
         // First, allocate temporary variables for each struct field
-        for (Param definedParam: definedParams) {
-            // If this param is a struct
-            if (definedParam.getType() instanceof StructType) {
-                generateTempStructFieldVariableVardec(definedParam, structDef);
-            }
-        }
+        allocateTemporaryStructVariables(definedParams, structDef);
 
         // Get actual params
         StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
@@ -1021,12 +1036,7 @@ public class Codegen {
         List<Param> definedParams = structDef.getParams();
 
         // First, allocate temporary variables for each struct field
-        for (Param definedParam: definedParams) {
-            // If this param is a struct
-            if (definedParam.getType() instanceof StructType) {
-                generateTempStructFieldVariableVardec(definedParam, structDef);
-            }
-        }
+        allocateTemporaryStructVariables(definedParams, structDef);
 
         // Get actual params
         StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
