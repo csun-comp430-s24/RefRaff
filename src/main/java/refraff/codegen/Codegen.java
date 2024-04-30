@@ -73,6 +73,7 @@ public class Codegen {
 
             // TEMPORARY, REMOVE LATER
             // addString("Sleep(10000);");
+            addIndentedString("return 0;\n");
             currentIndentCount -= 1;
 
             // Close the main method
@@ -691,9 +692,10 @@ public class Codegen {
                 addString(" = ");
                 generateExpression(assignStmt.getExpression());
                 addSemicolonNewLine();
+                // Retain whatever the variable is now pointing to
+                generateRetainFunctionCall(assignStmt);
             }
-            // Retain whatever the variable is now pointing to
-            generateRetainFunctionCall(assignStmt);
+            
 
         } else {
             indentLine(currentIndentCount);

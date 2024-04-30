@@ -20,8 +20,6 @@ import refraff.tokenizer.Tokenizer;
 import refraff.tokenizer.TokenizerException;
 import refraff.util.ResourceUtil;
 
-import java.util.List;
-import java.util.ArrayList;
 import java.util.*;
 
 import static org.junit.Assert.*;
@@ -81,6 +79,26 @@ public class TypecheckerTest {
         StructDef structDef = new StructDef(getStructName("A"), List.of(
                 new Param(getStructType("A"), getVariable("a"))
         ));
+
+        Program program = new Program(List.of(structDef), List.of(), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStructAllocInParens() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a = (new A { a: null });
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
 
         Program program = new Program(List.of(structDef), List.of(), List.of());
         testDoesNotThrowTypecheckerException(program);

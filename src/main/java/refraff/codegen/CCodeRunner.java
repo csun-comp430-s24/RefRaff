@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.lang.InterruptedException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 // This runs the generated code and throws exceptions if the code won't compile, run,
 // output the expected output, or has memory leaks
@@ -66,29 +67,98 @@ public class CCodeRunner {
 
     public static void runExecutable(Path executable, String expectedOutput) throws CodegenException {
         try {
-            // Run the compiled C program
             Process run = Runtime.getRuntime().exec(executable.toString());
-            BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
 
-            String line;
+            // Create threads to handle both input and error streams
+            BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(run.getErrorStream()));
             StringBuilder output = new StringBuilder();
-            while ((line = outputReader.readLine()) != null) {
-                output.append(line + "\n");
+            StringBuilder errors = new StringBuilder();
+
+            Thread outputThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = outputReader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            Thread errorThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = errorReader.readLine()) != null) {
+                        errors.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            outputThread.start();
+            errorThread.start();
+
+            // Use a timeout for waitFor
+            if (!run.waitFor(20, TimeUnit.SECONDS)) {
+                run.destroyForcibly();
+                outputThread.interrupt();
+                errorThread.interrupt();
+                throw new CodegenException("Executable timed out: " + executable);
             }
 
-            // I don't know if we want to do anything about the exit code
-            int exitCode = run.waitFor();
+            // Ensure all output is processed
+            outputThread.join();
+            errorThread.join();
 
-            // Compare outputs, throw exception if they don't match
+            // Check for errors in the output
+            if (errors.length() > 0) {
+                System.out.println("Error Output: " + errors.toString());
+            }
+
+            // Compare outputs
             if (!output.toString().trim().equals(expectedOutput.trim())) {
-                throw new CodegenException("Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
+                throw new CodegenException(
+                        "Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
             }
 
         } catch (IOException | InterruptedException e) {
             throw new CodegenException("Could not run executable: " + executable);
         }
-
     }
+
+    // public static void runExecutable(Path executable, String expectedOutput) throws CodegenException {
+    //     try {
+    //         System.out.println("Running program: " + executable.toString());
+    //         // Run the compiled C program
+    //         Process run = Runtime.getRuntime().exec(executable.toString());
+    //         Thread.sleep(1000);
+    //         BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
+
+    //         String line;
+    //         StringBuilder output = new StringBuilder();
+    //         while ((line = outputReader.readLine()) != null) {
+    //             output.append(line + "\n");
+    //         }
+
+    //         // I don't know if we want to do anything about the exit code
+    //         // int exitCode = run.waitFor();
+    //         if (!run.waitFor(3, TimeUnit.SECONDS)) {  // Wait for up to 10 seconds
+    //             System.out.println("Here");
+    //             run.destroy();  // Terminate the process if it doesn't finish in time
+    //             throw new CodegenException("Executable timed out: " + executable);
+    //         }
+
+    //         // Compare outputs, throw exception if they don't match
+    //         if (!output.toString().trim().equals(expectedOutput.trim())) {
+    //             throw new CodegenException("Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
+    //         }
+
+    //     } catch (IOException | InterruptedException e) {
+    //         throw new CodegenException("Could not run executable: " + executable);
+    //     }
+    // }
 
     public static void runWithDrMemory(File directory, Path executable, Path drMemLogDir)
             throws CodegenException {
