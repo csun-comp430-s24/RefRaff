@@ -170,6 +170,9 @@ public class Codegen {
     }
 
     private void exitScope() throws CodegenException {
+        addNewLine();
+        addIndentedString("// Exiting scope");
+        addNewLine();
         // Get the list of struct variables that were declared in the current scope
         Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
         
@@ -408,7 +411,6 @@ public class Codegen {
         }
     }
 
-    //
     private void generateStructRetainFunction(StructDef structDef) throws CodegenException {
         /*
          * Generates a function to add to the reference count when a struct object is assigned
@@ -459,7 +461,6 @@ public class Codegen {
         return "refraff_" + structType.getStructName().get().getName() + "_release";
     }
 
-    // I THINK THIS NEEDS TO RELEASE CHILDREN WHETHER OR NOT THE REFCOUNT IS 1
     private void generateStructReleaseFunction(StructDef structDef) throws CodegenException {
         /*
          * Generates a function to decrement to the reference count when a struct variable is 
@@ -602,12 +603,7 @@ public class Codegen {
         addSemicolonNewLine();
     }
 
-    /*********************************************************************************************************************
-     * THIS WILL BE FACTORED OUT! I'm just figuring things out
-     */
-
-    // Generate function calls for allocating new structs (recursive for nested
-    // structs)
+    // Generate function calls for allocating new structs (recursive for nested structs)
     private void generateStructAllocFunctionCalls(final AssignStmt assignStmt) throws CodegenException {
         // Get structdef so we know they types of the params
         StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
@@ -615,40 +611,27 @@ public class Codegen {
         // Get params (for types)
         List<Param> definedParams = structDef.getParams();
 
-        // First, allocate temporary variables for each struct field
-        allocateTemporaryStructVariables(definedParams, structDef);
+        // First, make sure temporary variables for each struct field are declared
+        generateDeclareTemporaryStructVariables(definedParams, structDef);
 
         // Get actual params
         StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
         List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
 
-        // Go through params (we'll need the defined params and the actual params for
-        // this)
+        // Go through params (we'll need the defined params and the actual params for this)
         for (int i = 0; i < structActualParams.size(); i++) {
-            // for (StructActualParam actualParam: structActualParams) {
             // But if it's a struct, we need to allocate that, then assign it to this struct
-            if (structActualParams.get(i).getExpression() instanceof StructAllocExp childAlloc) {
-                // If this is the same type of struct, then use the selfsame function (we don't
-                // need to make new temp variable)
-                if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateSelfSimilarStructAllocCall(childVardec);
-                } else {
-                    // Otherwise, we'll need to generate more temporary variables for the new strut
-                    // type's fields
-                    // Get the new struct's type from the defined params
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateStructAllocFunctionCalls(childVardec, structDef);
-                }
+            if (structActualParams.get(i).getExpression() instanceof StructAllocExp fieldAlloc) {
+                // HERE!!! WHAT DO WE NEED TO DO FOR THIS? CAN WE JUST SENT IT TO GEN ALLOC??
+                // If this is the same type of struct, then use the selfsame function (we don't need to make new temp variable)
+                AssignStmt fieldAssignStmt = new AssignStmt(
+                        new Variable(getTempVariableName(definedParams.get(i), structDef)),
+                        fieldAlloc);
+                generateStructAllocFunctionCalls(fieldAssignStmt);
             }
         }
 
+        // Then allocate this struct, assign it to this variable
         indentLine(currentIndentCount);
         generateVariable(assignStmt.getVariable());
         addString(" = ");
@@ -657,16 +640,6 @@ public class Codegen {
         generateCommaSeparatedArgs(assignStmt);
         addString(")");
         addSemicolonNewLine();
-
-        // Get rid of temporary references
-        // First, allocate temporary variables for each struct field
-        for (Param definedParam : definedParams) {
-            // If this param is a struct
-            if (definedParam.getType() instanceof StructType) {
-                generateTempStructFieldVariable(definedParam, structDef);
-            }
-        }
-        addNewLine();
     }
 
     // Parentheses mess up the allocation, so get rid of them
@@ -680,32 +653,38 @@ public class Codegen {
         }
     }
 
-    /**
-     * THIS WILL BE FACTORED OUT! I'm just figuring things out
-     * *******************************************************************************************************************
-     */
-
     private void generateAssignStmt(final Statement stmt) throws CodegenException {
         AssignStmt assignStmt = (AssignStmt) stmt;
 
         // Check if this is a struct variable
         if (structScopeManager.isStructVariable(assignStmt.getVariable().getName())) {
             StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
+            addNewLine();
+            addIndentedString("// Generating assignment stmt for struct " + structType.getStructName().get().getName());
+            addNewLine();
+
             // Release whatever the variable was pointing to
             releaseStructVariable(assignStmt.getVariable().getName(), structType);
             // Assign expression to variable
             // If the expression is in parens, get expression
             assignStmt = getAssignStmtWithoutParens(assignStmt);
-            if (assignStmt.getExpression() instanceof StructAllocExp) {
-                generateStructAllocFunctionCalls(assignStmt);
+            if (assignStmt.getExpression() instanceof StructAllocExp structAllocExp) {
+                // Allocate the struct, it will be assigned to a temporary variable
+                generateStructAllocExp(structAllocExp);
+                // Then assign it to this statement
+                AssignStmt assignWithTemp = new AssignStmt(assignStmt.getVariable(),
+                        new VariableExp(getTempStructAllocVariable(structType)));
+                generateAssignStmt(assignWithTemp);
             } else {
                 indentLine(currentIndentCount);
                 generateVariable(assignStmt.getVariable());
                 addString(" = ");
                 generateExpression(assignStmt.getExpression());
                 addSemicolonNewLine();
-                // Retain whatever the variable is now pointing to
-                generateRetainFunctionCall(assignStmt);
+                // Retain whatever the variable is now pointing to (if not null)
+                if (!(assignStmt.getExpression() instanceof NullExp)) {
+                    generateRetainFunctionCall(assignStmt);
+                }
             }
             
         } else {
@@ -718,8 +697,6 @@ public class Codegen {
     }
 
     private void generateBreakStmt(final Statement stmt) throws CodegenException {
-        BreakStmt breakStmt = (BreakStmt)stmt;
-
         addIndentedString("break;\n");
     }
 
@@ -831,35 +808,6 @@ public class Codegen {
         return "_temp_" + parentStructDef.getStructName().getName() + "_" + paramVariable.getName();
     }
 
-    // Tried to just send this info to generateCommaSeparatedArgs version with assignmentStmt,
-    // But was getting null for the StructType, so I need to factor this out another way
-    private void generateCommaSeparatedArgs(final VardecStmt vardecStmt) throws CodegenException {
-        // Get structdef so we know they types of the params
-        StructType structType = (StructType) vardecStmt.getType();
-        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-        List<Param> definedParams = structDef.getParams();
-
-        // Get actual params
-        StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
-        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
-
-        for (int i = 0; i < structActualParams.size(); i++) {
-            // If it's a primitive, just use the expression, otherwise, use the temporary
-            // struct variable
-            if (definedParams.get(i).getType() instanceof IntType
-                    || definedParams.get(i).getType() instanceof BoolType) {
-                generateExpression(structActualParams.get(i).getExpression());
-            } else {
-                // Otherwise, get the temporary variable holding the address of the struct
-                addString(getTempVariableName(definedParams.get(i), structDef));
-            }
-
-            if (i != structActualParams.size() - 1) {
-                addString(", ");
-            }
-        }
-    }
-
     // Generate arguments for allocating new structs with the generated struct alloc functions
     private void generateCommaSeparatedArgs(final AssignStmt assignStmt) throws CodegenException {
         // Get structdef so we know they types of the params
@@ -886,77 +834,7 @@ public class Codegen {
         }
     }
 
-    // Generate a struct variable for a struct that will be assigned to a field of another struct
-    // When we have multiple levels of nested structs, we can reuse this variable when creating them
-    private void generateTempStructFieldVariableVardec(final Param definedParam, final StructDef parentStructDef) 
-            throws CodegenException {
-        // <STRUCT_NAME>* temp_<variable> = NULL;
-        StructType structType = (StructType) definedParam.getType();
-        indentLine(currentIndentCount);
-        generateType(structType);
-        addSpace();
-        addString(getTempVariableName(definedParam, parentStructDef));
-        addString(" = ");
-        generateExpression(new NullExp());
-        addSemicolonNewLine();
-    }
-
-    private void generateTempStructFieldVariable(final Param definedParam, final StructDef parentStructDef)
-            throws CodegenException {
-        // temp_<variable> = NULL;
-        indentLine(currentIndentCount);
-        addString(getTempVariableName(definedParam, parentStructDef));
-        addString(" = ");
-        generateExpression(new NullExp());
-        addSemicolonNewLine();
-    }
-
-    private void generateSelfSimilarStructAllocCall(VardecStmt vardecStmt) 
-            throws CodegenException {
-        // Get structdef so we know they types of the params
-        StructType structType = (StructType) vardecStmt.getType();
-        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-        List<Param> definedParams = structDef.getParams();
-
-        // Get actual params
-        StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
-        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
-
-        // Go through params, allocate structs
-        for (int i = 0; i < structActualParams.size(); i++) {
-            // If this expression is a alloc expression, we need to go deeper!
-            if (structActualParams.get(i).getExpression() instanceof StructAllocExp childAlloc) {
-                // If this is the same struct type as the parent, then continue with this recursive function
-                if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    // Send variable and allocation exp through this recursive function again to allocate it first
-                    generateSelfSimilarStructAllocCall(childVardec);
-                } else {
-                    // Otherwise, we may have to make new temporary variable for possible struct fields, call other function generator
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateStructAllocFunctionCalls(childVardec, structDef);
-                }
-            }
-        }
-        
-        // Make assignment for this temporary variable (it's already been initialized)
-        indentLine(currentIndentCount);
-        addString(getTempVariableName(vardecStmt.getVariable(), structDef));
-        addString(" = ");
-        addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
-        addString("(");
-        generateCommaSeparatedArgs(vardecStmt);
-        addString(")");
-        addSemicolonNewLine();
-    }
-
-    private void allocateTemporaryStructVariables(List<Param> definedParams, StructDef structDef)
+    private void generateDeclareTemporaryStructVariables(List<Param> definedParams, StructDef structDef)
             throws CodegenException {
         // First, allocate temporary variables for each struct field
         for (Param definedParam : definedParams) {
@@ -977,133 +855,6 @@ public class Codegen {
                 }
             }
         }
-    }
-
-    // Generate function calls for allocating new structs (recursive for nested structs)
-    private void generateStructAllocFunctionCalls(final VardecStmt vardecStmt, final StructDef parentStructDef) throws CodegenException {
-        // Get structdef so we know they types of the params
-        StructType structType = (StructType) vardecStmt.getType();
-        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-        // Get params (for types)
-        List<Param> definedParams = structDef.getParams();
-
-        // First, allocate temporary variables for each struct field
-        allocateTemporaryStructVariables(definedParams, structDef);
-
-        // Get actual params
-        StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
-        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams(); // Change these function names -_-
-        
-        // Find the deepest struct allocation, allocate that first, and build our way out
-        // First just try with singly nested
-        
-        // Go through params (we'll need the defined params and the actual params for this)
-        for (int i = 0; i < structActualParams.size(); i++) {
-        // for (StructActualParam actualParam: structActualParams) {
-            // But if it's a struct, we need to allocate that, then assign it to this struct
-            if (structActualParams.get(i).getExpression() instanceof StructAllocExp childAlloc) {
-                // If this is the same type of struct, then use the selfsame function (we don't need to make new temp variable)
-                if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateSelfSimilarStructAllocCall(childVardec);
-                } else {
-                    // Otherwise, we'll need to generate more temporary variables for the new strut type's fields
-                    // Get the new struct's type from the defined params
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateStructAllocFunctionCalls(childVardec, structDef);
-                }
-            }
-        }
-
-        // We have to get all of the information for the last, outer most struct allocation first
-        // Which means all the nested structs and their allocations - so we can't start typing this function call yet
-        // So make a list of all of the struct params, get them together, then
-        // WE WILL ALSO HAVE TO DO THIS BUT WITH AN ASSIGNMENT - ANNOYING, BUT WE WON'T ALWAYS HAVE STRUCT TYPE
-        indentLine(currentIndentCount);
-        addString(getTempVariableName(vardecStmt.getVariable(), parentStructDef));
-        addString(" = ");
-        addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
-        addString("(");
-        generateCommaSeparatedArgs(vardecStmt);
-        addString(")");
-        addSemicolonNewLine();
-
-        // // Get rid of temporary references
-        // // First, allocate temporary variables for each struct field
-        // for (Param definedParam : definedParams) {
-        //     // If this param is a struct
-        //     if (definedParam.getType() instanceof StructType) {
-        //         generateTempStructFieldVariable(definedParam, structDef);
-        //     }
-        // }
-        addNewLine();
-    }
-
-    // Generate function calls for allocating new structs (recursive for nested structs)
-    private void generateStructAllocFunctionCallsFirst(final VardecStmt vardecStmt) throws CodegenException {
-        // Get structdef so we know they types of the params
-        StructType structType = (StructType) vardecStmt.getType();
-        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-        // Get params (for types)
-        List<Param> definedParams = structDef.getParams();
-
-        // First, allocate temporary variables for each struct field
-        allocateTemporaryStructVariables(definedParams, structDef);
-
-        // Get actual params
-        StructAllocExp structAllocExp = (StructAllocExp) vardecStmt.getExpression();
-        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams(); 
-        
-        // Go through params (we'll need the defined params and the actual params for this)
-        for (int i = 0; i < structActualParams.size(); i++) {
-        // for (StructActualParam actualParam: structActualParams) {
-            // But if it's a struct, we need to allocate that, then assign it to this struct
-            if (structActualParams.get(i).getExpression() instanceof StructAllocExp childAlloc) {
-                // If this is the same type of struct, then use the selfsame function (we don't need to make new temp variable)
-                if (childAlloc.getStructType().hasTypeEquality(structAllocExp.getStructType())) {
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateSelfSimilarStructAllocCall(childVardec);
-                } else {
-                    // Otherwise, we'll need to generate more temporary variables for the new strut type's fields
-                    // Get the new struct's type from the defined params
-                    StructType paramStructType = (StructType) definedParams.get(i).getType();
-                    Variable paramStructVariable = definedParams.get(i).getVariable();
-                    // Create a vardec to pass to the recursive function
-                    VardecStmt childVardec = new VardecStmt(paramStructType, paramStructVariable, childAlloc);
-                    generateStructAllocFunctionCalls(childVardec, structDef);
-                }
-            }
-        }
-
-        indentLine(currentIndentCount);
-        generateType(vardecStmt.getType());
-        addSpace();
-        generateVariable(vardecStmt.getVariable());
-        addString(" = ");
-        addString(getStructAllocationFunctionName(structAllocExp.getStructType()));
-        addString("(");
-        generateCommaSeparatedArgs(vardecStmt);
-        addString(")");
-        addSemicolonNewLine();
-
-        // // Get rid of temporary references
-        // // First, allocate temporary variables for each struct field
-        // for (Param definedParam : definedParams) {
-        //     // If this param is a struct
-        //     if (definedParam.getType() instanceof StructType) {
-        //         generateTempStructFieldVariable(definedParam, structDef);
-        //     }
-        // }
-        addNewLine();
     }
 
     // Parentheses mess up the allocation, so get rid of them
@@ -1129,8 +880,13 @@ public class Codegen {
 
             // If the expression is in parens, get expression
             vardecStmt = getVardecStmtWithoutParens(vardecStmt);
-            if (vardecStmt.getExpression() instanceof StructAllocExp) {
-                generateStructAllocFunctionCallsFirst(vardecStmt);
+            if (vardecStmt.getExpression() instanceof StructAllocExp structAllocExp) {
+                // Allocate the struct, it will be assigned to a temporary variable
+                generateStructAllocExp(structAllocExp);
+                // Then assign it to this statement
+                VardecStmt vardecWithTemp = new VardecStmt(structType, vardecStmt.getVariable(), 
+                    new VariableExp(getTempStructAllocVariable(structType)));
+                generateVardecStmt(vardecWithTemp);
             } else {
                 // Assign the expression
                 indentLine(currentIndentCount);
@@ -1140,8 +896,10 @@ public class Codegen {
                 addString(" = ");
                 generateExpression(vardecStmt.getExpression());
                 addSemicolonNewLine();
-                // Then retain the struct
-                generateRetainFunctionCall(vardecStmt);
+                // Then retain the struct if not null
+                if (!(vardecStmt.getExpression() instanceof NullExp)) {
+                    generateRetainFunctionCall(vardecStmt);
+                }
             }
         } else {
             // Otherwise, it's any primitive type
@@ -1289,24 +1047,37 @@ public class Codegen {
         }
     }
 
+    private String getTempStructAllocVariableName(StructType structType) {
+        String structName = structType.getStructName().get().getName();
+        return "_temp_" + structName + "_struct_alloc_var";
+    }
+
+    private Variable getTempStructAllocVariable(StructType structType) {
+        return new Variable(getTempStructAllocVariableName(structType));
+    }
+
     private void generateStructAllocExp(final Expression exp) throws CodegenException {
         StructAllocExp structAllocExp = (StructAllocExp) exp;
+        StructType structType = structAllocExp.getStructType();
+        addNewLine();
+        addIndentedString("// Allocating struct " + structAllocExp.getStructType().getStructName().get().getName());
+        addNewLine();
 
-        // This method is going to make a call to the generated function for struct allocation in C
-        // This will make our life easier trying to inline struct allocations
+        String tempAllocVariableName = getTempStructAllocVariableName(structType);
+        Variable tempAllocVariable = new Variable(tempAllocVariableName);
+        if (!structScopeManager.isInScope(tempAllocVariableName)) {
+            // Instantiate temporary struct alloc variable if it has not been already
+            generateVardecStmt(new VardecStmt(structType, tempAllocVariable, new NullExp()));
+        } else {
+            // Otherwise, release the temporary variable so we can use it to allocate this new one
+            // Also - I don't think I even need to do this. It will be release when we assign it a new value
+            generateAssignStmt(new AssignStmt(tempAllocVariable, new NullExp()));
+        }
 
-        // Right now, this is only called when a struct alloc expression is called by itself
-        // Create a vardec expression with a temporary variable. It will go nowhere and get cleaned up
-        // We could also just not generate this type of expression stmt
-        VardecStmt vardecStmt = new VardecStmt(
-            structAllocExp.getStructType(),
-            new Variable("_temp_alloc_exp_stmt"),
-            exp);
-        // vardecStmt = getVardecStmtWithoutParens(vardecStmt);
-        generateVardecStmt(vardecStmt);
-
-        // String allocationFunctionName = getStructAllocationFunctionName(structAllocExp.getStructType());
-        // generateNamedFunctionCall(allocationFunctionName, structAllocExp.getParams().params, structParam -> structParam.exp);
+        // Then allocate the expression, storing it in the temporary variable
+        // The temporary variable can then be assigned to another variable in a vardec or assignment stmt
+        AssignStmt allocAssignStmt = new AssignStmt(tempAllocVariable, structAllocExp);
+        generateStructAllocFunctionCalls(allocAssignStmt);
     }
 
     private void generateVarExp(final Expression exp) throws CodegenException {
@@ -1339,7 +1110,6 @@ public class Codegen {
         generateExpression(UnaryOpExp.getExp());
     }
 
-    // I don't know if I need this one? Is this one function too deep, lol
     private void generateVariable(final Variable variable) throws CodegenException {
         addString(variable.getName());
     }
