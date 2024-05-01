@@ -95,7 +95,7 @@ public class CodegenTest {
     // A temporary directory that is created for each individual test
     // CleanupMode.ON_SUCCESS will leave the directory open, so you can inspect the temporary directory for debugging.
     // The CleanupMode can be changed for debugging purposes: https://junit.org/junit5/docs/5.9.1/api/org.junit.jupiter.api/org/junit/jupiter/api/io/CleanupMode.html
-    @TempDir(cleanup = CleanupMode.ON_SUCCESS)
+    @TempDir(cleanup = CleanupMode.NEVER)
     File tempDirectory;
 
     @Test
@@ -634,7 +634,7 @@ public class CodegenTest {
          * codegen
          *
          * struct A {
-         * A a;
+         *   A a;
          * }
          * 
          * new A { a: null };
@@ -659,7 +659,7 @@ public class CodegenTest {
          * codegen
          *
          * struct A {
-         * A a;
+         *   A a;
          * }
          * 
          * (((new A { a: null })));
@@ -861,11 +861,35 @@ public class CodegenTest {
         /*
          * println(6);
          */
-        Statement printLnStmt = new PrintlnStmt(new IntLiteralExp(6));
+        Statement printlnStmt = new PrintlnStmt(new IntLiteralExp(6));
 
-        Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
+        Program program = new Program(List.of(), List.of(), List.of(printlnStmt));
         String expectedOutput = "6";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithParenInMathExp() {
+        /*
+         * Should print 10, then 16
+         * 
+         * println(2 + 2 * 4);
+         * 
+         * println((2 + 2) * 4);
+         */
+
+        Expression mult10 = new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.MULTIPLY, new IntLiteralExp(4));
+        Expression math10 = new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.PLUS, mult10);
+        math10.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(math10);
+
+        Expression parenExp = new ParenExp(new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.PLUS, new IntLiteralExp(2)));
+        Expression math16 = new BinaryOpExp(parenExp, OperatorEnum.MULTIPLY, new IntLiteralExp(4));
+        math16.setExpressionType(getIntType());
+        Statement printlnStmt2 = new PrintlnStmt(math16);
+
+        Program program = new Program(List.of(), List.of(), List.of(printlnStmt, printlnStmt2));
+        testProgramGeneratesAndDoesNotThrow(program, "10", "16");
     }
 
     @Test
@@ -935,6 +959,65 @@ public class CodegenTest {
         Statement dotExpStatement = new ExpressionStmt(dotExp);
 
         Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenAllocateStructToTheSameVariableMultipleTimes() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * A a = new A {
+         *   a: null
+         * };
+         * 
+         * a = new A {
+         *   a: null
+         * };
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement vardec = new VardecStmt(getStructType("A"), getVariable("a"), structAlloc);
+
+        Expression structAlloc2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement assign = new AssignStmt(getVariable("a"), structAlloc2);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardec, assign));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenAssignStmtWithStructAllocInParen() {
+        /*
+         * This foolishness is for code coverage
+         *  
+         * struct A {
+         *   A a;
+         * }
+         *
+         * A a = null
+         * 
+         * a = (new A { a: null };
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Statement vardec = new VardecStmt(getStructType("A"), getVariable("a"), getNullExp());
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement assign = new AssignStmt(getVariable("a"), parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardec, assign));
         testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
@@ -1051,6 +1134,39 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenAssignStmtWithMultipleNonStructFields() {
+        /*
+         * For coverage
+         * 
+         * struct A {
+         *   int num;
+         *   bool tof;
+         * }
+         *
+         * A a = null;
+         * 
+         * a = new A {
+         *   num: 1,
+         *   tof: true
+         * };
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getBoolType(), getVariable("tof"))));
+
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), getNullExp());
+
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("tof"), new BoolLiteralExp(true)))));
+        Statement assignStmt = new AssignStmt(getVariable("a"), structAllocExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecStmt, assignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
     public void testCodegenWithOrExpCondition() {
         /*
          * This should print because `6 || 0` should evaluate to 1
@@ -1069,6 +1185,48 @@ public class CodegenTest {
         Statement ifStmt = new IfElseStmt(condition, ifBody);
         Program program = new Program(List.of(), List.of(), List.of(ifStmt));
         String expectedOutput = "3";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithElseBlock() {
+        /*
+         * This should print 2
+         *
+         * if (false) {
+         *   println(1);
+         * } else {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Statement elseBody = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition = new BoolLiteralExp(false);
+        Statement ifStmt = new IfElseStmt(condition, ifBody, elseBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        String expectedOutput = "2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithElseStmtBlock() {
+        /*
+         * This should print 2 - for coverage
+         *
+         * if (false) {
+         *   println(1);
+         * } else {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Statement elseStmtBlock = new StmtBlock(List.of(new PrintlnStmt(new IntLiteralExp(2))));
+        Expression condition = new BoolLiteralExp(false);
+        Statement ifStmt = new IfElseStmt(condition, ifBody, elseStmtBlock);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        String expectedOutput = "2";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
 

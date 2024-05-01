@@ -589,13 +589,7 @@ public class Codegen {
     }
 
     private void generateRetainFunctionCall(VardecStmt vardecStmt) throws CodegenException {
-        StructType structType = structScopeManager.getStructTypeFromVariable(vardecStmt.getVariable().getName());
-        // refraff_<STRUCT_NAME>_retain(<VARIABLE_NAME>);
-        addIndentedString(getRetainFunctionName(structType));
-        addString("(");
-        generateVariable(vardecStmt.getVariable());
-        addString(")");
-        addSemicolonNewLine();
+        generateRetainFunctionCall(new AssignStmt(vardecStmt.getVariable(), vardecStmt.getExpression()));
     }
 
     private void generateRetainFunctionCall(AssignStmt assignStmt) throws CodegenException {
@@ -894,7 +888,8 @@ public class Codegen {
 
     // Generate a struct variable for a struct that will be assigned to a field of another struct
     // When we have multiple levels of nested structs, we can reuse this variable when creating them
-    private void generateTempStructFieldVariableVardec(final Param definedParam, final StructDef parentStructDef) throws CodegenException {
+    private void generateTempStructFieldVariableVardec(final Param definedParam, final StructDef parentStructDef) 
+            throws CodegenException {
         // <STRUCT_NAME>* temp_<variable> = NULL;
         StructType structType = (StructType) definedParam.getType();
         indentLine(currentIndentCount);
