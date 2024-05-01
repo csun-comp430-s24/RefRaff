@@ -354,9 +354,9 @@ public class Codegen {
         addNewLine();
         addNewLine();
 
-        // Check that struct was allocated
+        // Check that struct was allocated - we can probably remove this. I was debugging
         addIndentedString("if (newStruct == NULL)\n");
-        addIndentedString("\n");
+        addIndentedString("{\n");
         currentIndentCount += 1;
         addIndentedString("fprintf(stderr, \"Failed to allocate memory!\\n\");\n");
         addIndentedString("exit(EXIT_FAILURE);\n");
@@ -394,6 +394,20 @@ public class Codegen {
         return "refraff_" + structType.getStructName().get().getName() + "_retain";
     }
 
+    private void generateStructFieldFunctions(List<Param> params, Function<StructType, String> releaseOrRetainFunction) 
+            throws CodegenException {
+        for (Param param : params) {
+            if (param.getType() instanceof StructType fieldStructType) {
+                // refraff_<STRUCT_FIELD_1>_release(&my_struct-><STRUCT_FIELD_1>);
+                addIndentedString(releaseOrRetainFunction.apply(fieldStructType) + "(");
+                String structFieldAddressFormat = "my_struct->%1$s";
+                addString(String.format(structFieldAddressFormat, param.getVariable().getName()));
+                addString(")");
+                addSemicolonNewLine();
+            }
+        }
+    }
+
     //
     private void generateStructRetainFunction(StructDef structDef) throws CodegenException {
         /*
@@ -426,18 +440,8 @@ public class Codegen {
         // If struct is null, we can return
         addIndentedString("if (my_struct == NULL) return;\n\n");
 
-        // Free any child structs, first // FACTOR THIS OUT
-        List<Param> params = structDef.getParams();
-        for (Param param : params) {
-            if (param.getType() instanceof StructType fieldStructType) {
-                // refraff_<STRUCT_FIELD_1>_release(&my_struct-><STRUCT_FIELD_1>);
-                addIndentedString(getRetainFunctionName(fieldStructType) + "(");
-                String structFieldAddressFormat = "my_struct->%1$s";
-                addString(String.format(structFieldAddressFormat, param.getVariable().getName()));
-                addString(")");
-                addSemicolonNewLine();
-            }
-        }
+        // Retain any child structs, first
+        generateStructFieldFunctions(structDef.getParams(), this::getRetainFunctionName);
 
         addIndentedString("my_struct->");
         addString(getStructRefcountField(structType));
@@ -455,6 +459,7 @@ public class Codegen {
         return "refraff_" + structType.getStructName().get().getName() + "_release";
     }
 
+    // I THINK THIS NEEDS TO RELEASE CHILDREN WHETHER OR NOT THE REFCOUNT IS 1
     private void generateStructReleaseFunction(StructDef structDef) throws CodegenException {
         /*
          * Generates a function to decrement to the reference count when a struct variable is 
@@ -464,12 +469,13 @@ public class Codegen {
          * {
          *      if (my_struct == NULL) return;
          *
+         *      refraff_<STRUCT_FIELD_1>_release(my_struct-><STRUCT_FIELD_1>);
+         *      refraff_<STRUCT_FIELD_1>_release(my_struct-><STRUCT_FIELD_2>);
+         *      ...
+         * 
          *      my_struct-><STRUCT_NAME>_refcount--;
          *      if (my_struct-><STRUCT_NAME>_refcount < 1)
          *      {
-         *          refraff_<STRUCT_FIELD_1>_release(my_struct-><STRUCT_FIELD_1>);
-         *          refraff_<STRUCT_FIELD_1>_release(my_struct-><STRUCT_FIELD_2>);
-         *          ...
          *          free(my_struct);
          *      }
          * }
@@ -491,6 +497,9 @@ public class Codegen {
         // If struct is null, we can return
         addIndentedString("if (my_struct == NULL) return;\n\n");
 
+        // Free any child structs, first
+        generateStructFieldFunctions(structDef.getParams(), this::getReleaseFunctionName);
+
         addIndentedString("my_struct->");
         addString(getStructRefcountField(structType));
         addString("--");
@@ -504,19 +513,6 @@ public class Codegen {
         addNewLine();
 
         currentIndentCount += 1;
-
-        // Free any child structs, first
-        List<Param> params = structDef.getParams();
-        for (Param param : params) {
-            if (param.getType() instanceof StructType fieldStructType) {
-                // refraff_<STRUCT_FIELD_1>_release(&my_struct-><STRUCT_FIELD_1>);
-                addIndentedString(getReleaseFunctionName(fieldStructType) + "(");
-                String structFieldAddressFormat = "my_struct->%1$s";
-                addString(String.format(structFieldAddressFormat, param.getVariable().getName()));
-                addString(")");
-                addSemicolonNewLine();
-            }
-        }
 
         addIndentedString("free(my_struct)");
         addSemicolonNewLine();

@@ -8,6 +8,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
@@ -935,6 +936,70 @@ public class CodegenTest {
 
         Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
         testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testRepeatedAssignmentAndAbandonmentWithNestedStruct() {
+        /*
+         * Should print 2, and not leak
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         *
+         * A a1 = new A {
+         *   num: 1,
+         *   a: new A {
+         *     num: 2,
+         *     a: null
+         *   }
+         * };
+         * 
+         * A a2 = a1;
+         * 
+         * A a3 = a2;
+         * 
+         * A inner = a1.a;
+         * 
+         * a1 = null;
+         * 
+         * a2 = null;
+         * 
+         * a3 = null;
+         * 
+         * println(inner.num);
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("a"), structAllocExp2))));
+        Statement vardecA1 = new VardecStmt(getStructType("A"), getVariable("a1"), structAllocExp);
+
+        Statement vardecA2 = new VardecStmt(getStructType("A"), getVariable("a2"), new VariableExp(getVariable("a1")));
+        Statement vardecA3 = new VardecStmt(getStructType("A"), getVariable("a3"), new VariableExp(getVariable("a2")));
+
+        Expression dotExpA1A = new DotExp(new VariableExp(getVariable("a1")), getVariable("a"));
+        Statement vardecUnreachable = new VardecStmt(getStructType("A"), getVariable("inner"), dotExpA1A);
+
+        Statement assignA1 = new AssignStmt(getVariable("a1"), getNullExp());
+        Statement assignA2 = new AssignStmt(getVariable("a2"), getNullExp());
+        Statement assignA3 = new AssignStmt(getVariable("a3"), getNullExp());
+
+        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
+        dotExpInnerNum.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(dotExpInnerNum);
+
+        Program program = new Program(List.of(structDef), List.of(), 
+                List.of(vardecA1, vardecA2, vardecA3, vardecUnreachable, assignA1, assignA2, assignA3, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2");
     }
 
     @Test
