@@ -8,7 +8,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.Ignore;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.CleanupMode;
 import org.junit.jupiter.api.io.TempDir;
@@ -39,9 +38,9 @@ public class CodegenTest {
         return Node.setNodeSource(new BoolType(), "bool");
     }
 
-    private VoidType getVoidType() {
-        return Node.setNodeSource(new VoidType(), "void");
-    }
+    // private VoidType getVoidType() {
+    //     return Node.setNodeSource(new VoidType(), "void");
+    // }
 
     private NullExp getNullExp() {
         return Node.setNodeSource(new NullExp(), "null");
@@ -95,7 +94,7 @@ public class CodegenTest {
     // A temporary directory that is created for each individual test
     // CleanupMode.ON_SUCCESS will leave the directory open, so you can inspect the temporary directory for debugging.
     // The CleanupMode can be changed for debugging purposes: https://junit.org/junit5/docs/5.9.1/api/org.junit.jupiter.api/org/junit/jupiter/api/io/CleanupMode.html
-    @TempDir(cleanup = CleanupMode.NEVER)
+    @TempDir(cleanup = CleanupMode.ON_SUCCESS)
     File tempDirectory;
 
     @Test
@@ -1004,7 +1003,7 @@ public class CodegenTest {
          *
          * A a = null
          * 
-         * a = (new A { a: null };
+         * a = (new A { a: null });
          */
 
         StructDef structDef = new StructDef(getStructName("A"), List.of(
