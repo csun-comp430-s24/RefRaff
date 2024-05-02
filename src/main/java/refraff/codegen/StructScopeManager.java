@@ -1,9 +1,7 @@
 package refraff.codegen;
 
-import java.util.ArrayList;
 import java.util.EmptyStackException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -18,7 +16,7 @@ public class StructScopeManager {
         scopeStack.push(new HashMap<String, StructType>());
     }
 
-    public void declareStructVariable(String newStructVariable, StructType structType) throws CodegenException {
+    public void addStructVariableToScope(String newStructVariable, StructType structType) throws CodegenException {
         try {
             Map<String, StructType> currentScope = scopeStack.peek();
             variableToStructType.put(newStructVariable, structType);

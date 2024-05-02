@@ -59,9 +59,9 @@ public class Codegen {
 
             // Generate the main function entry point
             addString("int main()");
-            addNewLine();
+            addNewline();
             addString("{");
-            addNewLine();
+            addNewline();
 
             // Add the program's statements to the entry point
             enterScope();
@@ -79,12 +79,12 @@ public class Codegen {
 
     private void addImports() throws CodegenException {
         addString("#include <stdio.h>");
-        addNewLine();
+        addNewline();
 
         addString("#include <stdlib.h>");
-        addNewLine();
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
+        addNewline();
     }
 
     private void enterScope() {
@@ -101,7 +101,7 @@ public class Codegen {
 
         // Release each variable
         for (Map.Entry<String, StructType> entry : currentScopeStructVariables.entrySet()) {
-            releaseStructVariable(entry.getKey(), entry.getValue());
+            generateStructVariableReleaseFunction(entry.getKey(), entry.getValue());
         }
         currentIndentCount -= 1;
     }
@@ -134,7 +134,7 @@ public class Codegen {
         }
     }
 
-    private void addSemicolonNewLine() throws CodegenException {
+    private void addSemicolonNewline() throws CodegenException {
         try {
             writer.write(";\n");
         } catch (IOException e) {
@@ -143,7 +143,7 @@ public class Codegen {
     }
 
     // Adds a newline to the open file
-    private void addNewLine() throws CodegenException {
+    private void addNewline() throws CodegenException {
         try {
             writer.write("\n");
         } catch (IOException e) {
@@ -165,26 +165,26 @@ public class Codegen {
     }
 
     private void addComment(String comment) throws CodegenException {
-        addNewLine();
+        addNewline();
         addIndentedString("// " + comment);
-        addNewLine();
+        addNewline();
     }
 
     
 
-    private void releaseStructVariable(String structVariable, StructType structType) throws CodegenException {
+    private void generateStructVariableReleaseFunction(String structVariable, StructType structType) throws CodegenException {
         // refraff_<STRUCT_TYPE>_release(<STRUCT_VARIABLE_NAME>)
-        addIndentedString(getReleaseFunctionName(structType));
+        addIndentedString(getReleaseStructFunctionName(structType));
         addString("(");
         addString(structVariable);
         addString(")");
-        addSemicolonNewLine();
+        addSemicolonNewline();
     }
 
     
 
-    private void declareStructVariable(String structVariable, StructType structType) throws CodegenException {
-        structScopeManager.declareStructVariable(structVariable, structType);
+    private void addStructVariableToScope(String structVariable, StructType structType) throws CodegenException {
+        structScopeManager.addStructVariableToScope(structVariable, structType);
     }
 
     private void generateStructDefs(List<StructDef> structDefs) throws CodegenException {
@@ -262,9 +262,9 @@ public class Codegen {
 
         addString("typedef struct ");
         addString(structName);
-        addNewLine();
+        addNewline();
         addString("{");
-        addNewLine();
+        addNewline();
 
         currentIndentCount += 1;
 
@@ -273,7 +273,7 @@ public class Codegen {
         generateType(new IntType());
         addSpace();
         addString(getStructRefcountField(structName));
-        addSemicolonNewLine();
+        addSemicolonNewline();
 
         for (Param param : structDef.getParams()) {
             indentLine(currentIndentCount);
@@ -281,16 +281,16 @@ public class Codegen {
             generateType(param.getType());
             addSpace();
             generateVariable(param.getVariable());
-            addSemicolonNewLine();
+            addSemicolonNewline();
         }
 
         currentIndentCount -= 1;
 
         addString("} ");
         addString(structName);
-        addSemicolonNewLine();
+        addSemicolonNewline();
 
-        addNewLine();
+        addNewline();
     }
 
     private String getStructAllocationFunctionName(StructType structType) {
@@ -344,10 +344,10 @@ public class Codegen {
         addString("(");
         generateCommaSeparatedParams(structDef.getParams());
         addString(")");
-        addNewLine();
+        addNewline();
 
         addString("{");
-        addNewLine();
+        addNewline();
 
         currentIndentCount += 1;
 
@@ -355,8 +355,8 @@ public class Codegen {
 
         indentLine(currentIndentCount);
         addString(String.format(mallocFormat, structDef.getStructName().getName()));
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
 
         // Check that struct was allocated - we can probably remove this. I was debugging
         addIndentedString("if (newStruct == NULL)\n");
@@ -371,30 +371,30 @@ public class Codegen {
         final String refcountFieldInitializationFormat = "newStruct->%1$s = 1;";
         indentLine(currentIndentCount);
         addString(String.format(refcountFieldInitializationFormat, getStructRefcountField(structType)));
-        addNewLine();
+        addNewline();
 
         final String fieldInitializationFormat = "newStruct->%1$s = %1$s;";
 
         for (Param param : structDef.getParams()) {
             indentLine(currentIndentCount);
             addString(String.format(fieldInitializationFormat, param.getVariable().getName()));
-            addNewLine();
+            addNewline();
         }
 
-        addNewLine();
+        addNewline();
         indentLine(currentIndentCount);
         addString("return newStruct;");
-        addNewLine();
+        addNewline();
 
         currentIndentCount -= 1;
 
         addString("}");
 
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
     }
 
-    private String getRetainFunctionName(StructType structType) {
+    private String getRetainStructFunctionName(StructType structType) {
         return "refraff_" + structType.getStructName().get().getName() + "_retain";
     }
 
@@ -407,7 +407,7 @@ public class Codegen {
                 String structFieldAddressFormat = "my_struct->%1$s";
                 addString(String.format(structFieldAddressFormat, param.getVariable().getName()));
                 addString(")");
-                addSemicolonNewLine();
+                addSemicolonNewline();
             }
         }
     }
@@ -431,12 +431,12 @@ public class Codegen {
 
         generateType(new VoidType());
         addSpace();
-        addString(getRetainFunctionName(structType) + "(");
+        addString(getRetainStructFunctionName(structType) + "(");
         generateType(structType);
         addString(" my_struct)");
-        addNewLine();
+        addNewline();
         addString("{");
-        addNewLine();
+        addNewline();
 
         currentIndentCount += 1;
 
@@ -444,21 +444,21 @@ public class Codegen {
         addIndentedString("if (my_struct == NULL) return;\n\n");
 
         // Retain any child structs, first
-        generateStructFieldFunctions(structDef.getParams(), this::getRetainFunctionName);
+        generateStructFieldFunctions(structDef.getParams(), this::getRetainStructFunctionName);
 
         addIndentedString("my_struct->");
         addString(getStructRefcountField(structType));
         addString("++");
-        addSemicolonNewLine();
+        addSemicolonNewline();
 
         currentIndentCount -= 1;
 
         addString("}");
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
     }
 
-    private String getReleaseFunctionName(StructType structType) {
+    private String getReleaseStructFunctionName(StructType structType) {
         return "refraff_" + structType.getStructName().get().getName() + "_release";
     }
 
@@ -487,12 +487,12 @@ public class Codegen {
 
         generateType(new VoidType());
         addSpace();
-        addString(getReleaseFunctionName(structType) + "(");
+        addString(getReleaseStructFunctionName(structType) + "(");
         generateType(structType);
         addString(" my_struct)");
-        addNewLine();
+        addNewline();
         addString("{");
-        addNewLine();
+        addNewline();
 
         currentIndentCount += 1;
 
@@ -500,35 +500,35 @@ public class Codegen {
         addIndentedString("if (my_struct == NULL) return;\n\n");
 
         // Free any child structs, first
-        generateStructFieldFunctions(structDef.getParams(), this::getReleaseFunctionName);
+        generateStructFieldFunctions(structDef.getParams(), this::getReleaseStructFunctionName);
 
         addIndentedString("my_struct->");
         addString(getStructRefcountField(structType));
         addString("--");
-        addSemicolonNewLine();
+        addSemicolonNewline();
 
         // if (my_struct-><STRUCT_NAME>_refcount < 1)
         String structFreeCheckFormat = "if (my_struct->%1$s < 1)";
         addIndentedString(String.format(structFreeCheckFormat, getStructRefcountField(structType)));
-        addNewLine();
+        addNewline();
         addIndentedString("{");
-        addNewLine();
+        addNewline();
 
         currentIndentCount += 1;
 
         addIndentedString("free(my_struct)");
-        addSemicolonNewLine();
+        addSemicolonNewline();
 
         currentIndentCount -= 1;
 
         addIndentedString("}");
-        addNewLine();
+        addNewline();
 
         currentIndentCount -= 1;
 
         addString("}");
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
     }
 
     private void generateFunctionDefs(List<FunctionDef> functionDefs) throws CodegenException {
@@ -557,8 +557,8 @@ public class Codegen {
 
         generateStmtBlock(functionDef.getFunctionBody());
 
-        addNewLine();
-        addNewLine();
+        addNewline();
+        addNewline();
     }
 
     // Map of statements to their codegenerating functions functions
@@ -597,11 +597,11 @@ public class Codegen {
     private void generateRetainFunctionCall(AssignStmt assignStmt) throws CodegenException {
         StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
         // refraff_<STRUCT_NAME>_retain(<VARIABLE_NAME>);
-        addIndentedString(getRetainFunctionName(structType));
+        addIndentedString(getRetainStructFunctionName(structType));
         addString("(");
         generateVariable(assignStmt.getVariable());
         addString(")");
-        addSemicolonNewLine();
+        addSemicolonNewline();
     }
 
     // Generate function calls for allocating new structs (recursive for nested structs)
@@ -626,7 +626,7 @@ public class Codegen {
                 // HERE!!! WHAT DO WE NEED TO DO FOR THIS? CAN WE JUST SENT IT TO GEN ALLOC??
                 // If this is the same type of struct, then use the selfsame function (we don't need to make new temp variable)
                 AssignStmt fieldAssignStmt = new AssignStmt(
-                        new Variable(getTempVariableName(definedParams.get(i), structDef)),
+                        new Variable(getTempStructVariableName(definedParams.get(i), structDef)),
                         fieldAlloc);
                 generateStructAllocFunctionCalls(fieldAssignStmt);
             }
@@ -640,7 +640,7 @@ public class Codegen {
         addString("(");
         generateCommaSeparatedArgs(assignStmt);
         addString(")");
-        addSemicolonNewLine();
+        addSemicolonNewline();
     }
 
     // Parentheses mess up the allocation, so get rid of them
@@ -663,7 +663,7 @@ public class Codegen {
             addComment("Generating struct assignment stmt for " + assignStmt.getVariable().getName());
 
             // Release whatever the variable was pointing to
-            releaseStructVariable(assignStmt.getVariable().getName(), structType);
+            generateStructVariableReleaseFunction(assignStmt.getVariable().getName(), structType);
             // Assign expression to variable
             // If the expression is in parens, get expression
             assignStmt = getAssignStmtWithoutParens(assignStmt);
@@ -679,7 +679,7 @@ public class Codegen {
                 generateVariable(assignStmt.getVariable());
                 addString(" = ");
                 generateExpression(assignStmt.getExpression());
-                addSemicolonNewLine();
+                addSemicolonNewline();
                 // Retain whatever the variable is now pointing to (if not null)
                 if (!(assignStmt.getExpression() instanceof NullExp)) {
                     generateRetainFunctionCall(assignStmt);
@@ -691,7 +691,7 @@ public class Codegen {
             generateVariable(assignStmt.getVariable());
             addString(" = ");
             generateExpression(assignStmt.getExpression());
-            addSemicolonNewLine();
+            addSemicolonNewline();
         }
     }
 
@@ -704,7 +704,7 @@ public class Codegen {
 
         indentLine(currentIndentCount);
         generateExpression(expStmt.getExpression());
-        addSemicolonNewLine();
+        addSemicolonNewline();
     }
 
     private void generateIfElseStmt(final Statement stmt) throws CodegenException {
@@ -778,7 +778,7 @@ public class Codegen {
             generateExpression(returnStmt.getReturnValue().get());
         }
 
-        addSemicolonNewLine();
+        addSemicolonNewline();
     }
 
     private void generateStmtBlock(final Statement stmt) throws CodegenException {
@@ -786,7 +786,7 @@ public class Codegen {
 
         indentLine(currentIndentCount);
         addString("{");
-        addNewLine();
+        addNewline();
 
         enterScope();
         generateStatements(stmtBlock.getBlockBody());
@@ -794,15 +794,15 @@ public class Codegen {
 
         indentLine(currentIndentCount);
         addString("}");
-        addNewLine();
+        addNewline();
     }
 
     // Generate temporary struct variables for nested structs
-    private String getTempVariableName(Param definedParam, StructDef parentStructDef) {
-        return getTempVariableName(definedParam.getVariable(), parentStructDef);
+    private String getTempStructVariableName(Param definedParam, StructDef parentStructDef) {
+        return getTempStructVariableName(definedParam.getVariable(), parentStructDef);
     }
 
-    private String getTempVariableName(Variable paramVariable, StructDef parentStructDef) {
+    private String getTempStructVariableName(Variable paramVariable, StructDef parentStructDef) {
         return "_temp_" + parentStructDef.getStructName().getName() + "_" + paramVariable.getName();
     }
 
@@ -823,7 +823,7 @@ public class Codegen {
                 generateExpression(structActualParams.get(i).getExpression());
             } else {
                 // Otherwise, get the temporary variable holding the address of the struct
-                addString(getTempVariableName(definedParams.get(i), structDef));
+                addString(getTempStructVariableName(definedParams.get(i), structDef));
             }
             
             if (i != structActualParams.size() - 1) {
@@ -839,17 +839,12 @@ public class Codegen {
             // If this param is a struct
             if (definedParam.getType() instanceof StructType structType) {
                 // Create the temporary variable if it has not been created yet
-                String tempVariableName = getTempVariableName(definedParam, structDef);
+                String tempVariableName = getTempStructVariableName(definedParam, structDef);
                 if (!structScopeManager.isInScope(tempVariableName)) {
                     generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
-
-                    // generateTempStructFieldVariableVardec(definedParam, structDef);
-                    // structScopeManager.declareStructVariable(tempVariableName, structType);
                 } else {
                     // Otherwise, release the previous temporary variable
-                    // generateAssignStmt(new AssignStmt(new Variable(tempVariableName), new NullExp()));
-
-                    releaseStructVariable(tempVariableName, structType);
+                    generateStructVariableReleaseFunction(tempVariableName, structType);
                 }
             }
         }
@@ -872,7 +867,7 @@ public class Codegen {
         // If we are declaring a struct variable,
         if (vardecStmt.getType() instanceof StructType structType) {
             // then add that variable to the current scope
-            declareStructVariable(vardecStmt.getVariable().getName(), structType);
+            addStructVariableToScope(vardecStmt.getVariable().getName(), structType);
             // Also, we need to do something with the expression - if it's a struct (which it has to be)
             // Then  - if it's a new struct, we have to create a new one
 
@@ -893,7 +888,7 @@ public class Codegen {
                 generateVariable(vardecStmt.getVariable());
                 addString(" = ");
                 generateExpression(vardecStmt.getExpression());
-                addSemicolonNewLine();
+                addSemicolonNewline();
                 // Then retain the struct if not null
                 if (!(vardecStmt.getExpression() instanceof NullExp)) {
                     generateRetainFunctionCall(vardecStmt);
@@ -907,7 +902,7 @@ public class Codegen {
             generateVariable(vardecStmt.getVariable());
             addString(" = ");
             generateExpression(vardecStmt.getExpression());
-            addSemicolonNewLine();
+            addSemicolonNewline();
         }
     }
 

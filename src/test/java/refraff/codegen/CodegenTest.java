@@ -1686,7 +1686,7 @@ public class CodegenTest {
         StructScopeManager structScopeManager = new StructScopeManager();
         String variableName = "variableName";
         StructType structType = getStructType("structTypeName");
-        assertThrows(CodegenException.class, () -> structScopeManager.declareStructVariable(variableName, structType));
+        assertThrows(CodegenException.class, () -> structScopeManager.addStructVariableToScope(variableName, structType));
     }
 
     @Test
