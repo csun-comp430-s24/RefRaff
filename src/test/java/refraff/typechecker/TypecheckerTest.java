@@ -20,10 +20,7 @@ import refraff.tokenizer.Tokenizer;
 import refraff.tokenizer.TokenizerException;
 import refraff.util.ResourceUtil;
 
-import java.util.List;
-import java.util.ArrayList;
 import java.util.*;
-import java.util.function.BiFunction;
 
 import static org.junit.Assert.*;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -84,6 +81,82 @@ public class TypecheckerTest {
         ));
 
         Program program = new Program(List.of(structDef), List.of(), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStructAllocExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * new A { a: null };
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement expStmt = new ExpressionStmt(structAlloc);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStructAllocInParenExpressionInExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * (new A { a: null });
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement expStmt = new ExpressionStmt(parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStructAllocInParens() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a = (new A { a: null });
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
         testDoesNotThrowTypecheckerException(program);
     }
 
@@ -910,6 +983,96 @@ public class TypecheckerTest {
         );
 
         Program program = new Program(List.of(structDef), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    // Scope tests
+
+    @Test
+    public void testFunctionDefHasOwnScopeFromProgramEntry() {
+        /*
+         *  func foo(): void {
+         *       int a = 2;
+         *  }
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        FunctionDef funcDef = new FunctionDef(
+                getFunctionName("foo"),
+                List.of(),
+                getVoidType(),
+                new FunctionBody(List.of(aVardec)));
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of(aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testIfStatementHasLowerScope() {
+        /*
+         *  if (true)
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement ifStatement = new IfElseStmt(new BoolLiteralExp(true), aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testIfElseStatementHasLowerScope() {
+        /*
+         *  if (true)
+         *     int a = 2;
+         *  else
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement ifElseStatement = new IfElseStmt(new BoolLiteralExp(true), aVardec, aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifElseStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testWhileStatementHasLowerScope() {
+        /*
+         *  while (true)
+         *     int a = 2;
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement whileStatement = new WhileStmt(new BoolLiteralExp(true), aVardec);
+
+        Program program = new Program(List.of(), List.of(), List.of(whileStatement, aVardec));
+        testDoesNotThrowTypecheckerException(program);
+    }
+
+    @Test
+    public void testStatementBlockHasLowerScope() {
+        /*
+         *  {
+         *     int a = 2;
+         *  }
+         *
+         *  int a = 2;
+         */
+
+        Statement aVardec = new VardecStmt(getIntType(), getVariable("a"), new IntLiteralExp(2));
+        Statement statementBlock = new StmtBlock(List.of(aVardec));
+
+        Program program = new Program(List.of(), List.of(), List.of(statementBlock, aVardec));
         testDoesNotThrowTypecheckerException(program);
     }
 

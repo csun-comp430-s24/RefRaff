@@ -30,6 +30,15 @@ public class BoolLiteralExp extends PrimaryExpression {
     }
 
     @Override
+    public String toString() {
+        if (value) {
+            return "true";
+        } else {
+            return "false";
+        }
+    }
+
+    @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), getValue());
     }

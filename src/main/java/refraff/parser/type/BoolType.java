@@ -8,4 +8,8 @@ public class BoolType extends Type {
         super(NODE_TYPE_DESCRIPTOR);
     }
 
+    @Override
+    public String toString() {
+        return "bool";
+    }
 }

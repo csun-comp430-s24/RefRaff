@@ -8,4 +8,8 @@ public class IntType extends Type {
         super(NODE_TYPE_DESCRIPTOR);
     }
 
+    @Override
+    public String toString() {
+        return "int";
+    }
 }

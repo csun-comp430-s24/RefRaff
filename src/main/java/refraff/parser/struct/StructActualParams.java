@@ -17,6 +17,10 @@ public class StructActualParams extends AbstractSyntaxTreeNode {
         this.params = params;
     }
 
+    public List<StructActualParam> getStructActualParams() {
+        return this.params;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), params);
