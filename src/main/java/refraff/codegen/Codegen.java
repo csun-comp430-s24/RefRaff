@@ -95,7 +95,7 @@ public class Codegen {
     // Frees structs held by variables that are about to go out of scope
     private void exitScope() throws CodegenException {
         addComment("Exiting scope");
-        
+
         // Get the list of struct variables that were declared in the current scope
         Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
 

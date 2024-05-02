@@ -568,6 +568,65 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithNestedIfElseWhile() {
+        /*
+         * 
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A a1 = new A { a: null };
+         * 
+         * int num = 3;
+         * 
+         * if (num == 3) {
+         *   A a2 = new A { a: a1 };
+         * 
+         *   while (num > 0) {
+         *     A a3 = new A { a: a2 };
+         *     num = num - 1;
+         * 
+         *     if (num == 0) {
+         *       A a4 = new A { a: a3 };
+         *     }
+         *   }
+         * }
+         */
+        StructDef structA = new StructDef(getStructName("A"), List.of(new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocA1 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new NullExp()))));
+        Statement  vardecStmtA1 = new VardecStmt(getStructType("A"), getVariable("a1"), structAllocA1);
+
+        Statement vardecStmtNum = new VardecStmt(getIntType(), getVariable("num"), new IntLiteralExp(3));
+
+        Expression doubleEqualsNum0 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(0));
+        Expression structAllocA4 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a3"))))));
+        Statement ifBlock2 = new VardecStmt(getStructType("A"), getVariable("a4"), structAllocA4);
+        Statement ifStmt2 = new IfElseStmt(doubleEqualsNum0, ifBlock2);
+
+        Expression structAllocA3 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a2"))))));
+        Statement vardecStmtA3 = new VardecStmt(getStructType("A"), getVariable("a3"), structAllocA3);
+        Expression minusNum1 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.MINUS, new IntLiteralExp(1));
+        Statement numDecrement = new AssignStmt(getVariable("num"), minusNum1);
+        Statement stmtBlock2 = new StmtBlock(List.of(vardecStmtA3, numDecrement, ifStmt2));
+        Expression greaterThanNum0 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.GREATER_THAN, new IntLiteralExp(0));
+        Statement whileStmt = new WhileStmt(greaterThanNum0, stmtBlock2);
+
+        Expression structAllocA2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a1"))))));
+        Statement vardecStmtA2 = new VardecStmt(getStructType("A"), getVariable("a2"), structAllocA2);
+        Expression doubleEqualsNum3 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(3));
+        Statement stmtBlock1 = new StmtBlock(List.of(vardecStmtA2, whileStmt));
+        Statement ifStmt = new IfElseStmt(doubleEqualsNum3, stmtBlock1);
+
+        Program program = new Program(List.of(structA), List.of(), List.of(vardecStmtA1, vardecStmtNum, ifStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
     public void testCodegenWithSingleStatementStructVardecInIf() {
         /*
          *
