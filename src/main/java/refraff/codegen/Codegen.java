@@ -645,7 +645,6 @@ public class Codegen {
                     generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
                 } else {
                     // Otherwise, release the previous temporary variable
-                    // TRY DELETING THIS - IT MIGHT BE FINE
                     generateStructVariableReleaseFunction(tempVariableName, structType);
                 }
             }
@@ -1054,8 +1053,6 @@ public class Codegen {
             generateVardecStmt(new VardecStmt(structType, tempAllocVariable, new NullExp()));
         } else {
             // Otherwise, release the temporary variable so we can use it to allocate this new one
-            // Also - I don't think I even need to do this. It will be released when we assign it a new value
-            // TRY TO DELETE - SEE WHAT HAPPENS
             generateAssignStmt(new AssignStmt(tempAllocVariable, new NullExp()));
         }
 
