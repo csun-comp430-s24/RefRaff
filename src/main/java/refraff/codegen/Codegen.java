@@ -63,17 +63,10 @@ public class Codegen {
             addString("{");
             addNewLine();
 
-
             // Add the program's statements to the entry point
-            currentIndentCount += 1;
             enterScope();
             generateStatements(program.getStatements());
             exitScope();
-
-            // TEMPORARY, REMOVE LATER
-            // addString("Sleep(10000);");
-            // addIndentedString("return 0;\n");
-            currentIndentCount -= 1;
 
             // Close the main method
             addString("}");
@@ -90,12 +83,27 @@ public class Codegen {
 
         addString("#include <stdlib.h>");
         addNewLine();
-
-        // FOR TEMPORARY DEBUGGING
-        // addString("#include <windows.h>");
         addNewLine();
-
         addNewLine();
+    }
+
+    private void enterScope() {
+        currentIndentCount += 1;
+        structScopeManager.enterScope();
+    }
+
+    // Frees structs held by variables that are about to go out of scope
+    private void exitScope() throws CodegenException {
+        addComment("Exiting scope");
+        
+        // Get the list of struct variables that were declared in the current scope
+        Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
+
+        // Release each variable
+        for (Map.Entry<String, StructType> entry : currentScopeStructVariables.entrySet()) {
+            releaseStructVariable(entry.getKey(), entry.getValue());
+        }
+        currentIndentCount -= 1;
     }
 
     // Adds the specified string to the open file
@@ -162,9 +170,7 @@ public class Codegen {
         addNewLine();
     }
 
-    private void enterScope() {
-        structScopeManager.enterScope();
-    }
+    
 
     private void releaseStructVariable(String structVariable, StructType structType) throws CodegenException {
         // refraff_<STRUCT_TYPE>_release(<STRUCT_VARIABLE_NAME>)
@@ -175,16 +181,7 @@ public class Codegen {
         addSemicolonNewLine();
     }
 
-    private void exitScope() throws CodegenException {
-        addComment("Exiting scope");
-        // Get the list of struct variables that were declared in the current scope
-        Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
-        
-        // Release each variable
-        for (Map.Entry<String, StructType> entry : currentScopeStructVariables.entrySet()) {
-            releaseStructVariable(entry.getKey(), entry.getValue());
-        }
-    }
+    
 
     private void declareStructVariable(String structVariable, StructType structType) throws CodegenException {
         structScopeManager.declareStructVariable(structVariable, structType);
@@ -791,11 +788,9 @@ public class Codegen {
         addString("{");
         addNewLine();
 
-        currentIndentCount += 1;
         enterScope();
         generateStatements(stmtBlock.getBlockBody());
         exitScope();
-        currentIndentCount -= 1;
 
         indentLine(currentIndentCount);
         addString("}");
