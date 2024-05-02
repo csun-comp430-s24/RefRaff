@@ -87,31 +87,23 @@ public class Codegen {
         addNewline();
     }
 
-    private void enterScope() {
-        currentIndentCount += 1;
-        structScopeManager.enterScope();
-    }
-
-    // Frees structs held by variables that are about to go out of scope
-    private void exitScope() throws CodegenException {
-        addComment("Exiting scope");
-
-        // Get the list of struct variables that were declared in the current scope
-        Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
-
-        // Release each variable
-        for (Map.Entry<String, StructType> entry : currentScopeStructVariables.entrySet()) {
-            generateStructVariableReleaseFunction(entry.getKey(), entry.getValue());
-        }
-        currentIndentCount -= 1;
-    }
-
     // Adds the specified string to the open file
     private void addString(String str) throws CodegenException {
         try {
             writer.write(str);
         } catch (IOException e) {
             throw new CodegenException("Error in writing string");
+        }
+    }
+
+    private void indentLine(int numIndents) throws CodegenException {
+        try {
+            for (int i = 0; i < numIndents; i++) {
+                // We can change this to spaces if that's your preference
+                writer.write("\t");
+            }
+        } catch (IOException e) {
+            throw new CodegenException("Error in indenting line");
         }
     }
 
@@ -151,26 +143,11 @@ public class Codegen {
         }
     }
 
-    // Indents the specified number of times
-    // I don't know if this will be useful yet
-    private void indentLine(int numIndents) throws CodegenException {
-        try {
-            for (int i = 0; i < numIndents; i++) {
-                // We can change this to spaces if that's your preference
-                writer.write("\t");
-            }
-        } catch (IOException e) {
-            throw new CodegenException("Error in indenting line");
-        }
-    }
-
     private void addComment(String comment) throws CodegenException {
         addNewline();
         addIndentedString("// " + comment);
         addNewline();
     }
-
-    
 
     private void generateStructVariableReleaseFunction(String structVariable, StructType structType) throws CodegenException {
         // refraff_<STRUCT_TYPE>_release(<STRUCT_VARIABLE_NAME>)
@@ -181,7 +158,24 @@ public class Codegen {
         addSemicolonNewline();
     }
 
-    
+    private void enterScope() {
+        currentIndentCount += 1;
+        structScopeManager.enterScope();
+    }
+
+    // Frees structs held by variables that are about to go out of scope
+    private void exitScope() throws CodegenException {
+        addComment("Exiting scope");
+
+        // Get the list of struct variables that were declared in the current scope
+        Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
+
+        // Release each variable
+        for (Map.Entry<String, StructType> entry : currentScopeStructVariables.entrySet()) {
+            generateStructVariableReleaseFunction(entry.getKey(), entry.getValue());
+        }
+        currentIndentCount -= 1;
+    }
 
     private void addStructVariableToScope(String structVariable, StructType structType) throws CodegenException {
         structScopeManager.addStructVariableToScope(structVariable, structType);
@@ -604,6 +598,61 @@ public class Codegen {
         addSemicolonNewline();
     }
 
+    // Generate temporary struct variables for nested structs
+    private String getTempStructVariableName(Param definedParam, StructDef parentStructDef) {
+        return getTempStructVariableName(definedParam.getVariable(), parentStructDef);
+    }
+
+    private String getTempStructVariableName(Variable paramVariable, StructDef parentStructDef) {
+        return "_temp_" + parentStructDef.getStructName().getName() + "_" + paramVariable.getName();
+    }
+
+    // Generate arguments for allocating new structs with the generated struct alloc functions
+    private void generateCommaSeparatedArgs(final AssignStmt assignStmt) throws CodegenException {
+        // Get structdef so we know they types of the params
+        StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
+        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
+        List<Param> definedParams = structDef.getParams();
+
+        // Get actual params
+        StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
+        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
+
+        for (int i = 0; i < structActualParams.size(); i++) {
+            // If it's a primitive, just use the expression, otherwise, use the temporary
+            // struct variable
+            if (definedParams.get(i).getType() instanceof IntType
+                    || definedParams.get(i).getType() instanceof BoolType) {
+                generateExpression(structActualParams.get(i).getExpression());
+            } else {
+                // Otherwise, get the temporary variable holding the address of the struct
+                addString(getTempStructVariableName(definedParams.get(i), structDef));
+            }
+
+            if (i != structActualParams.size() - 1) {
+                addString(", ");
+            }
+        }
+    }
+
+    private void generateDeclareTemporaryStructVariables(List<Param> definedParams, StructDef structDef)
+            throws CodegenException {
+        // First, allocate temporary variables for each struct field
+        for (Param definedParam : definedParams) {
+            // If this param is a struct
+            if (definedParam.getType() instanceof StructType structType) {
+                // Create the temporary variable if it has not been created yet
+                String tempVariableName = getTempStructVariableName(definedParam, structDef);
+                if (!structScopeManager.isInScope(tempVariableName)) {
+                    generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
+                } else {
+                    // Otherwise, release the previous temporary variable
+                    generateStructVariableReleaseFunction(tempVariableName, structType);
+                }
+            }
+        }
+    }
+
     // Generate function calls for allocating new structs (recursive for nested structs)
     private void generateStructAllocFunctionCalls(final AssignStmt assignStmt) throws CodegenException {
         // Get structdef so we know they types of the params
@@ -797,59 +846,6 @@ public class Codegen {
         addNewline();
     }
 
-    // Generate temporary struct variables for nested structs
-    private String getTempStructVariableName(Param definedParam, StructDef parentStructDef) {
-        return getTempStructVariableName(definedParam.getVariable(), parentStructDef);
-    }
-
-    private String getTempStructVariableName(Variable paramVariable, StructDef parentStructDef) {
-        return "_temp_" + parentStructDef.getStructName().getName() + "_" + paramVariable.getName();
-    }
-
-    // Generate arguments for allocating new structs with the generated struct alloc functions
-    private void generateCommaSeparatedArgs(final AssignStmt assignStmt) throws CodegenException {
-        // Get structdef so we know they types of the params
-        StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
-        StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
-        List<Param> definedParams = structDef.getParams();
-
-        // Get actual params
-        StructAllocExp structAllocExp = (StructAllocExp) assignStmt.getExpression();
-        List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
-
-        for (int i = 0; i < structActualParams.size(); i++) {
-            // If it's a primitive, just use the expression, otherwise, use the temporary struct variable
-            if (definedParams.get(i).getType() instanceof IntType || definedParams.get(i).getType() instanceof BoolType) {
-                generateExpression(structActualParams.get(i).getExpression());
-            } else {
-                // Otherwise, get the temporary variable holding the address of the struct
-                addString(getTempStructVariableName(definedParams.get(i), structDef));
-            }
-            
-            if (i != structActualParams.size() - 1) {
-                addString(", ");
-            }
-        }
-    }
-
-    private void generateDeclareTemporaryStructVariables(List<Param> definedParams, StructDef structDef)
-            throws CodegenException {
-        // First, allocate temporary variables for each struct field
-        for (Param definedParam : definedParams) {
-            // If this param is a struct
-            if (definedParam.getType() instanceof StructType structType) {
-                // Create the temporary variable if it has not been created yet
-                String tempVariableName = getTempStructVariableName(definedParam, structDef);
-                if (!structScopeManager.isInScope(tempVariableName)) {
-                    generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
-                } else {
-                    // Otherwise, release the previous temporary variable
-                    generateStructVariableReleaseFunction(tempVariableName, structType);
-                }
-            }
-        }
-    }
-
     // Parentheses only up struct allocations, so get rid of them
     private VardecStmt getVardecStmtWithoutParens(VardecStmt vardecStmt) {
         if (vardecStmt.getExpression() instanceof ParenExp parenExp) {
@@ -915,7 +911,7 @@ public class Codegen {
 
         // I'm having it generate braces by default because if there's a single
         // struct vardec statement, we'll be adding more retain/release function calls
-        // in the same scope 
+        // in the same scope (But this is mostly just for consistent curly braces)
 
         // generate statement(s)
         if (whileStmt.getBody() instanceof StmtBlock) {
