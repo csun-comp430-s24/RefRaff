@@ -219,7 +219,23 @@ A a1 = new A {
 };
 ```
 - **Allocation Order**: The innermost `A` struct is allocated first by assigning `null` to a temporary variable. This process is repeated until the outermost `A` struct is assembled and assigned to a temporary variable.<br>
-This can then be assigned to a named variable if the struct allocation was part of an assignement or variable declaration statement.
+This is then be assigned to a named variable if the struct allocation was part of an assignement or variable declaration statement.
+
+|Generated Code                                         |Explanation          |
+|-------------------------------------------------------|---------------------|
+|// Allocating struct A                                 |
+|struct A* _temp_A_struct_alloc_var = NULL;             |Create temporary variable for allocation expression
+|struct A* _temp_A_a = NULL;                            |Create temporary variable for struct field (this is the deepest 'a' field)
+|refraff_A_release(_temp_A_a);                          |This line is superfluous in this case (but it matters in some other assignments)
+|_temp_A_a = refraff_A_alloc(_temp_A_a);                |Create middle struct
+|_temp_A_struct_alloc_var = refraff_A_alloc(_temp_A_a); |Create outer struct
+|struct A* a1 = _temp_A_struct_alloc_var;               |Assign struct to named variable
+|refraff_A_retain(a1);                                  |This struct has A1 and the temp variable pointing to it. Both will be released when moving out of scope.
+|// Exiting scope                                       |
+|refraff_A_release(a1);                                 |
+|refraff_A_release(_temp_A_struct_alloc_var);           |
+|refraff_A_release(_temp_A_a);                          |
+
 
 - **Variable Management**: 
   - In a struct assignment statement, any earlier value the struct variable was holding is "released" before the new value is assigned.
