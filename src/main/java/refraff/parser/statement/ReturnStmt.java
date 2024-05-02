@@ -21,6 +21,10 @@ public class ReturnStmt extends Statement {
         this.returnValue = Optional.ofNullable(expression);
     }
 
+    public boolean hasReturnValue() {
+        return !returnValue.isEmpty();
+    }
+
     public Optional<Expression> getReturnValue() {
         return returnValue;
     }
