@@ -458,7 +458,7 @@ public class Codegen {
 
     private void generateStructReleaseFunction(StructDef structDef) throws CodegenException {
         /*
-         * Generates a function to decrement to the reference count when a struct variable is 
+         * Generates a function to decrement the reference count when a struct variable is 
          * reassigned or when a struct variable goes out of scope
          * 
          * void refraff_<STRUCT_NAME>_release(<STRUCT_NAME>* my_struct)
@@ -493,7 +493,7 @@ public class Codegen {
         // If struct is null, we can return
         addIndentedString("if (my_struct == NULL) return;\n\n");
 
-        // Free any child structs, first
+        // Free any field structs, first
         generateStructFieldFunctions(structDef.getParams(), this::getReleaseStructFunctionName);
 
         addIndentedString("my_struct->");
@@ -537,7 +537,6 @@ public class Codegen {
          * {
          *      <FUNCTION_BODY>
          * }
-         *
          *
          */
 
@@ -609,7 +608,7 @@ public class Codegen {
 
     // Generate arguments for allocating new structs with the generated struct alloc functions
     private void generateCommaSeparatedArgs(final AssignStmt assignStmt) throws CodegenException {
-        // Get structdef so we know they types of the params
+        // Get structdef so we know the types of the params
         StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
         StructDef structDef = structNameToDef.get(structType.getStructName().get().getName());
         List<Param> definedParams = structDef.getParams();
@@ -619,8 +618,7 @@ public class Codegen {
         List<StructActualParam> structActualParams = structAllocExp.getParams().getStructActualParams();
 
         for (int i = 0; i < structActualParams.size(); i++) {
-            // If it's a primitive, just use the expression, otherwise, use the temporary
-            // struct variable
+            // If it's a primitive, just use the expression, otherwise, use the temporary struct variable
             if (definedParams.get(i).getType() instanceof IntType
                     || definedParams.get(i).getType() instanceof BoolType) {
                 generateExpression(structActualParams.get(i).getExpression());
@@ -647,6 +645,7 @@ public class Codegen {
                     generateVardecStmt(new VardecStmt(structType, new Variable(tempVariableName), new NullExp()));
                 } else {
                     // Otherwise, release the previous temporary variable
+                    // TRY DELETING THIS - IT MIGHT BE FINE
                     generateStructVariableReleaseFunction(tempVariableName, structType);
                 }
             }
@@ -670,10 +669,8 @@ public class Codegen {
 
         // Go through params (we'll need the defined params and the actual params for this)
         for (int i = 0; i < structActualParams.size(); i++) {
-            // But if it's a struct, we need to allocate that, then assign it to this struct
+            // But if it's a struct, we need to allocate that, then assign it to a temporary struct variable
             if (structActualParams.get(i).getExpression() instanceof StructAllocExp fieldAlloc) {
-                // HERE!!! WHAT DO WE NEED TO DO FOR THIS? CAN WE JUST SENT IT TO GEN ALLOC??
-                // If this is the same type of struct, then use the selfsame function (we don't need to make new temp variable)
                 AssignStmt fieldAssignStmt = new AssignStmt(
                         new Variable(getTempStructVariableName(definedParams.get(i), structDef)),
                         fieldAlloc);
@@ -681,7 +678,7 @@ public class Codegen {
             }
         }
 
-        // Then allocate this struct, assign it to this variable
+        // Then allocate and assign the struct
         indentLine(currentIndentCount);
         generateVariable(assignStmt.getVariable());
         addString(" = ");
@@ -693,6 +690,7 @@ public class Codegen {
     }
 
     // Parentheses mess up the allocation, so get rid of them
+    // e.g. A a = ((new A { a: null }));
     private AssignStmt getAssignStmtWithoutParens(AssignStmt assignStmt) {
         if (assignStmt.getExpression() instanceof ParenExp parenExp) {
             return getAssignStmtWithoutParens(
@@ -713,7 +711,6 @@ public class Codegen {
 
             // Release whatever the variable was pointing to
             generateStructVariableReleaseFunction(assignStmt.getVariable().getName(), structType);
-            // Assign expression to variable
             // If the expression is in parens, get expression
             assignStmt = getAssignStmtWithoutParens(assignStmt);
             if (assignStmt.getExpression() instanceof StructAllocExp structAllocExp) {
@@ -736,6 +733,7 @@ public class Codegen {
             }
             
         } else {
+            // Otherwise, print regular assignment statement
             indentLine(currentIndentCount);
             generateVariable(assignStmt.getVariable());
             addString(" = ");
@@ -764,6 +762,8 @@ public class Codegen {
         generateExpression(ifElseStmt.getCondition());
         addString(")\n");
 
+        // The parenthesis are generated in the statement block function. A single line if statement
+        // may end up being more lines in the generated code, so I just put them in a statement block by default
         if (ifElseStmt.getIfBody() instanceof StmtBlock) {
             generateStatements(List.of(ifElseStmt.getIfBody()));
         } else {
@@ -774,7 +774,6 @@ public class Codegen {
         Optional<Statement> optionalElseBody = ifElseStmt.getElseBody();
         if (!optionalElseBody.isEmpty()) {
             addIndentedString("else\n");
-            // generateStatements(List.of(optionalElseBody.get()));
             if (optionalElseBody.get() instanceof StmtBlock stmtBlock) {
                 generateStatements(List.of(stmtBlock));
             } else {
@@ -864,8 +863,6 @@ public class Codegen {
         if (vardecStmt.getType() instanceof StructType structType) {
             // then add that variable to the current scope
             addStructVariableToScope(vardecStmt.getVariable().getName(), structType);
-            // Also, we need to do something with the expression - if it's a struct (which it has to be)
-            // Then  - if it's a new struct, we have to create a new one
 
             // If the expression is in parens, get expression
             vardecStmt = getVardecStmtWithoutParens(vardecStmt);
@@ -1057,7 +1054,8 @@ public class Codegen {
             generateVardecStmt(new VardecStmt(structType, tempAllocVariable, new NullExp()));
         } else {
             // Otherwise, release the temporary variable so we can use it to allocate this new one
-            // Also - I don't think I even need to do this. It will be release when we assign it a new value
+            // Also - I don't think I even need to do this. It will be released when we assign it a new value
+            // TRY TO DELETE - SEE WHAT HAPPENS
             generateAssignStmt(new AssignStmt(tempAllocVariable, new NullExp()));
         }
 
