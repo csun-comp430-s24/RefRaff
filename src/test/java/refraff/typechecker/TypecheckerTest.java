@@ -427,7 +427,6 @@ public class TypecheckerTest {
 
         Program program = new Program(List.of(), List.of(), List.of(vardec, ifStmt));
         testDoesNotThrowTypecheckerException(program);
-
     }
 
     @Test
@@ -953,11 +952,36 @@ public class TypecheckerTest {
         testDoesNotThrowTypecheckerException(program);
     }
 
-    // Tests for function definitions
-    // Test function with mutliple return statements (when if/else typechecking is implemented)
-    // Test function with different typed return statements throws error (after if/else)
-    // Should we check for return reachability?
+    @Test
+    public void testFunctionWithNoElseReturnButLaterReturn() {
+        /*
+         * func foo(bool b) : int {
+         *   if (b) {
+         *     return 0;
+         *   } else {
+         *     println(1);
+         *   }
+         * 
+         *   return 2;
+         * }
+         * 
+         */
+        
+        Statement returnStmt2 = new ReturnStmt(new IntLiteralExp(2));
+        Statement printStmt = new PrintlnStmt(new IntLiteralExp(1));
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), returnStmt0, printStmt);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(ifElseStmt, returnStmt2));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
 
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testDoesNotThrowTypecheckerException(program);
+    }
 
     @Test
     public void testStructNameAsParamType() {
@@ -1655,6 +1679,155 @@ public class TypecheckerTest {
 
         Program invalidProgram = new Program(List.of(), List.of(funcDef, funcDef2), List.of());
         testThrowsTypecheckerException(invalidProgram);
+    }
+
+    @Test
+    public void testFunctionWithNoElseReturnThrows() {
+        /*
+         * func foo(bool b) : int {
+         *   if (b) {
+         *     return 0;
+         *   } else {
+         *     println(1);
+         *   }
+         * }
+         * 
+         */
+        
+        Statement printStmt = new PrintlnStmt(new IntLiteralExp(1));
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), returnStmt0, printStmt);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(ifElseStmt));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionWithUnreachableCode() {
+        /*
+         * func foo(bool b) : int {
+         *   if (b) {
+         *     return 0;
+         *     int i = 1;
+         *   }
+         * }
+         * 
+         */
+        
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement vardecStmt = new VardecStmt(getIntType(), getVariable("i"), new IntLiteralExp(1));
+        Statement ifBody = new StmtBlock(List.of(returnStmt0, vardecStmt));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), ifBody);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(ifElseStmt));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionWithDifferentReturnTypesThrows() {
+        /*
+         * func foo(bool b) : int {
+         *   if (b) {
+         *     return 0;
+         *   } else {
+         *     return true;
+         *   }
+         * }
+         * 
+         */
+
+        Statement elseBody = new ReturnStmt(new BoolLiteralExp(true));
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement ifBody = new StmtBlock(List.of(returnStmt0));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), ifBody, elseBody);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(ifElseStmt));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionWithOneValueReturnTypeOneEmptyReturn() {
+        /*
+         * func foo(bool b) : int {
+         *   if (b) {
+         *     return 0;
+         *   } else {
+         *     return;
+         *   }
+         * }
+         * 
+         */
+        
+        Statement elseBody = new ReturnStmt();
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement ifBody = new StmtBlock(List.of(returnStmt0));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), ifBody, elseBody);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(ifElseStmt));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(program);
+    }
+
+    @Test
+    public void testFunctionWithDefinitelyReturnInsideMaybeReturn() {
+        /*
+         * Even though this technically always returns, we're not currently checking for
+         * the values of the guard expressions, so this should throw
+         * 
+         * func foo(bool b) : int {
+         *   while (true) {
+         *     if (b) {
+         *       return 0;
+         *     } else {
+         *       return 1;
+         *     }
+         *   }
+         * }
+         * 
+         */
+        
+        Statement elseBody = new ReturnStmt(new IntLiteralExp(1));
+        Statement returnStmt0 = new ReturnStmt(new IntLiteralExp(0));
+        Statement ifBody = new StmtBlock(List.of(returnStmt0));
+        Statement ifElseStmt = new IfElseStmt(new VariableExp(getVariable("b")), ifBody, elseBody);
+        Statement whileStmt = new WhileStmt(new BoolLiteralExp(true), ifElseStmt);
+        StmtBlock funcBodyBlock = new StmtBlock(List.of(whileStmt));
+         
+        FunctionDef funcDef = new FunctionDef(
+            getFunctionName("foo"), 
+            List.of(new Param(getBoolType(), getVariable("b"))), 
+            getIntType(), 
+            funcBodyBlock);
+
+        Program program = new Program(List.of(), List.of(funcDef), List.of());
+        testThrowsTypecheckerException(program);
     }
 
     // Integration test
