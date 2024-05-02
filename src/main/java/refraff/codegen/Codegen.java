@@ -156,6 +156,12 @@ public class Codegen {
         }
     }
 
+    private void addComment(String comment) throws CodegenException {
+        addNewLine();
+        addIndentedString("// " + comment);
+        addNewLine();
+    }
+
     private void enterScope() {
         structScopeManager.enterScope();
     }
@@ -170,9 +176,7 @@ public class Codegen {
     }
 
     private void exitScope() throws CodegenException {
-        addNewLine();
-        addIndentedString("// Exiting scope");
-        addNewLine();
+        addComment("Exiting scope");
         // Get the list of struct variables that were declared in the current scope
         Map<String, StructType> currentScopeStructVariables = structScopeManager.exitScope();
         
@@ -659,9 +663,7 @@ public class Codegen {
         // Check if this is a struct variable
         if (structScopeManager.isStructVariable(assignStmt.getVariable().getName())) {
             StructType structType = structScopeManager.getStructTypeFromVariable(assignStmt.getVariable().getName());
-            addNewLine();
-            addIndentedString("// Generating assignment stmt for struct " + structType.getStructName().get().getName());
-            addNewLine();
+            addComment("Generating struct assignment stmt for " + assignStmt.getVariable().getName());
 
             // Release whatever the variable was pointing to
             releaseStructVariable(assignStmt.getVariable().getName(), structType);
@@ -727,8 +729,8 @@ public class Codegen {
         if (!optionalElseBody.isEmpty()) {
             addIndentedString("else\n");
             // generateStatements(List.of(optionalElseBody.get()));
-            if (ifElseStmt.getIfBody() instanceof StmtBlock) {
-                generateStatements(List.of(optionalElseBody.get()));
+            if (optionalElseBody.get() instanceof StmtBlock stmtBlock) {
+                generateStatements(List.of(stmtBlock));
             } else {
                 generateStatements(List.of(new StmtBlock(List.of(optionalElseBody.get()))));
             }
@@ -736,6 +738,7 @@ public class Codegen {
     }
 
     private void generatePrintlnStmt(final Statement stmt) throws CodegenException {
+        // Without flushing, some of the outputs are not captured
         addIndentedString("fflush(stdout);\n");
 
         PrintlnStmt printlnStmt = (PrintlnStmt)stmt;
@@ -857,7 +860,7 @@ public class Codegen {
         }
     }
 
-    // Parentheses mess up the allocation, so get rid of them
+    // Parentheses only up struct allocations, so get rid of them
     private VardecStmt getVardecStmtWithoutParens(VardecStmt vardecStmt) {
         if (vardecStmt.getExpression() instanceof ParenExp parenExp) {
             return getVardecStmtWithoutParens(
@@ -1059,9 +1062,7 @@ public class Codegen {
     private void generateStructAllocExp(final Expression exp) throws CodegenException {
         StructAllocExp structAllocExp = (StructAllocExp) exp;
         StructType structType = structAllocExp.getStructType();
-        addNewLine();
-        addIndentedString("// Allocating struct " + structAllocExp.getStructType().getStructName().get().getName());
-        addNewLine();
+        addComment("Allocating struct " + structAllocExp.getStructType().getStructName().get().getName());
 
         String tempAllocVariableName = getTempStructAllocVariableName(structType);
         Variable tempAllocVariable = new Variable(tempAllocVariableName);

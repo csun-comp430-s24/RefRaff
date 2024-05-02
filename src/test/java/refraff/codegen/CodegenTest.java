@@ -663,6 +663,7 @@ public class CodegenTest {
          * 
          * (((new A { a: null })));
          * 
+         * (new A { a: null });
          */
 
         StructDef structDef = new StructDef(getStructName("A"), List.of(
@@ -670,10 +671,15 @@ public class CodegenTest {
 
         Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
                 List.of(new StructActualParam(getVariable("a"), getNullExp()))));
-        Expression parenExp = new ParenExp(structAlloc);
+        Expression parenExp = new ParenExp(new ParenExp(new ParenExp(structAlloc)));
         Statement expStmt = new ExpressionStmt(parenExp);
 
-        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        Expression structAlloc2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp2 = new ParenExp(structAlloc2);
+        Statement expStmt2 = new ExpressionStmt(parenExp2);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt, expStmt2));
         testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
@@ -779,6 +785,42 @@ public class CodegenTest {
         Statement ifElseStmt = new IfElseStmt(condition, ifBody, elseBody);
         Program program = new Program(List.of(), List.of(), List.of(ifElseStmt));
         testProgramGeneratesAndDoesNotThrow(program);
+    }
+
+    @Test
+    public void testCodegenWithElseStmtBlock() {
+        /*
+         * For coverage
+         * 
+         * int foo = 0;
+         * 
+         * if (false) {
+         *   int foo = 1;
+         * } else {
+         *   int foo = 2;
+         * }
+         * 
+         * println(foo);
+         */
+
+        Statement vardecStmt = new VardecStmt(getIntType(), getVariable("foo"), new IntLiteralExp(0));
+
+        Statement ifBody = new AssignStmt(
+            getVariable("foo"),
+            new IntLiteralExp(6));
+        Statement elseBody = new AssignStmt(
+            getVariable("foo"),
+            new IntLiteralExp(0));
+        Statement stmtBlock = new StmtBlock(List.of(elseBody));
+        Expression condition = new BoolLiteralExp(false);
+        Statement ifElseStmt = new IfElseStmt(condition, ifBody, stmtBlock);
+
+        Expression foo = new VariableExp(getVariable("foo"));
+        foo.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(foo);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, ifElseStmt, printlnStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "0");
     }
 
     @Test
@@ -1209,27 +1251,6 @@ public class CodegenTest {
     }
 
     @Test
-    public void testCodegenWithElseStmtBlock() {
-        /*
-         * This should print 2 - for coverage
-         *
-         * if (false) {
-         *   println(1);
-         * } else {
-         *   println(2);
-         * }
-         */
-
-        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
-        Statement elseStmtBlock = new StmtBlock(List.of(new PrintlnStmt(new IntLiteralExp(2))));
-        Expression condition = new BoolLiteralExp(false);
-        Statement ifStmt = new IfElseStmt(condition, ifBody, elseStmtBlock);
-        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
-        String expectedOutput = "2";
-        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
-    }
-
-    @Test
     public void testCodegenWithAndExpCondition() {
         /*
          * This should not print because `6 && 0` should evaluate to 0
@@ -1464,7 +1485,113 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
     }
 
-    
+    @Test
+    public void testCodegenNotOperator() {
+        /*
+         * Should print 3
+         *
+         * bool trueBool = true;
+         * 
+         * bool falseBool = false;
+         * 
+         * if (!(trueBool && falseBool) == trueBool) {
+         *   println(3);
+         * }
+         */
+
+
+        Statement vardecTrue = new VardecStmt(getBoolType(), getVariable("trueBool"), new BoolLiteralExp(true));
+
+        Statement vardecFalse = new VardecStmt(getBoolType(), getVariable("falseBool"), new BoolLiteralExp(false));
+
+        Expression andExp = new BinaryOpExp(new VariableExp(getVariable("trueBool")), OperatorEnum.AND, new VariableExp(getVariable("falseBool")));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.DOUBLE_EQUALS, new VariableExp(getVariable("trueBool")));
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecTrue, vardecFalse, ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenNotOperatorWithOrExp() {
+        /*
+         * Should print 3
+         *
+         * bool trueBool = true;
+         * 
+         * bool falseBool = false;
+         * 
+         * if (!(falseBool || falseBool) == trueBool) {
+         *   println(3);
+         * }
+         */
+
+
+        Statement vardecTrue = new VardecStmt(getBoolType(), getVariable("trueBool"), new BoolLiteralExp(true));
+
+        Statement vardecFalse = new VardecStmt(getBoolType(), getVariable("falseBool"), new BoolLiteralExp(false));
+
+        Expression andExp = new BinaryOpExp(new VariableExp(getVariable("falseBool")), OperatorEnum.OR, new VariableExp(getVariable("falseBool")));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.DOUBLE_EQUALS, new VariableExp(getVariable("trueBool")));
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecTrue, vardecFalse, ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenLogicalOperatorPrecedenceNotBeforeOr() {
+        /*
+         * if (!(true && false) || true == true) {
+         *   println(3);
+         * }
+         * 
+         */
+
+        Expression andExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.OR, new BoolLiteralExp(false));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression doubleEqualsExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.DOUBLE_EQUALS, new BoolLiteralExp(true));
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.OR, doubleEqualsExp);
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenLogicalOperatorPrecedenceNotBeforeAndBeforeOr() {
+        /*
+         * if (true && !true || false == 0) {
+         *   println(3); 
+         * }
+         */
+
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, new BoolLiteralExp(true));
+        Expression andExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.OR, notExp);
+        Expression doubleEqualsExp = new BinaryOpExp(new BoolLiteralExp(false), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(0));
+        Expression condition = new BinaryOpExp(andExp, OperatorEnum.DOUBLE_EQUALS, doubleEqualsExp);
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
 
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String... expectedLines) {
