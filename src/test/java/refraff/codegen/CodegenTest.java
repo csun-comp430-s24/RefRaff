@@ -38,9 +38,9 @@ public class CodegenTest {
         return Node.setNodeSource(new BoolType(), "bool");
     }
 
-    private VoidType getVoidType() {
-        return Node.setNodeSource(new VoidType(), "void");
-    }
+    // private VoidType getVoidType() {
+    //     return Node.setNodeSource(new VoidType(), "void");
+    // }
 
     private NullExp getNullExp() {
         return Node.setNodeSource(new NullExp(), "null");
@@ -250,6 +250,499 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithAStructReassignment() {
+        /*
+         * struct B {
+         *   A a;
+         * }
+         *
+         * struct A {}
+         *
+         * B b = new B { a: null };
+         * B b2 = b;
+         */
+
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+        StructDef structDefA = new StructDef(getStructName("A"), List.of());
+
+        Expression allocExp = new StructAllocExp(getStructType("B"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement allocStatement = new VardecStmt(getStructType("B"), getVariable("b"), allocExp);
+
+        Expression assignExp = new VariableExp(getVariable("b"));
+        Statement reassignStmt = new VardecStmt(getStructType("B"), getVariable("b2"), assignExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(), List.of(allocStatement, reassignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenWithASameAndDifferentStructFields() {
+        /*
+         * This should print 2
+         *
+         * struct B {
+         *   int num;
+         *   B b;
+         *   A a;
+         * }
+         *
+         * struct A {
+         *   A a;
+         * }
+         *
+         * B b = new B { 
+         *   num: 1,
+         *   b: new B {
+         *     num: 2,
+         *     b: null,
+         *     a: null
+         *   }
+         *   a: new A {
+         *     a: null
+         *   }
+         * };
+         * 
+         * B innerB = b.b;
+         * 
+         * println(innerB.num);
+         */
+
+        
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(new IntType(), getVariable("num")),
+                new Param(getStructType("B"), getVariable("b")),
+                new Param(getStructType("A"), getVariable("a"))));
+        
+        StructDef structDefA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExpA = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB2 = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("b"), getNullExp()),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("b"), allocExpB2),
+                    new StructActualParam(getVariable("a"), allocExpA))));
+        Statement vardecStmtB = new VardecStmt(getStructType("B"), getVariable("b"), allocExpB);
+
+        Expression dotExp = new DotExp(new VariableExp(getVariable("b")), getVariable("b"));
+        Statement vardecStmtInnerB = new VardecStmt(getStructType("B"), getVariable("innerB"), dotExp);
+
+        Expression innerDotExp = new DotExp(new VariableExp(getVariable("innerB")), getVariable("num"));
+        innerDotExp.setExpressionType(getIntType());
+        PrintlnStmt printlnStmt = new PrintlnStmt(innerDotExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(),
+                List.of(vardecStmtB, vardecStmtInnerB, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2");
+    }
+
+    @Test
+    public void testCodegenAbandoningVardecVariableDoesntFreeFromOtherReference() {
+        /*
+         * This should print 3
+         *
+         * struct B {
+         *   int num;
+         *   B b;
+         *   A a;
+         * }
+         *
+         * struct A {
+         *   A a;
+         * }
+         *
+         * B b = new B { 
+         *   num: 1,
+         *   b: new B {
+         *     num: 2,
+         *     b: new B {
+         *       num: 3,
+         *       b: null,
+         *       a: null
+         *     },
+         *     a: null
+         *   },
+         *   a: new A {
+         *     a: null
+         *   }
+         * };
+         * 
+         * B innerB = b.b.b;
+         * 
+         * b = null;
+         * 
+         * println(innerB.num);
+         */
+
+        
+        StructDef structDefB = new StructDef(getStructName("B"), List.of(
+                new Param(new IntType(), getVariable("num")),
+                new Param(getStructType("B"), getVariable("b")),
+                new Param(getStructType("A"), getVariable("a"))));
+        
+        StructDef structDefA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExpA = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB3 = new StructAllocExp(getStructType("B"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(3)),
+                        new StructActualParam(getVariable("b"), getNullExp()),
+                        new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB2 = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("b"), allocExpB3),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression allocExpB = new StructAllocExp(getStructType("B"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("b"), allocExpB2),
+                    new StructActualParam(getVariable("a"), allocExpA))));
+        Statement vardecStmtB = new VardecStmt(getStructType("B"), getVariable("b"), allocExpB);
+
+        Expression dotExp2 = new DotExp(new VariableExp(getVariable("b")), getVariable("b"));
+        Expression dotExp = new DotExp(dotExp2, getVariable("b"));
+        Statement vardecStmtInnerB = new VardecStmt(getStructType("B"), getVariable("innerB"), dotExp);
+
+        Statement assignStmt = new AssignStmt(getVariable("b"), getNullExp());
+
+        Expression innerDotExp = new DotExp(new VariableExp(getVariable("innerB")), getVariable("num"));
+        innerDotExp.setExpressionType(getIntType());
+        PrintlnStmt printlnStmt = new PrintlnStmt(innerDotExp);
+
+        Program program = new Program(List.of(structDefB, structDefA), List.of(),
+                List.of(vardecStmtB, vardecStmtInnerB, assignStmt, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "3");
+    }
+
+    @Test
+    public void testCodegenWithStructAssignmentsInWhileLoop() {
+        /*
+         * Should print 2, 2 and not leak
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * A outer = new A {
+         *   num: 1,
+         *   a: new A {
+         *     num: 2,
+         *     a: null
+         *   }
+         * };
+         * 
+         * int count = 1;
+         * 
+         * while (count > 0) {
+         *   A inner = outer.a;
+         *   println(inner.num);
+         *   count = count - 1;
+         * }
+         * 
+         * println(outer.a.num);
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+            new Param(getIntType(), getVariable("num")),
+            new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("a"), structAllocExp2))));
+        Statement outerVardec = new VardecStmt(getStructType("A"), getVariable("outer"), structAllocExp);
+
+        Statement countVardec = new VardecStmt(getIntType(), getVariable("count"), new IntLiteralExp(1));
+
+        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
+        dotExpInnerNum.setExpressionType(getIntType());
+        Statement innerPrint = new PrintlnStmt(dotExpInnerNum);
+        Expression dotExpOuterA = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Statement innerVardec = new VardecStmt(getStructType("A"), getVariable("inner"), dotExpOuterA);
+        Expression minusExp = new BinaryOpExp(new VariableExp(getVariable("count")), OperatorEnum.MINUS, new IntLiteralExp(1));
+        Statement decrement = new AssignStmt(getVariable("count"), minusExp);
+        StmtBlock whileBody = new StmtBlock(List.of(innerVardec, innerPrint, decrement));
+        Expression guard = new BinaryOpExp(new VariableExp(getVariable("count")), OperatorEnum.GREATER_THAN, new IntLiteralExp(0));
+        Statement whileStmt = new WhileStmt(guard, whileBody);
+
+        Expression dotExpOuterA2 = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Expression dotExpDotNum = new DotExp(dotExpOuterA2, getVariable("num"));
+        dotExpDotNum.setExpressionType(getIntType());
+        Statement outerPrint = new PrintlnStmt(dotExpDotNum);
+
+        Program program = new Program(List.of(structA), List.of(), List.of(outerVardec, countVardec, whileStmt, outerPrint));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2", "2");
+    }
+
+    
+    @Test
+    public void testCodegenWithStructAssignmentsInIfStatement() {
+        /*
+         * Should print 2, 2 and not leak
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * A outer = new A {
+         *   num: 1,
+         *   a: new A {
+         *     num: 2,
+         *     a: null
+         *   }
+         * };
+         * 
+         * if (true) {
+         *   A inner = outer.a;
+         *   println(inner.num);
+         * }
+         * 
+         * println(outer.a.num);
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+            new Param(getIntType(), getVariable("num")),
+            new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("a"), structAllocExp2))));
+        Statement outerVardec = new VardecStmt(getStructType("A"), getVariable("outer"), structAllocExp);
+
+        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
+        dotExpInnerNum.setExpressionType(getIntType());
+        Statement innerPrint = new PrintlnStmt(dotExpInnerNum);
+        Expression dotExpOuterA = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Statement innerVardec = new VardecStmt(getStructType("A"), getVariable("inner"), dotExpOuterA);
+        StmtBlock ifBody = new StmtBlock(List.of(innerVardec, innerPrint));
+        Statement ifStmt = new IfElseStmt(new BoolLiteralExp(true), ifBody);
+
+        Expression dotExpOuterA2 = new DotExp(new VariableExp(getVariable("outer")), getVariable("a"));
+        Expression dotExpDotNum = new DotExp(dotExpOuterA2, getVariable("num"));
+        dotExpDotNum.setExpressionType(getIntType());
+        Statement outerPrint = new PrintlnStmt(dotExpDotNum);
+
+        Program program = new Program(List.of(structA), List.of(), List.of(outerVardec, ifStmt, outerPrint));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2", "2");
+    }
+
+    @Test
+    public void testCodegenReassignStructVariableToNewStructAlloc() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a1 = new A { a: null };
+         * 
+         * a1 = new A { a: null };
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression allocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), allocExp);
+
+        Expression allocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement assignStmt = new AssignStmt(getVariable("a"), allocExp2);
+
+        Program program = new Program(List.of(structA), List.of(),
+                List.of(vardecStmt, assignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenWithNestedIfElseWhile() {
+        /*
+         * 
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A a1 = new A { a: null };
+         * 
+         * int num = 3;
+         * 
+         * if (num == 3) {
+         *   A a2 = new A { a: a1 };
+         * 
+         *   while (num > 0) {
+         *     A a3 = new A { a: a2 };
+         *     num = num - 1;
+         * 
+         *     if (num == 0) {
+         *       A a4 = new A { a: a3 };
+         *     }
+         *   }
+         * }
+         */
+        StructDef structA = new StructDef(getStructName("A"), List.of(new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocA1 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new NullExp()))));
+        Statement  vardecStmtA1 = new VardecStmt(getStructType("A"), getVariable("a1"), structAllocA1);
+
+        Statement vardecStmtNum = new VardecStmt(getIntType(), getVariable("num"), new IntLiteralExp(3));
+
+        Expression doubleEqualsNum0 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(0));
+        Expression structAllocA4 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a3"))))));
+        Statement ifBlock2 = new VardecStmt(getStructType("A"), getVariable("a4"), structAllocA4);
+        Statement ifStmt2 = new IfElseStmt(doubleEqualsNum0, ifBlock2);
+
+        Expression structAllocA3 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a2"))))));
+        Statement vardecStmtA3 = new VardecStmt(getStructType("A"), getVariable("a3"), structAllocA3);
+        Expression minusNum1 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.MINUS, new IntLiteralExp(1));
+        Statement numDecrement = new AssignStmt(getVariable("num"), minusNum1);
+        Statement stmtBlock2 = new StmtBlock(List.of(vardecStmtA3, numDecrement, ifStmt2));
+        Expression greaterThanNum0 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.GREATER_THAN, new IntLiteralExp(0));
+        Statement whileStmt = new WhileStmt(greaterThanNum0, stmtBlock2);
+
+        Expression structAllocA2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), new VariableExp(getVariable("a1"))))));
+        Statement vardecStmtA2 = new VardecStmt(getStructType("A"), getVariable("a2"), structAllocA2);
+        Expression doubleEqualsNum3 = new BinaryOpExp(new VariableExp(getVariable("num")), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(3));
+        Statement stmtBlock1 = new StmtBlock(List.of(vardecStmtA2, whileStmt));
+        Statement ifStmt = new IfElseStmt(doubleEqualsNum3, stmtBlock1);
+
+        Program program = new Program(List.of(structA), List.of(), List.of(vardecStmtA1, vardecStmtNum, ifStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenWithSingleStatementStructVardecInIf() {
+        /*
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * if (true) {
+         *   A inner = new A {
+         *     num: 1
+         *     a: null
+         *   };
+         * }
+         * 
+         */
+
+        StructDef structA = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                        new StructActualParam(getVariable("num"), getNullExp()))));
+        Statement whileBody = new VardecStmt(getStructType("A"), getVariable("inner"), structAlloc);
+
+        Expression testExp = new BoolLiteralExp(true);
+        Statement ifStmt = new IfElseStmt(testExp, whileBody);
+
+        Program program = new Program(List.of(structA), List.of(),
+                List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testStructAllocInParens() {
+        /*
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * A* a = (new A { a: null });
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testStructAllocExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * new A { a: null };
+         * 
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement expStmt = new ExpressionStmt(structAlloc);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testStructAllocInParenExpressionInExpressionStmt() {
+        /*
+         * I'm pretty sure this is legal. I'm just checking before I put it in the
+         * codegen
+         *
+         * struct A {
+         *   A a;
+         * }
+         * 
+         * (((new A { a: null })));
+         * 
+         * (new A { a: null });
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(new ParenExp(new ParenExp(structAlloc)));
+        Statement expStmt = new ExpressionStmt(parenExp);
+
+        Expression structAlloc2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp2 = new ParenExp(structAlloc2);
+        Statement expStmt2 = new ExpressionStmt(parenExp2);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(expStmt, expStmt2));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
     public void testCodegenWithExpressionStmt() {
         /*
          * 3;
@@ -354,6 +847,42 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithElseStmtBlock() {
+        /*
+         * For coverage
+         * 
+         * int foo = 0;
+         * 
+         * if (false) {
+         *   int foo = 1;
+         * } else {
+         *   int foo = 2;
+         * }
+         * 
+         * println(foo);
+         */
+
+        Statement vardecStmt = new VardecStmt(getIntType(), getVariable("foo"), new IntLiteralExp(0));
+
+        Statement ifBody = new AssignStmt(
+            getVariable("foo"),
+            new IntLiteralExp(6));
+        Statement elseBody = new AssignStmt(
+            getVariable("foo"),
+            new IntLiteralExp(0));
+        Statement stmtBlock = new StmtBlock(List.of(elseBody));
+        Expression condition = new BoolLiteralExp(false);
+        Statement ifElseStmt = new IfElseStmt(condition, ifBody, stmtBlock);
+
+        Expression foo = new VariableExp(getVariable("foo"));
+        foo.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(foo);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecStmt, ifElseStmt, printlnStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "0");
+    }
+
+    @Test
     public void testCodegenWithWhileStmt() {
         /*
          * int foo = 3;
@@ -432,11 +961,35 @@ public class CodegenTest {
         /*
          * println(6);
          */
-        Statement printLnStmt = new PrintlnStmt(new IntLiteralExp(6));
+        Statement printlnStmt = new PrintlnStmt(new IntLiteralExp(6));
 
-        Program program = new Program(List.of(), List.of(), List.of(printLnStmt));
+        Program program = new Program(List.of(), List.of(), List.of(printlnStmt));
         String expectedOutput = "6";
         testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithParenInMathExp() {
+        /*
+         * Should print 10, then 16
+         * 
+         * println(2 + 2 * 4);
+         * 
+         * println((2 + 2) * 4);
+         */
+
+        Expression mult10 = new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.MULTIPLY, new IntLiteralExp(4));
+        Expression math10 = new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.PLUS, mult10);
+        math10.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(math10);
+
+        Expression parenExp = new ParenExp(new BinaryOpExp(new IntLiteralExp(2), OperatorEnum.PLUS, new IntLiteralExp(2)));
+        Expression math16 = new BinaryOpExp(parenExp, OperatorEnum.MULTIPLY, new IntLiteralExp(4));
+        math16.setExpressionType(getIntType());
+        Statement printlnStmt2 = new PrintlnStmt(math16);
+
+        Program program = new Program(List.of(), List.of(), List.of(printlnStmt, printlnStmt2));
+        testProgramGeneratesAndDoesNotThrow(program, "10", "16");
     }
 
     @Test
@@ -506,7 +1059,211 @@ public class CodegenTest {
         Statement dotExpStatement = new ExpressionStmt(dotExp);
 
         Program program = new Program(List.of(structDef), List.of(), List.of(vardecA, dotExpStatement));
-        testProgramGeneratesAndDoesNotThrow(program);
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenAllocateStructToTheSameVariableMultipleTimes() {
+        /*
+         * struct A {
+         *   A a;
+         * }
+         *
+         * A a = new A {
+         *   a: null
+         * };
+         * 
+         * a = new A {
+         *   a: null
+         * };
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement vardec = new VardecStmt(getStructType("A"), getVariable("a"), structAlloc);
+
+        Expression structAlloc2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement assign = new AssignStmt(getVariable("a"), structAlloc2);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardec, assign));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenAssignStmtWithStructAllocInParen() {
+        /*
+         * This foolishness is for code coverage
+         *  
+         * struct A {
+         *   A a;
+         * }
+         *
+         * A a = null
+         * 
+         * a = (new A { a: null });
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Statement vardec = new VardecStmt(getStructType("A"), getVariable("a"), getNullExp());
+
+        Expression structAlloc = new StructAllocExp(getStructType("A"), new StructActualParams(
+                List.of(new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression parenExp = new ParenExp(structAlloc);
+        Statement assign = new AssignStmt(getVariable("a"), parenExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardec, assign));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testRepeatedAssignmentAndAbandonmentWithNestedStruct() {
+        /*
+         * Should print 2, and not leak
+         *
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         *
+         * A a1 = new A {
+         *   num: 1,
+         *   a: new A {
+         *     num: 2,
+         *     a: null
+         *   }
+         * };
+         * 
+         * A a2 = a1;
+         * 
+         * A a3 = a2;
+         * 
+         * A inner = a1.a;
+         * 
+         * a1 = null;
+         * 
+         * a2 = null;
+         * 
+         * a3 = null;
+         * 
+         * println(inner.num);
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp2 = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(2)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("a"), structAllocExp2))));
+        Statement vardecA1 = new VardecStmt(getStructType("A"), getVariable("a1"), structAllocExp);
+
+        Statement vardecA2 = new VardecStmt(getStructType("A"), getVariable("a2"), new VariableExp(getVariable("a1")));
+        Statement vardecA3 = new VardecStmt(getStructType("A"), getVariable("a3"), new VariableExp(getVariable("a2")));
+
+        Expression dotExpA1A = new DotExp(new VariableExp(getVariable("a1")), getVariable("a"));
+        Statement vardecUnreachable = new VardecStmt(getStructType("A"), getVariable("inner"), dotExpA1A);
+
+        Statement assignA1 = new AssignStmt(getVariable("a1"), getNullExp());
+        Statement assignA2 = new AssignStmt(getVariable("a2"), getNullExp());
+        Statement assignA3 = new AssignStmt(getVariable("a3"), getNullExp());
+
+        Expression dotExpInnerNum = new DotExp(new VariableExp(getVariable("inner")), getVariable("num"));
+        dotExpInnerNum.setExpressionType(getIntType());
+        Statement printlnStmt = new PrintlnStmt(dotExpInnerNum);
+
+        Program program = new Program(List.of(structDef), List.of(), 
+                List.of(vardecA1, vardecA2, vardecA3, vardecUnreachable, assignA1, assignA2, assignA3, printlnStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program, "2");
+    }
+
+    @Test
+    public void testCodegenStructFunctionAssignment() {
+        /*
+         * struct A {
+         *   int num;
+         *   A a;
+         * }
+         * 
+         * A getA() {
+         *   A a = new A {
+         *     num: 3,
+         *     a: null
+         *   }
+         * }
+         *
+         * A a = getA();
+         * 
+         * println(a.num);
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getStructType("A"), getVariable("a"))));
+
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(3)),
+                    new StructActualParam(getVariable("a"), getNullExp()))));
+        Statement stmtBlock = new VardecStmt(getStructType("A"), getVariable("a"), structAllocExp);
+        StmtBlock funcBody = new StmtBlock(List.of(stmtBlock));
+        Type returnType = getStructType("A");
+        FunctionDef functionDef = new FunctionDef(
+            getFunctionName("getA"), 
+            List.of(), 
+            returnType,
+            funcBody);
+
+        CommaExp commaExp = new CommaExp(List.of());
+        Expression funcCall = new FuncCallExp(getFunctionName("getA"), commaExp);
+        Statement vardecFunc = new VardecStmt(getStructType("A"), getVariable("a"), funcCall);
+
+        Expression dotExp = new DotExp(new VariableExp(getVariable("a")), getVariable("num"));
+        dotExp.setExpressionType(getIntType());
+        Statement printStmt = new PrintlnStmt(dotExp);
+
+        Program program = new Program(List.of(structDef), List.of(functionDef), List.of(vardecFunc, printStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
+    }
+
+    @Test
+    public void testCodegenAssignStmtWithMultipleNonStructFields() {
+        /*
+         * For coverage
+         * 
+         * struct A {
+         *   int num;
+         *   bool tof;
+         * }
+         *
+         * A a = null;
+         * 
+         * a = new A {
+         *   num: 1,
+         *   tof: true
+         * };
+         */
+
+        StructDef structDef = new StructDef(getStructName("A"), List.of(
+                new Param(getIntType(), getVariable("num")),
+                new Param(getBoolType(), getVariable("tof"))));
+
+        Statement vardecStmt = new VardecStmt(getStructType("A"), getVariable("a"), getNullExp());
+
+        Expression structAllocExp = new StructAllocExp(getStructType("A"), new StructActualParams(
+            List.of(new StructActualParam(getVariable("num"), new IntLiteralExp(1)),
+                    new StructActualParam(getVariable("tof"), new BoolLiteralExp(true)))));
+        Statement assignStmt = new AssignStmt(getVariable("a"), structAllocExp);
+
+        Program program = new Program(List.of(structDef), List.of(), List.of(vardecStmt, assignStmt));
+        testProgramGeneratesAndDoesNotThrowOrLeak(program);
     }
 
     @Test
@@ -532,6 +1289,27 @@ public class CodegenTest {
     }
 
     @Test
+    public void testCodegenWithElseBlock() {
+        /*
+         * This should print 2
+         *
+         * if (false) {
+         *   println(1);
+         * } else {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Statement elseBody = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition = new BoolLiteralExp(false);
+        Statement ifStmt = new IfElseStmt(condition, ifBody, elseBody);
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        String expectedOutput = "2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
     public void testCodegenWithAndExpCondition() {
         /*
          * This should not print because `6 && 0` should evaluate to 0
@@ -551,6 +1329,329 @@ public class CodegenTest {
         testProgramGeneratesAndDoesNotThrow(program);
     }
 
+    @Test
+    public void testCodegenWithNotEqualsExpCondition() {
+        /*
+         * This should only print 1
+         *
+         * if (6 != 5) {
+         *   println(1);
+         * }
+         * 
+         * if (6 != 6) {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.NOT_EQUALS,
+                new IntLiteralExp(6));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(6),
+                OperatorEnum.NOT_EQUALS,
+                new IntLiteralExp(6));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "1";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithGreaterThanExpCondition() {
+        /*
+         * This should only print 3
+         *
+         * if (7 > 6) {
+         *   println(3);
+         * }
+         * 
+         * if (3 > 6) {
+         *   println(1);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(7),
+                OperatorEnum.GREATER_THAN,
+                new IntLiteralExp(6));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(3),
+                OperatorEnum.GREATER_THAN,
+                new IntLiteralExp(6));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "3";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithLessThanExpCondition() {
+        /*
+         * This should only print 1
+         *
+         * if (3 < 4) {
+         *   println(1);
+         * }
+         * 
+         * if (4 < 3) {
+         *   println(2);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(3),
+                OperatorEnum.LESS_THAN,
+                new IntLiteralExp(4));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.LESS_THAN,
+                new IntLiteralExp(3));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2));
+        String expectedOutput = "1";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithGreaterThanEqualsExpCondition() {
+        /*
+         * This should only print 1 and 2
+         *
+         * if (5 >= 4) {
+         *   println(1);
+         * }
+         * 
+         * if (4 >= 4) {
+         *   println(2);
+         * }
+         * 
+         * if (4 >= 5) {
+         *   println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Statement ifBody3 = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition3 = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.GREATER_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt3 = new IfElseStmt(condition3, ifBody3);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2, ifStmt3));
+        String expectedOutput = "1\n2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenWithLessThanEqualsExpCondition() {
+        /*
+         * This should only print 1 and 2
+         *
+         * if (4 <= 5) {
+         *  println(1);
+         * }
+         * 
+         * if (5 <= 5) {
+         *  println(2);
+         * }
+         * 
+         * if (5 <= 4) {
+         *  println(3);
+         * }
+         */
+
+        Statement ifBody = new PrintlnStmt(new IntLiteralExp(1));
+        Expression condition = new BinaryOpExp(
+                new IntLiteralExp(4),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Statement ifBody2 = new PrintlnStmt(new IntLiteralExp(2));
+        Expression condition2 = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(5));
+        Statement ifStmt2 = new IfElseStmt(condition2, ifBody2);
+
+        Statement ifBody3 = new PrintlnStmt(new IntLiteralExp(3));
+        Expression condition3 = new BinaryOpExp(
+                new IntLiteralExp(5),
+                OperatorEnum.LESS_THAN_EQUALS,
+                new IntLiteralExp(4));
+        Statement ifStmt3 = new IfElseStmt(condition3, ifBody3);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt, ifStmt2, ifStmt3));
+        String expectedOutput = "1\n2";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenNotOperatorExp() {
+        /*
+         * bool trueBool = true;
+         * bool falseBool = !trueBool;
+         * println(falseBool);
+         */
+
+        Statement trueAssign = new VardecStmt(
+            getBoolType(),
+            getVariable("trueBool"),
+            new BoolLiteralExp(true));
+
+        Expression notTrue = new UnaryOpExp(OperatorEnum.NOT, new VariableExp(getVariable("trueBool")));
+        Statement falseAssign = new VardecStmt(
+                getBoolType(),
+                getVariable("falseBool"),
+                notTrue);
+        Expression printExp = new VariableExp(getVariable("falseBool"));
+        printExp.setExpressionType(getBoolType());
+
+        Statement falsePrint = new PrintlnStmt(printExp);
+
+        Program program = new Program(List.of(), List.of(), List.of(trueAssign, falseAssign, falsePrint));
+        String expectedOutput = "false";
+        testProgramGeneratesAndDoesNotThrow(program, expectedOutput);
+    }
+
+    @Test
+    public void testCodegenNotOperator() {
+        /*
+         * Should print 3
+         *
+         * bool trueBool = true;
+         * 
+         * bool falseBool = false;
+         * 
+         * if (!(trueBool && falseBool) == trueBool) {
+         *   println(3);
+         * }
+         */
+
+
+        Statement vardecTrue = new VardecStmt(getBoolType(), getVariable("trueBool"), new BoolLiteralExp(true));
+
+        Statement vardecFalse = new VardecStmt(getBoolType(), getVariable("falseBool"), new BoolLiteralExp(false));
+
+        Expression andExp = new BinaryOpExp(new VariableExp(getVariable("trueBool")), OperatorEnum.AND, new VariableExp(getVariable("falseBool")));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.DOUBLE_EQUALS, new VariableExp(getVariable("trueBool")));
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecTrue, vardecFalse, ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenNotOperatorWithOrExp() {
+        /*
+         * Should print 3
+         *
+         * bool trueBool = true;
+         * 
+         * bool falseBool = false;
+         * 
+         * if (!(falseBool || falseBool) == trueBool) {
+         *   println(3);
+         * }
+         */
+
+
+        Statement vardecTrue = new VardecStmt(getBoolType(), getVariable("trueBool"), new BoolLiteralExp(true));
+
+        Statement vardecFalse = new VardecStmt(getBoolType(), getVariable("falseBool"), new BoolLiteralExp(false));
+
+        Expression andExp = new BinaryOpExp(new VariableExp(getVariable("falseBool")), OperatorEnum.OR, new VariableExp(getVariable("falseBool")));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.DOUBLE_EQUALS, new VariableExp(getVariable("trueBool")));
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(vardecTrue, vardecFalse, ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenLogicalOperatorPrecedenceNotBeforeOr() {
+        /*
+         * if (!(true && false) || true == true) {
+         *   println(3);
+         * }
+         * 
+         */
+
+        Expression andExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.OR, new BoolLiteralExp(false));
+        Expression parenExp = new ParenExp(andExp);
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, parenExp);
+        Expression doubleEqualsExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.DOUBLE_EQUALS, new BoolLiteralExp(true));
+        Expression condition = new BinaryOpExp(notExp, OperatorEnum.OR, doubleEqualsExp);
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
+    @Test
+    public void testCodegenLogicalOperatorPrecedenceNotBeforeAndBeforeOr() {
+        /*
+         * if (true && !true || false == 0) {
+         *   println(3); 
+         * }
+         */
+
+        Expression notExp = new UnaryOpExp(OperatorEnum.NOT, new BoolLiteralExp(true));
+        Expression andExp = new BinaryOpExp(new BoolLiteralExp(true), OperatorEnum.OR, notExp);
+        Expression doubleEqualsExp = new BinaryOpExp(new BoolLiteralExp(false), OperatorEnum.DOUBLE_EQUALS, new IntLiteralExp(0));
+        Expression condition = new BinaryOpExp(andExp, OperatorEnum.DOUBLE_EQUALS, doubleEqualsExp);
+        Expression int3 = new IntLiteralExp(3);
+        int3.setExpressionType(getIntType());
+        Statement ifBody = new PrintlnStmt(int3);
+        Statement ifStmt = new IfElseStmt(condition, ifBody);
+
+        Program program = new Program(List.of(), List.of(), List.of(ifStmt));
+        testProgramGeneratesAndDoesNotThrow(program, "3");
+    }
+
     // Test invalid inputs
     private void testGeneratedFileThrowsCodegenException(String cSourceFile, String... expectedLines) {
         File sourceFile = new File(tempDirectory, cSourceFile);
@@ -562,6 +1663,30 @@ public class CodegenTest {
         File sourceFile = new File(tempDirectory, cSourceFile);
         assertThrows(CodegenMemoryLeakException.class,
                 () -> CCodeRunner.runWithDrMemoryAndCaptureOutput(tempDirectory, sourceFile, expectedLines));
+    }
+
+    @Test
+    public void structScopeManagerThrowsWhenExitingScopeOnEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        assertThrows(CodegenException.class, () -> structScopeManager.exitScope());
+    }
+
+    @Test
+    public void structScopeManagerThrowsWhenCheckingIfVariableIsInScopeOnEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        String variableName = "variableName";
+        assertThrows(CodegenException.class, () -> structScopeManager.isInScope(variableName));
+    }
+
+    @Test
+    public void structScopeManagerThrowsWhenAddingVariableToEmptyStack() {
+        // This is for code coverage
+        StructScopeManager structScopeManager = new StructScopeManager();
+        String variableName = "variableName";
+        StructType structType = getStructType("structTypeName");
+        assertThrows(CodegenException.class, () -> structScopeManager.addStructVariableToScope(variableName, structType));
     }
 
     @Test
@@ -598,7 +1723,7 @@ public class CodegenTest {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
             Typechecker.typecheckProgram(program);
-            testProgramGeneratesAndDoesNotThrow(program, "3");
+            testProgramGeneratesAndDoesNotThrowOrLeak(program, "3");
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
         }
@@ -611,7 +1736,7 @@ public class CodegenTest {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Program program = Parser.parseProgram(sourcedTokens);
             Typechecker.typecheckProgram(program);
-            testProgramGeneratesAndDoesNotThrow(program, "3", "false");
+            testProgramGeneratesAndDoesNotThrowOrLeak(program, "3", "false");
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
         }

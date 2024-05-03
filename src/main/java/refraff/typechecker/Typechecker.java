@@ -267,6 +267,9 @@ public class Typechecker {
                 functionTypeEnv.put(Standardized.of(param.getVariable()), param.getType());
             }
 
+            // Check that the function either always returns, or never returns (void)
+            definitelyReturns(funcDef);
+
             // Then get the stated return type of the function
             Type functionType = funcDef.getReturnType();
 
@@ -276,6 +279,98 @@ public class Typechecker {
             // Throw an error if the return types don't match
             throwTypecheckerExceptionOnMismatchedTypes(funcName.getName(), program, functionBodyType,
                                                        functionType, functionBodyType);
+        }
+    }
+
+    // This is implemented as a second pass, which is not efficient, but I feel like
+    // I'd have to change so much to check for this at the same time as type checking
+    private void definitelyReturns(FunctionDef functionDef) throws TypecheckerException {
+        String functionName = functionDef.getFunctionName().getName();
+        List<Statement> statements = functionDef.getFunctionBody().getBlockBody();
+        ReturnStatus returnStatus = getReturnStatus(functionName, statements);
+
+        if (!returnStatus.isValidReturnStatus()) {
+            throw new TypecheckerException("Function " + functionName + " only returns value sometimes");
+        }
+    }
+
+    // Recursive function for checking whether a function definitely returns
+    private ReturnStatus getReturnStatus(String functionName, List<Statement> statements)
+            throws TypecheckerException {
+        ReturnStatus thisReturnStatus = new ReturnStatus();
+
+        // For each statement in this block
+        for (int i = 0; i < statements.size(); i++) {
+
+            if (statements.get(i) instanceof ReturnStmt returnStatement) {
+                // if this returns statement is the last statement in this block
+                if (i == statements.size() - 1) {
+                    // And if it returns a value
+                    if (returnStatement.hasReturnValue()) {
+                        // This level definitely return a value
+                        return ReturnStatus.getDefinitelyReturnsStatus();
+                    } else {
+                        // If it doesn't return a value, the return status as it is currently
+                        return thisReturnStatus;
+                    }
+                } else {
+                    // There are statements after the return, throw
+                    // CHANGE TO THROWTYPECHECKER EXCEPTION
+                    throw new TypecheckerException("Unreachable code in " + functionName);
+                }
+            }
+
+            // If it's an if statement
+            if (statements.get(i) instanceof IfElseStmt ifElseStmt) {
+                // If the body is a single statement, put it in a list, or get list from body
+                List<Statement> ifBody = getListOfStmts(ifElseStmt.getIfBody());
+                ReturnStatus ifReturnStatus = getReturnStatus(functionName, ifBody);
+
+                // If it's an if/else statement, get the else return status
+                Optional<Statement> optionalElse = ifElseStmt.getElseBody();
+                if (!optionalElse.isEmpty()) {
+                    List<Statement> elseBody = getListOfStmts(optionalElse.get());
+                    ReturnStatus elseReturnStatus = getReturnStatus(functionName, elseBody);
+
+                    // Throw for unreachable code
+                    if (bothDefinitelyReturn(ifReturnStatus, elseReturnStatus) && i < statements.size() - 1) {
+                        // CHANGE TO THROWTYPECHECKER EXCEPTION
+                        throw new TypecheckerException("Unreachable code in " + functionName);
+                    } else if (bothDefinitelyReturn(ifReturnStatus, elseReturnStatus)) {
+                        // If this is the last statement and both definitely return, return a definitely status
+                        return ReturnStatus.getDefinitelyReturnsStatus();
+                    } else {
+                        // Otherwise, update this status with the else return status
+                        thisReturnStatus.updateReturnStatus(elseReturnStatus);
+                    }
+                }
+                thisReturnStatus.updateReturnStatus(ifReturnStatus);
+            }
+
+            // If it's a while statement, update this return status with the while loop return status
+            // I'm not going to see if any loops are always/never entered, but we could do that later if we want
+            if (statements.get(i) instanceof WhileStmt whileStmt) {
+                List<Statement> whileBody = getListOfStmts(whileStmt.getBody());
+                ReturnStatus whileReturnStatus = getReturnStatus(functionName, whileBody);
+
+                thisReturnStatus.updateReturnStatus(whileReturnStatus);
+            }
+
+        }
+
+        return thisReturnStatus;
+    }
+
+    private boolean bothDefinitelyReturn(ReturnStatus firstReturnStatus, ReturnStatus secondReturnStatus) {
+        return firstReturnStatus.getDefinitelyReturns() == true
+               && secondReturnStatus.getDefinitelyReturns() == true;
+    }
+
+    private List<Statement> getListOfStmts(Statement statement) {
+        if (statement instanceof StmtBlock stmtBlock) {
+            return stmtBlock.getBlockBody();
+        } else {
+            return List.of(statement);
         }
     }
 
@@ -406,28 +501,6 @@ public class Typechecker {
         this.withinFunctionDef = true;
         typecheckStatements(copyOf(typeEnv), functionBody.getBlockBody());
         this.withinFunctionDef = false;
-
-        // This method won't accept keep track of returns within nested statement blocks: e.g. while
-        // It may be easier to keep track of a global function tracker, and append the return types to a global list
-//        // For each statement
-//        for (Statement stmt : functionBody.getBlockBody()) {
-//            // If this is a return statement
-//            if (stmt.getClass().equals(ReturnStmt.class)) {
-//                System.out.println("Return statement: " + stmt);
-//                functionBodyTypes.add(typecheckReturnStmt(stmt, typeEnv));
-//            } else {
-//                System.out.println("Other statement: " + stmt);
-//                // For any other statement, just type check as normal
-//                // For now I'm making a list with a single statement,
-//                // But I should factor out teypecheck statement (singular)
-//
-//            }
-//        }
-//
-//        // If the return types list is empty, return void type
-//        if (functionBodyTypes.isEmpty()) {
-//            return VOID_TYPE;
-//        }
 
         throwIfReturnsDoNotMatchFunctionReturnType(functionReturnType, allReturnTypesInThisFunction, functionBody);
         allReturnTypesInThisFunction.clear();

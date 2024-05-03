@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.lang.InterruptedException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.TimeUnit;
 
 // This runs the generated code and throws exceptions if the code won't compile, run,
 // output the expected output, or has memory leaks
@@ -31,7 +32,6 @@ public class CCodeRunner {
 
         // Run and capture the output of the file, like normally
         runAndCaptureOutput(directory, sourceFile, expectedLines);
-
         // Run the compiled program with the Dr. Memory command line tool
         runWithDrMemory(directory, executable, drMemLogDir);
 
@@ -66,39 +66,105 @@ public class CCodeRunner {
 
     public static void runExecutable(Path executable, String expectedOutput) throws CodegenException {
         try {
-            // Run the compiled C program
             Process run = Runtime.getRuntime().exec(executable.toString());
-            BufferedReader reader = new BufferedReader(new InputStreamReader(run.getInputStream()));
 
-            String line;
+            // Create threads to handle both input and error streams - when I use the other version with just the
+            // output capture, some of the programs won't terminate, and I can't end them. Idk : (
+            BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(run.getErrorStream()));
             StringBuilder output = new StringBuilder();
-            while ((line = reader.readLine()) != null) {
-                output.append(line + "\n");
+            StringBuilder errors = new StringBuilder();
+
+            Thread outputThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = outputReader.readLine()) != null) {
+                        output.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            Thread errorThread = new Thread(() -> {
+                try {
+                    String line;
+                    while ((line = errorReader.readLine()) != null) {
+                        errors.append(line).append("\n");
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+
+            outputThread.start();
+            errorThread.start();
+
+            // Use a timeout for waitFor - This is interesting. I can only force a program to close if I use the
+            // threads and not the other way of capturing output. So, some program won't close on their own when testing.
+            // But if I compile and run the same generated code outside of the tests, it will output the correct information 
+            // and terminate. If I run the executable created by the test, it will output the correct output and terminate.
+            // So I just have this close the program after 30 seconds. It's annoying. I don't even know if you would have
+            // The same issues on your end. You can check by uncommenting the exception and seeing which programs don't close -_- 
+            if (!run.waitFor(20, TimeUnit.SECONDS)) {
+                run.destroyForcibly();
+                outputThread.interrupt();
+                errorThread.interrupt();
+                // throw new CodegenException("Executable timed out: " + executable);
             }
 
-            // I don't know if we want to do anything about the exit code
-            int exitCode = run.waitFor();
+            // Ensure all output is processed
+            outputThread.join();
+            errorThread.join();
 
-            // Compare outputs, throw exception if they don't match
+            // Check for errors in the output
+            if (errors.length() > 0) {
+                System.out.println("Error Output: " + errors.toString());
+            }
+
+            // Compare outputs
             if (!output.toString().trim().equals(expectedOutput.trim())) {
-                throw new CodegenException("Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
+                throw new CodegenException(
+                        "Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
             }
 
         } catch (IOException | InterruptedException e) {
             throw new CodegenException("Could not run executable: " + executable);
         }
-
     }
+
+    // public static void runExecutable(Path executable, String expectedOutput) throws CodegenException {
+    //     try {
+    //         System.out.println("Running program: " + executable.toString());
+    //         // Run the compiled C program
+    //         Process run = Runtime.getRuntime().exec(executable.toString());
+    //         BufferedReader outputReader = new BufferedReader(new InputStreamReader(run.getInputStream()));
+
+    //         String line;
+    //         StringBuilder output = new StringBuilder();
+    //         while ((line = outputReader.readLine()) != null) {
+    //             output.append(line + "\n");
+    //         }
+
+    //         // I don't know if we want to do anything about the exit code
+    //         int exitCode = run.waitFor();
+
+    //         // Compare outputs, throw exception if they don't match
+    //         if (!output.toString().trim().equals(expectedOutput.trim())) {
+    //             throw new CodegenException("Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
+    //         }
+
+    //     } catch (IOException | InterruptedException e) {
+    //         throw new CodegenException("Could not run executable: " + executable);
+    //     }
+    // }
 
     public static void runWithDrMemory(File directory, Path executable, Path drMemLogDir)
             throws CodegenException {
         try {
-            // Make sure log file exists
+            // Make sure log file exists - I think we can get rid of this?
             File logDir = new File(drMemLogDir.toString());
             logDir.mkdirs();
-
-            // Clear logs from any previous runs (just to reduce clutter)
-            clearDirectory(logDir);
 
             // Run the program with Dr. Memory
             ProcessBuilder runBuilder = new ProcessBuilder(
@@ -161,33 +227,5 @@ public class CCodeRunner {
         }
         // If we got this far, something's wrong
         throw new CodegenException("Could not parse Dr. Memory report, line: " + leakLine);
-    }
-
-    // Clear the log directory before running the newly generated file
-    private static void clearDirectory(File dir) throws IOException {
-        if (dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            // Necessary because some JVMs return null for empty dirs
-            if (files != null) {
-                for (File file : files) {
-                    deleteDirectory(file);
-                }
-            }
-        }
-    }
-
-    private static void deleteDirectory(File dir) throws IOException {
-        if (dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            if (files != null) {
-                for (File file : files) {
-                    deleteDirectory(file);
-                }
-            }
-        }
-        // Attempt to delete the file or directory
-        if (!dir.delete()) {
-            throw new IOException("Failed to delete " + dir);
-        }
     }
 }

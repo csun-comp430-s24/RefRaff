@@ -20,6 +20,14 @@ public class StructActualParam extends AbstractSyntaxTreeNode {
         this.exp = exp;
     }
 
+    public Variable getVariable() {
+        return var;
+    }
+
+    public Expression getExpression() {
+        return exp;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(super.hashCode(), var, exp);
