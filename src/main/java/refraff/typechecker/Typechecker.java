@@ -13,6 +13,7 @@ import refraff.parser.expression.*;
 import refraff.parser.statement.*;
 import refraff.parser.function.*;
 import refraff.util.Pair;
+import refraff.util.SourcedErrorBuilder;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -103,51 +104,8 @@ public class Typechecker {
 
     private void throwTypecheckerException(String beingParsed, AbstractSyntaxTreeNode parent,
                                            AbstractSyntaxTreeNode child, String errorMessage) throws TypecheckerException {
-        SourcePosition childStartPosition = child.getSource().getStartPosition();
-
-        StringBuilder errorMessageBuilder = new StringBuilder();
-
-        errorMessageBuilder.append("Typechecker error when evaluating ");
-        errorMessageBuilder.append(beingParsed);
-        errorMessageBuilder.append(" at ");
-        errorMessageBuilder.append(childStartPosition.toString());
-        errorMessageBuilder.append(":\n");
-
-        String parentNodeString = parent.getSource().getSourceString();
-
-        SourcePosition parentStartPosition = parent.getSource().getStartPosition();
-        SourcePosition childEndPosition = child.getSource().getEndPosition();
-
-        int numberOfLinesToPrint = (childEndPosition.getLinePosition() - parentStartPosition.getLinePosition()) + 1;
-
-        // Append all the lines until the child is fully displayed
-        parentNodeString.lines()
-                .limit(numberOfLinesToPrint)
-                .forEach(line -> {
-                    errorMessageBuilder.append(line);
-                    errorMessageBuilder.append('\n');
-                });
-
-        int numberOfSpacesToPrint = numberOfLinesToPrint == 1
-                ? childStartPosition.getColumnPosition() - parentStartPosition.getColumnPosition()
-                : childStartPosition.getColumnPosition() - 1;
-
-        String spacePrefix = " ".repeat(numberOfSpacesToPrint);
-        String caretPointer = "^".repeat(childEndPosition.getColumnPosition() - childStartPosition.getColumnPosition());
-
-        // Add spaces until we're under the child, then use the caret pointer to point to the child and new line
-        errorMessageBuilder.append(spacePrefix);
-        errorMessageBuilder.append(caretPointer);
-        errorMessageBuilder.append('\n');
-
-        // Add space until we're under the child, then print the error message below the caret pointer and new line
-        errorMessageBuilder.append(spacePrefix);
-        errorMessageBuilder.append("    ");
-        errorMessageBuilder.append(errorMessage);
-        errorMessageBuilder.append('\n');
-
-        String builtErrorMessage = errorMessageBuilder.toString();
-        throw new TypecheckerException(builtErrorMessage);
+        throw new TypecheckerException(SourcedErrorBuilder.getErrorString("Typechecker", beingParsed,
+                parent, child, errorMessage));
     }
 
     /**
