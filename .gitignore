@@ -37,3 +37,6 @@ build/
 ### Dr Memory ###
 **/src/test/**/testDrMemoryLog/*
 **/src/main/**/drMemoryLog/*
+
+### Dependency Reduced POM ###
+dependency-reduced-pom.xml

@@ -1,0 +1,13 @@
+func printBigger(bool a, bool b): void {
+      println(a || b);
+ }
+
+ func printBigger(int a, int b): void {
+      if (a > b)
+          println(a);
+      else
+          println(b);
+ }
+
+ printBigger(true, false);
+ printBigger(17, 4);
