@@ -19,6 +19,9 @@ import refraff.parser.expression.primaryExpression.*;
 import refraff.parser.statement.*;
 
 public class Codegen {
+
+    private static final String DEFAULT_OUTPUT_FILE_NAME = "output.c";
+
     private final Program program;
     private final Path generatedCodePath;
     private BufferedWriter writer;
@@ -31,9 +34,12 @@ public class Codegen {
     private final Map<String, List<FunctionDef>> overloadedFunctionNameToFunctionDefs;
     private final Map<FunctionDef, String> functionDefToFunctionName;
 
-    private Codegen(Program program, File directory) {
+    private Codegen(Program program, File directory, String outputFileName) {
         this.program = program;
-        this.generatedCodePath = Paths.get(directory.getPath(), "output.c");
+
+        String trueOutputName = outputFileName == null ? DEFAULT_OUTPUT_FILE_NAME : outputFileName;
+        this.generatedCodePath = Paths.get(directory.getPath(), trueOutputName);
+
         this.structScopeManager = new StructScopeManager();
         this.structNameToDef = program.getStructDefs().stream()
                 .collect(Collectors.toMap(
@@ -45,9 +51,13 @@ public class Codegen {
     }
 
     public static void generateProgram(Program program, File directory) throws CodegenException {
+        generateProgram(program, directory, null);
+    }
+
+    public static void generateProgram(Program program, File directory, String outputFileName) throws CodegenException {
         // We could directly supply the System.getProperty("user.dir"); in the main function
         // But we should be able to specify where the output is going to go
-        new Codegen(program, directory).generateProgram();
+        new Codegen(program, directory, outputFileName).generateProgram();
     }
 
     private void generateProgram() throws CodegenException {
