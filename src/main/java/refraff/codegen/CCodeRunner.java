@@ -39,12 +39,17 @@ public class CCodeRunner {
         checkLeakReport(drMemLogDir);
     }
 
+    private static String escapePath(Path path) {
+        String pathString = path.toString();
+
+        // If there's spaces, escape them; else return just the path
+        return pathString.contains(" ") ? "\"" + pathString + "\"" : pathString;
+    }
+
     public static void compileCCode(Path sourceFile, Path executable) throws CodegenException {
         try {
-            // Compile generated C code (The extra quotations are there to handle directory
-            // names with spaces in them)
-            Process compile = Runtime.getRuntime()
-                    .exec("gcc -o " + "\"" + executable.toString() + "\" \"" + sourceFile + "\"");
+            // Compile generated C code
+            Process compile = Runtime.getRuntime().exec("gcc -o " + escapePath(executable) + " " + escapePath(sourceFile));
             compile.waitFor();
 
             // Capture errors from the compilation process
@@ -54,9 +59,10 @@ public class CCodeRunner {
             while ((errorLine = errorReader.readLine()) != null) {
                 errorOutput.append(errorLine + "\n");
             }
-            // Throw error if we couln't compile
+
+            // Throw error if we couldn't compile
             if (!errorOutput.toString().isEmpty()) {
-                throw new CodegenException("Compilation errors:\n" + errorOutput.toString());
+                throw new CodegenException("Compilation errors:\n" + errorOutput);
             }
 
         } catch (IOException | InterruptedException e) {
@@ -119,17 +125,17 @@ public class CCodeRunner {
 
             // Check for errors in the output
             if (errors.length() > 0) {
-                System.out.println("Error Output: " + errors.toString());
+                System.out.println("Error Output: " + errors);
             }
 
             // Compare outputs
             if (!output.toString().trim().equals(expectedOutput.trim())) {
                 throw new CodegenException(
-                        "Was expecting output `" + expectedOutput + "` but got `" + output.toString() + "`");
+                        "Was expecting output `" + expectedOutput + "` but got `" + output + "`");
             }
 
         } catch (IOException | InterruptedException e) {
-            throw new CodegenException("Could not run executable: " + executable);
+            throw new CodegenException("Could not run executable, compiled C file (" + executable + "): " + e.getMessage());
         }
     }
 
@@ -166,9 +172,11 @@ public class CCodeRunner {
             File logDir = new File(drMemLogDir.toString());
             logDir.mkdirs();
 
+            String drMemoryCommand = System.getProperty("os.name").startsWith("Windows") ? "drmemory.exe" : "drmemory";
+
             // Run the program with Dr. Memory
             ProcessBuilder runBuilder = new ProcessBuilder(
-                    "drmemory.exe", "-logdir", drMemLogDir.toString(), "-batch", "--", executable.toString());
+                    drMemoryCommand, "-logdir", drMemLogDir.toString(), "-batch", "--", executable.toString());
             runBuilder.directory(directory);
 
             // Redirect Dr. Memory output to files (Dr. Memory dynamically names directories, and it's
@@ -185,7 +193,7 @@ public class CCodeRunner {
             run.waitFor();
 
         } catch (IOException | InterruptedException e) {
-            throw new CodegenException("Could not run executable: " + executable);
+            throw new CodegenException("Could not run executable with Dr Memory: " + e.getMessage());
         }
 
     }
