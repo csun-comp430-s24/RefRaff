@@ -11,10 +11,8 @@ public class ParseResult<A> {
 
     @Override
     public boolean equals(final Object other) {
-        if (other instanceof ParseResult) {
-            final ParseResult<A> otherResult = (ParseResult<A>)other;
-            return(result.equals(otherResult.result) &&
-                   nextPosition == otherResult.nextPosition);
+        if (other instanceof ParseResult<?> otherResult) {
+            return (result.equals(otherResult.result) && nextPosition == otherResult.nextPosition);
         } else {
             return false;
         }

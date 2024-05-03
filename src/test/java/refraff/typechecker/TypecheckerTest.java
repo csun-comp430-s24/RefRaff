@@ -1,10 +1,6 @@
 package refraff.typechecker;
 
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.DynamicTest;
-import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.*;
 import org.opentest4j.AssertionFailedError;
 import refraff.Sourced;
 import refraff.parser.*;
@@ -22,8 +18,7 @@ import refraff.util.ResourceUtil;
 
 import java.util.*;
 
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TypecheckerTest {
 
@@ -553,7 +548,7 @@ public class TypecheckerTest {
 
     private DynamicTest failing(DynamicTest test) {
         return DynamicTest.dynamicTest(test.getDisplayName() + " should fail",
-                () -> Assertions.assertThrows(AssertionFailedError.class, test.getExecutable()));
+                () -> assertThrows(AssertionFailedError.class, test.getExecutable()));
     }
 
     private DynamicTest testBinOpMismatchedTypes(OperatorEnum op, Type expectedType) {
@@ -1876,7 +1871,7 @@ public class TypecheckerTest {
         }
     }
 
-    @Ignore("Method to screenshot typechecker error messages")
+    @Disabled("Method to screenshot typechecker error messages")
     @Test
     public void testTokenizeParseTypecheckInvalidProgram() {
         String input = """
