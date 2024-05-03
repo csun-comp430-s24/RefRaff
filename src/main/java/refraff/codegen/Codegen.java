@@ -28,6 +28,9 @@ public class Codegen {
     // This is to get the types of struct fields when instantiating from StructAllocExp that don't have that info
     Map<String, StructDef> structNameToDef;
 
+    private final Map<String, List<FunctionDef>> overloadedFunctionNameToFunctionDefs;
+    private final Map<FunctionDef, String> functionDefToFunctionName;
+
     private Codegen(Program program, File directory) {
         this.program = program;
         this.generatedCodePath = Paths.get(directory.getPath(), "output.c");
@@ -36,6 +39,9 @@ public class Codegen {
                 .collect(Collectors.toMap(
                         structDef -> structDef.getStructName().getName(),
                         Function.identity()));
+
+        this.overloadedFunctionNameToFunctionDefs = new HashMap<>();
+        this.functionDefToFunctionName = new HashMap<>();
     }
 
     public static void generateProgram(Program program, File directory) throws CodegenException {
@@ -526,7 +532,44 @@ public class Codegen {
     }
 
     private void generateFunctionDefs(List<FunctionDef> functionDefs) throws CodegenException {
+        Map<String, Boolean> hasOverload = new HashMap<>();
+
+        // Iterate over the function definitions, determine if each function name has an overload
         for (FunctionDef functionDef : functionDefs) {
+            String functionName = functionDef.getFunctionName().getName();
+
+            // If we already have an entry in our map, then we've put another function def with this name in
+            if (hasOverload.containsKey(functionName)) {
+                hasOverload.put(functionName, true);
+                continue;
+            }
+
+            // If we don't have an entry in our map, then put a false variable in
+            hasOverload.put(functionName, false);
+        }
+
+        Map<String, Integer> overloadedFunctionCounter = new HashMap<>();
+
+        // Assign each function def a
+        for (FunctionDef functionDef : functionDefs) {
+            String functionName = functionDef.getFunctionName().getName();
+            String correctedFunctionName = functionName;
+
+            if (hasOverload.get(functionName)) {
+                // Increment the number of overloads
+                int currentOverloadCount = overloadedFunctionCounter.getOrDefault(functionName, 0) + 1;
+                overloadedFunctionCounter.put(functionName, currentOverloadCount);
+
+                correctedFunctionName += "_overload_" + currentOverloadCount;
+
+                // Add these to a list
+                List<FunctionDef> overloadedFunctionDefs = overloadedFunctionNameToFunctionDefs.getOrDefault(functionName,
+                        new ArrayList<>());
+                overloadedFunctionDefs.add(functionDef);
+                overloadedFunctionNameToFunctionDefs.put(functionName, overloadedFunctionDefs);
+            }
+
+            functionDefToFunctionName.put(functionDef, correctedFunctionName);
             generateFunctionDef(functionDef);
         }
     }
@@ -542,7 +585,7 @@ public class Codegen {
 
         generateType(functionDef.getReturnType());
         addSpace();
-        addString(functionDef.getFunctionName().getName());
+        addString(functionDefToFunctionName.get(functionDef));
 
         addString("(");
         generateCommaSeparatedParams(functionDef.getParams());
@@ -1003,12 +1046,51 @@ public class Codegen {
 
     private void generateFuncCallExp(final Expression exp) throws CodegenException {
         FuncCallExp funcCallExp = (FuncCallExp) exp;
+        String functionName = getOverloadedFunctionNameFromExpressions(funcCallExp.getFuncName().getName(),
+                funcCallExp.getCommaExp().getExpressions());
 
         // Generate a function call with comma separated expression parameters
         generateNamedFunctionCall(
-                funcCallExp.getFuncName().getName(),
+                functionName,
                 funcCallExp.getCommaExp().getExpressions(),
                 Function.identity());
+    }
+
+    private String getOverloadedFunctionNameFromExpressions(String originalFunctionName,
+                                                            List<Expression> expressions) throws CodegenException {
+        // If this isn't an overloaded function, then return the original name
+        if (!overloadedFunctionNameToFunctionDefs.containsKey(originalFunctionName)) {
+            return originalFunctionName;
+        }
+
+        List<FunctionDef> functionDefs = overloadedFunctionNameToFunctionDefs.get(originalFunctionName);
+        for (FunctionDef functionDef : functionDefs) {
+            List<Param> params = functionDef.getParams();
+
+            if (params.size() != expressions.size()) {
+                continue;
+            }
+
+            boolean hasEquality = true;
+
+            for (int i = 0; i < params.size(); i++) {
+                Param param = params.get(i);
+                Expression expression = expressions.get(i);
+
+                // Check for type equality of all parameters of the function def vs the call expressions
+                if (!param.getType().hasTypeEquality(expression.getExpressionType())) {
+                    hasEquality = false;
+                    break;
+                }
+            }
+
+            // If all the types match exactly, return the corrected name of this function def
+            if (hasEquality) {
+                return functionDefToFunctionName.get(functionDef);
+            }
+        }
+
+        throw new CodegenException("Illegal state: could not find overloaded function signature based on params.");
     }
 
     private Expression getExpressionWithoutParen(final Expression exp) {

@@ -38,9 +38,9 @@ public class CodegenTest {
         return Node.setNodeSource(new BoolType(), "bool");
     }
 
-    // private VoidType getVoidType() {
-    //     return Node.setNodeSource(new VoidType(), "void");
-    // }
+    private VoidType getVoidType() {
+        return Node.setNodeSource(new VoidType(), "void");
+    }
 
     private NullExp getNullExp() {
         return Node.setNodeSource(new NullExp(), "null");
@@ -1737,6 +1737,19 @@ public class CodegenTest {
             Program program = Parser.parseProgram(sourcedTokens);
             Typechecker.typecheckProgram(program);
             testProgramGeneratesAndDoesNotThrowOrLeak(program, "3", "false");
+        } catch (TokenizerException | ParserException | TypecheckerException ex) {
+            fail(ex.toString());
+        }
+    }
+
+    @Test
+    public void testCodegenRefraffProgramFunctionOverloadingWithoutException() {
+        String input = ResourceUtil.readInputFile("program_function_overloading.txt");
+        try {
+            List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
+            Program program = Parser.parseProgram(sourcedTokens);
+            Typechecker.typecheckProgram(program);
+            testProgramGeneratesAndDoesNotThrow(program, "true", "17");
         } catch (TokenizerException | ParserException | TypecheckerException ex) {
             fail(ex.toString());
         }

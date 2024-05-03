@@ -43,10 +43,11 @@ public class FunctionDef extends AbstractSyntaxTreeNode {
         
         for (int i = 0; i < this.params.size(); i++) {
             // If the types of the parameters don't match, return false
-            if (!this.params.get(i).getClass().equals(otherParams.get(i).getClass())) {
+            if (!this.params.get(i).getType().hasTypeEquality(otherParams.get(i).getType())) {
                 return false;
             }
         }
+
         return true;
     }
 
