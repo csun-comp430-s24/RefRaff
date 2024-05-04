@@ -63,7 +63,6 @@ public class RefRaff {
 
             System.out.printf("Wrote output to %s!%n", outputFileName);
         } catch (TokenizerException | ParserException | TypecheckerException | CodegenException ex) {
-            System.out.println("RefRaff error:");
             System.out.println(ex.getMessage());
         }
     }

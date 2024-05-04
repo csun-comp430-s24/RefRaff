@@ -1,16 +1,14 @@
 package refraff.parser;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.*;
 
-import org.junit.Assert;
-import org.junit.Test;
-
+import org.junit.jupiter.api.Test;
 import refraff.Source;
 import refraff.SourcePosition;
 import refraff.Sourced;
@@ -77,7 +75,7 @@ public class ParserTest {
     private <T extends AbstractSyntaxTreeNode> void testMatchesExpectedResult(ParsingFunction<Parser,
             Optional<ParseResult<T>>> parsingFunction, T expectedValue, List<Sourced<Token>> sourcedTokens) {
         Optional<ParseResult<T>> optionalParseResult = testParsesWithoutException(parsingFunction, sourcedTokens);
-        assertFalse("Parse result must contain something", optionalParseResult.isEmpty());
+        assertFalse(optionalParseResult.isEmpty(), "Parse result must contain something");
 
         ParseResult<T> expectedResult = new ParseResult<>(expectedValue, sourcedTokens.size());
         ParseResult<T> actualResult = optionalParseResult.get();
@@ -1086,7 +1084,7 @@ public class ParserTest {
             List<Sourced<Token>> sourcedTokens = new Tokenizer(input).tokenize();
             Parser.parseProgram(sourcedTokens);
         } catch (TokenizerException | ParserException ex) {
-            Assert.fail(ex.toString());
+            fail(ex.toString());
         }
     }
 

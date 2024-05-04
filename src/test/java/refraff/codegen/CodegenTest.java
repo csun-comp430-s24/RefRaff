@@ -1,9 +1,5 @@
 package refraff.codegen;
 
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.fail;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +22,8 @@ import refraff.tokenizer.TokenizerException;
 import refraff.typechecker.Typechecker;
 import refraff.typechecker.TypecheckerException;
 import refraff.util.ResourceUtil;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 public class CodegenTest {
     
@@ -95,7 +93,7 @@ public class CodegenTest {
     // CleanupMode.ON_SUCCESS will leave the directory open, so you can inspect the temporary directory for debugging.
     // The CleanupMode can be changed for debugging purposes: https://junit.org/junit5/docs/5.9.1/api/org.junit.jupiter.api/org/junit/jupiter/api/io/CleanupMode.html
     @TempDir(cleanup = CleanupMode.ON_SUCCESS)
-    File tempDirectory;
+    private File tempDirectory;
 
     @Test
     public void testCodeRunnerRunsExampleCFile() {

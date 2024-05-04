@@ -5,6 +5,7 @@ import refraff.SourcePosition;
 import refraff.Sourced;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.symbol.*;
+import refraff.typechecker.TypecheckerException;
 import refraff.util.Pair;
 
 import java.util.*;
@@ -78,11 +79,12 @@ public class Tokenizer {
 
     // A regex pattern that places all valid symbols and operators as distinct choices to be tokenized
     // Take each symbol, escape it and create a group [e.g. `(\<\=)`], then OR the groups together with regex `|`
-    private static final Pattern SYMBOL_PATTERN = Pattern.compile(
+    private static final Pattern SYMBOL_PATTERN = Pattern.compile("(" +
             SYMBOL_TOKENS.stream()
                     .map(Token::getTokenizedValue)
                     .map(symbol -> "(" + Pattern.quote(symbol) + ")")
                     .collect(Collectors.joining("|"))
+            + ")"
     );
 
     private static final Map<String, Token> SYMBOL_TO_TOKEN = getStringToTokenMap(SYMBOL_TOKENS);
@@ -149,13 +151,39 @@ public class Tokenizer {
                 continue;
             }
 
+            String failedToTokenize = input.substring(tokenizerPosition);
+
+            int offset = 0;
+            int remainingLength = failedToTokenize.length();
+
+            // While we still have more string left and the character in the future isn't whitespace,
+            while (offset < remainingLength && !Character.isWhitespace(failedToTokenize.charAt(offset))) {
+                // Increment the offset
+                offset++;
+            }
+
+            // If we found a whitespace character before the end of the string ends,
+            if (offset < remainingLength) {
+                // Update the failedToTokenize to be the piece up until the whitespace
+                failedToTokenize = failedToTokenize.substring(0, offset);
+            }
+
+            // Else, there is no whitespace before the end of the string
+
             // If we cannot match any whitespace or token by now, throw an exception
-            String errorMessage = "Tokenizer error at %s: could not tokenize starting at `%s`";
-            throw new TokenizerException(String.format(errorMessage, currentPosition.toString(),
-                    input.substring(tokenizerPosition)));
+            throwTypecheckerException(failedToTokenize);
         }
 
         return tokens;
+    }
+
+    private void throwTypecheckerException(String failedToTokenize) throws TokenizerException {
+        String errorMessage = """
+                    Tokenizer error at %s: could not tokenize `%s`
+                    
+                    See valid tokens at: https://github.com/csun-comp430-s24/RefRaff#Grammar
+                    """;
+        throw new TokenizerException(String.format(errorMessage, currentPosition.toString(), failedToTokenize));
     }
 
     private boolean inputOutOfBounds() {
@@ -224,7 +252,8 @@ public class Tokenizer {
             if (hasPrevCarriageReturn && c != '\n') {
                 newLines++;
                 hasPrevCarriageReturn = false;
-                break;
+
+                continue;
             }
 
             switch (c) {
@@ -249,11 +278,12 @@ public class Tokenizer {
     }
 
     // Tries to tokenize mapped tokens
-    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) {
+    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Map<String, Token> tokenMap) throws TokenizerException {
         return tryTokenize(pattern, tokenMap::get);
     }
 
-    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Function<String, Token> stringToTokenFunction) {
+    public Optional<Sourced<Token>> tryTokenize(Pattern pattern, Function<String, Token> stringToTokenFunction)
+            throws TokenizerException {
         Optional<String> optionalMatchedString = findMatchingPattern(pattern);
 
         // If we did not find a match for our token, return an empty optional
@@ -265,6 +295,10 @@ public class Tokenizer {
         String matchedToken = optionalMatchedString.get();
         Token token = stringToTokenFunction.apply(matchedToken);
 
+        if (token == null) {
+            throwTypecheckerException(matchedToken);
+        }
+
         // Create the source for the line/column position for our token
         Source source = new Source(matchedToken, previousPosition, currentPosition);
         Sourced<Token> sourcedToken = new Sourced<>(source, token);
@@ -272,18 +306,18 @@ public class Tokenizer {
         return Optional.of(sourcedToken);
     }
 
-    public Optional<Sourced<Token>> tryTokenizeSymbol() {
+    public Optional<Sourced<Token>> tryTokenizeSymbol() throws TokenizerException {
         return tryTokenize(SYMBOL_PATTERN, SYMBOL_TO_TOKEN);
     }
 
-    public Optional<Sourced<Token>> tryTokenizeReservedOrIdentifier() {
+    public Optional<Sourced<Token>> tryTokenizeReservedOrIdentifier() throws TokenizerException {
         return tryTokenize(
                 IDENTIFIER_PATTERN,
                 token -> RESERVED_TO_TOKEN.getOrDefault(token, new IdentifierToken(token))
         );
     }
 
-    public Optional<Sourced<Token>> tryTokenizeIntLiteral() {
+    public Optional<Sourced<Token>> tryTokenizeIntLiteral() throws TokenizerException {
         return tryTokenize(INT_LITERAL_PATTERN, IntLiteralToken::new);
     }
     

@@ -6,6 +6,8 @@ import java.util.function.Function;
 import java.util.AbstractMap.SimpleImmutableEntry;
 
 import refraff.Source;
+import refraff.SourcePosition;
+import refraff.Sourceable;
 import refraff.Sourced;
 import refraff.parser.function.*;
 import refraff.parser.statement.*;
@@ -17,6 +19,7 @@ import refraff.parser.expression.*;
 import refraff.tokenizer.symbol.*;
 import refraff.tokenizer.reserved.*;
 import refraff.tokenizer.*;
+import refraff.util.SourcedErrorBuilder;
 
 public class Parser {
     
@@ -26,7 +29,7 @@ public class Parser {
         this.sourcedTokens = sourcedTokens;
     }
 
-    // Returns an optional token or emtpy if we've reached the end of tokens
+    // Returns an optional token or empty if we've reached the end of tokens
     public Optional<Token> getToken(final int position) {
         // If we somehow go below position 0, we did something REAL bad in the parser
         assert(position >= 0);
@@ -45,41 +48,57 @@ public class Parser {
         return received.isPresent() && received.get().getClass().equals(expected);
     }
 
-    private void throwParserExceptionOnNoSemicolon(String beingParsed, int position) throws ParserException {
-        throwParserExceptionOnUnexpected(beingParsed, SemicolonToken.class, "terminating `;`", position);
+    private void throwParserExceptionOnNoSemicolon(String beingParsed, int startPos, int position) throws ParserException {
+        throwParserExceptionOnUnexpected(beingParsed, SemicolonToken.class, "terminating `;`", startPos, position);
     }
 
     private void throwParserExceptionOnUnexpected(String beingParsed, Class<? extends Token> tokenClass,
-                                                  String tokenRepresentation, int position) throws ParserException {
+                                                  String tokenRepresentation, int startPos, int position) throws ParserException {
         if (isExpectedToken(position, tokenClass)) {
             return;
         }
 
-        throwParserException(beingParsed, tokenRepresentation, position);
+        throwParserException(beingParsed, tokenRepresentation, startPos, position);
     }
 
     private <T> void throwParserExceptionOnEmptyOptional(String beingParsed, Optional<T> optional,
-                                                         String expected, int position) throws ParserException {
+                                                         String expected, int startPos, int position) throws ParserException {
         if (optional.isPresent()) {
             return;
         }
 
-        throwParserException(beingParsed, expected, position);
+        throwParserException(beingParsed, expected, startPos, position);
     }
 
-    private void throwParserException(String beingParsed, String expected, int position) throws ParserException {
-        final String exceptionMessage = "Error parsing %s at %s: expected %s but received: %s";
-        String actualTokenValue = getToken(position).map(Token::toString).orElse("none");
-        String linePosition;
-        if (position >= sourcedTokens.size()) {
-            linePosition = "end of file";
-        } else {
-            linePosition = sourcedTokens.get(position).getSource().toPositionString();
+    private void throwParserException(String beingParsed, String expected, int startPos, int position) throws ParserException {
+        final String exceptionMessage = String.format("expected %s", expected);
+
+        List<Source> tokenSources = new ArrayList<>();
+
+        for (int i = startPos; i <= Math.min(position, sourcedTokens.size() - 1); i++) {
+            Sourced<Token> sourcedToken = sourcedTokens.get(i);
+            tokenSources.add(sourcedToken.getSource());
         }
 
-        String formattedExceptionMessage = String.format(exceptionMessage, beingParsed, linePosition, expected,
-                actualTokenValue);
-        throw new ParserMalformedException(formattedExceptionMessage);
+        Source lastSource = sourcedTokens.get(sourcedTokens.size() - 1).getSource();
+        SourcePosition lastEndPosition = lastSource.getEndPosition();
+
+        Source endOfFileSource = new Source(
+                "<END OF FILE>",
+                new SourcePosition(lastEndPosition.getLinePosition(), lastEndPosition.getColumnPosition() + 1),
+                new SourcePosition(lastEndPosition.getLinePosition(), lastEndPosition.getColumnPosition() + 14)
+        );
+
+        Sourceable parent = () -> tokenSources.isEmpty() ? endOfFileSource : Source.fromSources(tokenSources);
+        Sourceable child = () -> position >= sourcedTokens.size() ? endOfFileSource : sourcedTokens.get(position).getSource();
+
+        throwParserException(beingParsed, parent, child, exceptionMessage);
+    }
+
+    private void throwParserException(String beingParsed, Sourceable parent, Sourceable child,
+                                      String exceptionMessage) throws ParserException {
+        throw new ParserMalformedException(SourcedErrorBuilder.getErrorString("Parser", beingParsed, parent,
+                child, exceptionMessage));
     }
 
     // Attempts to parse token array
@@ -107,8 +126,46 @@ public class Parser {
         currentPosition = parseZeroOrMore(this::parseStructDef, structDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseFunctionDef, functionDefs::add, currentPosition);
         currentPosition = parseZeroOrMore(this::parseStatement, statements::add, currentPosition);
+
+        int lastIndex = sourcedTokens.size() - 1;
+
+        // If there aren't any remaining tokens, directly return the result
+        if (currentPosition >= lastIndex) {
+            return getSourcedParseResult(new Program(structDefs, functionDefs, statements), position, currentPosition);
+        }
         
-        return getSourcedParseResult(new Program(structDefs, functionDefs, statements), position, currentPosition);
+        // Else, we have remaining tokens and should throw an error
+        List<Source> tokenSources = new ArrayList<>();
+        for (int i = currentPosition; i <= lastIndex; i++) {
+            tokenSources.add(sourcedTokens.get(i).getSource());
+        }
+
+        // Compile the list of remaining tokens into a single source, set this to the parent
+        Source remainingSource = Source.fromSources(tokenSources);
+        Sourceable parent = () -> remainingSource;
+
+        int startLinePosition = remainingSource.getStartPosition().getLinePosition();
+
+        // If our failed to parse is on a single line, print out the single line
+        if (startLinePosition == remainingSource.getEndPosition().getLinePosition()) {
+            throwParserException("program entry point", parent, parent, "expected a valid statement");
+
+            // Unreachable
+            return null;
+        }
+
+        // If it's on multiple lines, print just the first line
+        String firstLine = remainingSource.getSourceString().split("\n")[0];
+        SourcePosition startPosition = new SourcePosition(startLinePosition, 1);
+        SourcePosition endPosition = new SourcePosition(startLinePosition, firstLine.length());
+
+        Source childSource = new Source(firstLine, startPosition, endPosition);
+        Sourceable child = () -> childSource;
+
+        throwParserException("program entry point", parent, child, "expected a valid statement");
+
+        // Unreachable
+        return null;
     }
 
     /**
@@ -166,7 +223,7 @@ public class Parser {
         // Try to parse the struct name
         Optional<ParseResult<Type>> opStructName = parseType(currentPosition);
         if (opStructName.isEmpty() || !(opStructName.get().result instanceof StructType)) {
-            throwParserException(structDefinition, "struct name", currentPosition);
+            throwParserException(structDefinition, "struct name", position, currentPosition);
         }
 
         ParseResult<Type> parsedTypeResult = opStructName.get();
@@ -176,7 +233,7 @@ public class Parser {
         currentPosition = parsedTypeResult.nextPosition;
 
         // Ensure that there's a left brace here
-        throwParserExceptionOnUnexpected(structDefinition, LeftBraceToken.class, "{", currentPosition);
+        throwParserExceptionOnUnexpected(structDefinition, LeftBraceToken.class, "{", position, currentPosition);
         currentPosition += 1;
 
         List<Param> params = new ArrayList<>();
@@ -192,14 +249,14 @@ public class Parser {
             currentPosition = param.nextPosition;
 
             // Ensure that if we do have a param, we have a semicolon here
-            throwParserExceptionOnNoSemicolon(structDefinition + " variable declaration", currentPosition);
+            throwParserExceptionOnNoSemicolon(structDefinition + " variable declaration", position, currentPosition);
             currentPosition += 1;
 
             params.add(param.result);
         }
 
         // Ensure that there's a right brace here
-        throwParserExceptionOnUnexpected(structDefinition, RightBraceToken.class, "}", currentPosition);
+        throwParserExceptionOnUnexpected(structDefinition, RightBraceToken.class, "}",  position, currentPosition);
         currentPosition += 1;
 
         // Return the variable declaration
@@ -253,7 +310,7 @@ public class Parser {
         final String functionDefinition = "function definition";
 
         // Throw an exception if no function name identifier
-        throwParserExceptionOnUnexpected(functionDefinition, IdentifierToken.class, "a function name", currentPosition);
+        throwParserExceptionOnUnexpected(functionDefinition, IdentifierToken.class, "a function name",  position, currentPosition);
         FunctionName functionName = getSourcedNode(currentPosition, (token) -> new FunctionName(token.getTokenizedValue()));
 
         currentPosition += 1;
@@ -262,7 +319,7 @@ public class Parser {
         final String functionDefinitionWithName = functionDefinition + " for function " + functionName.functionName;
 
         // Ensure we have a left paren (begin function params)
-        throwParserExceptionOnUnexpected(functionDefinitionWithName, LeftParenToken.class, "(", currentPosition);
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, LeftParenToken.class, "(",  position, currentPosition);
         currentPosition += 1;
 
         // Ensure we have the comma params (the function params)
@@ -271,17 +328,17 @@ public class Parser {
         currentPosition = parsedFunctionParams.nextPosition;
 
         // Ensure we have a right paren (end function params)
-        throwParserExceptionOnUnexpected(functionDefinitionWithName, RightParenToken.class, ")", currentPosition);
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, RightParenToken.class, ")",  position, currentPosition);
         currentPosition += 1;
 
         // Ensure we have the colon separator for the return type of the function
-        throwParserExceptionOnUnexpected(functionDefinitionWithName, ColonToken.class, ":", currentPosition);
+        throwParserExceptionOnUnexpected(functionDefinitionWithName, ColonToken.class, ":",  position, currentPosition);
         currentPosition += 1;
 
         // Ensure we have a valid return type
         Optional<ParseResult<Type>> optionalReturnType = parseType(currentPosition);
         throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalReturnType, "a valid return type",
-                currentPosition);
+                position, currentPosition);
 
         ParseResult<Type> parsedTypeResult = optionalReturnType.get();
 
@@ -291,7 +348,7 @@ public class Parser {
         // Ensure we have a statement block at the end
         Optional<ParseResult<StmtBlock>> optionalStatementBlock = parseStatementBlock(currentPosition);
         throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalStatementBlock, "a function body",
-                currentPosition);
+                position, currentPosition);
 
         ParseResult<StmtBlock> parsedStatementBlock = optionalStatementBlock.get();
         StmtBlock functionBody = parsedStatementBlock.result;
@@ -325,7 +382,7 @@ public class Parser {
 
             Optional<ParseResult<Param>> optionalParsedParam = parseParam(currentPosition);
             throwParserExceptionOnEmptyOptional(functionDefinitionWithName, optionalParsedParam,
-                    "an additional function parameter after comma", currentPosition);
+                    "an additional function parameter after comma",  position, currentPosition);
 
             ParseResult<Param> paramResult = optionalParsedParam.get();
 
@@ -347,12 +404,12 @@ public class Parser {
         currentPosition = optionalVar.get().nextPosition;
 
         // Make sure there's a colon here - throw exceptions from this point
-        throwParserExceptionOnUnexpected("struct actual param", ColonToken.class, "a colon :", currentPosition);
+        throwParserExceptionOnUnexpected("struct actual param", ColonToken.class, "a colon :",  position, currentPosition);
         currentPosition += 1;
 
         // parse expression
         Optional<ParseResult<Expression>> optionalExp = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("struct actual param", optionalExp, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional("struct actual param", optionalExp, "an expression",  position, currentPosition);
 
         // Create struct actual param and return
         return getOptionalSourcedParseResult(
@@ -388,7 +445,7 @@ public class Parser {
             // Parse another param, add it to the param list - there has to be one now
             optionalStructActParam = parseStructActualParam(currentPosition);
             throwParserExceptionOnEmptyOptional(structParamString, optionalStructActParam,
-                    "struct actual param", currentPosition);
+                    "struct actual param",  position, currentPosition);
 
             listOfActualParams.add(optionalStructActParam.get().result);
             currentPosition = optionalStructActParam.get().nextPosition;
@@ -420,12 +477,12 @@ public class Parser {
             Optional<ParseResult<T>> optionalParseResult = parsingFunction.apply(position);
 
             if (optionalParseResult.isEmpty()) {
-                throwParserException(beingParsed, beingParsed, position);
+                throwParserException(beingParsed, beingParsed, position, position);
             }
 
             return optionalParseResult.get();
         } catch (ParserNoElementFoundException ex) {
-            throwParserException(beingParsed, beingParsed, position);
+            throwParserException(beingParsed, beingParsed, position, position);
         }
 
         throw new IllegalStateException("Cannot occur.");
@@ -533,7 +590,7 @@ public class Parser {
         Optional<ParseResult<Variable>> optionalVariable = parseVar(currentPosition);
         if (optionalVariable.isEmpty()) {
             if (shouldThrowIfNoIdentifier) {
-                throwParserException(variableAssignment, "a variable name", currentPosition);
+                throwParserException(variableAssignment, "a variable name",  position, currentPosition);
             }
             return Optional.empty();
         }
@@ -549,13 +606,13 @@ public class Parser {
 
         // Ensure that there's an expression
         Optional<ParseResult<Expression>> opExp = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional(variableAssignment, opExp, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional(variableAssignment, opExp, "an expression", position, currentPosition);
 
         ParseResult<Expression> exp = opExp.get();
         currentPosition = exp.nextPosition;
 
         // Ensure that there's a semicolon
-        throwParserExceptionOnNoSemicolon(variableAssignment, currentPosition);
+        throwParserExceptionOnNoSemicolon(variableAssignment, position, currentPosition);
         currentPosition += 1;
 
         // Return the assignment statement
@@ -607,7 +664,7 @@ public class Parser {
     // Parses `(` exp `)` in the context of a statement: so this is NOT a paren expression
     private ParseResult<Expression> parseExpWithParensAroundItOrThrow(final String where,
                                                                       final int position) throws ParserException {
-        throwParserExceptionOnUnexpected(where, LeftParenToken.class, "(", position);
+        throwParserExceptionOnUnexpected(where, LeftParenToken.class, "(", position, position);
         int currentPosition = position + 1;
 
         ParseResult<Expression> parsedExpressionResult = parseMandatoryExp(currentPosition);
@@ -615,7 +672,7 @@ public class Parser {
         Expression expression = parsedExpressionResult.result;
         currentPosition = parsedExpressionResult.nextPosition;
 
-        throwParserExceptionOnUnexpected(where, RightParenToken.class, ")", currentPosition);
+        throwParserExceptionOnUnexpected(where, RightParenToken.class, ")", position, currentPosition);
         currentPosition += 1;
 
         // Expression has already been sourced by now
@@ -657,7 +714,7 @@ public class Parser {
         // We are definitely parsing a break statement
         int currentPosition = position + 1;
 
-        throwParserExceptionOnNoSemicolon("break statement", currentPosition);
+        throwParserExceptionOnNoSemicolon("break statement", position, currentPosition);
         currentPosition += 1;
 
         return getOptionalSourcedParseResult(new BreakStmt(), position, currentPosition);
@@ -678,7 +735,7 @@ public class Parser {
         Expression expression = parsedPrintlnExpression.result;
         currentPosition = parsedPrintlnExpression.nextPosition;
 
-        throwParserExceptionOnNoSemicolon(printlnStatement, currentPosition);
+        throwParserExceptionOnNoSemicolon(printlnStatement, position, currentPosition);
         currentPosition += 1;
 
         return getOptionalSourcedParseResult(new PrintlnStmt(expression), position, currentPosition);
@@ -704,7 +761,7 @@ public class Parser {
             // If we have a parser no element found, we couldn't parse the exp that was optional (this is okay)
         }
 
-        throwParserExceptionOnNoSemicolon("return statement", currentPosition);
+        throwParserExceptionOnNoSemicolon("return statement", position, currentPosition);
         currentPosition += 1;
 
         return getOptionalSourcedParseResult(new ReturnStmt(returnValue), position, currentPosition);
@@ -722,7 +779,7 @@ public class Parser {
         List<Statement> blockBody = new ArrayList<>();
         currentPosition = parseZeroOrMore(this::parseStatement, blockBody::add, currentPosition);
 
-        throwParserExceptionOnUnexpected("statement body", RightBraceToken.class, "}", currentPosition);
+        throwParserExceptionOnUnexpected("statement body", RightBraceToken.class, "}", position, currentPosition);
         currentPosition += 1;
 
         return getOptionalSourcedParseResult(new StmtBlock(blockBody), position, currentPosition);
@@ -750,7 +807,7 @@ public class Parser {
         expression = parsedExpression.result;
         currentPosition = parsedExpression.nextPosition;
 
-        throwParserExceptionOnNoSemicolon("expression statement", currentPosition);
+        throwParserExceptionOnNoSemicolon("expression statement", position, currentPosition);
         currentPosition += 1;
 
         return getOptionalSourcedParseResult(new ExpressionStmt(expression), position, currentPosition);
@@ -793,7 +850,7 @@ public class Parser {
         int currentPosition = position;
         // Try to parse a lower precedence expression
         Optional<ParseResult<Expression>> returnValue = parseLowerPrecedence.apply(currentPosition);
-        throwParserExceptionOnEmptyOptional(subExpressionName, returnValue, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional(subExpressionName, returnValue, "an expression", position, currentPosition);
 
         currentPosition = returnValue.get().nextPosition;
 
@@ -805,7 +862,7 @@ public class Parser {
             
             // Parse the right hand side of the binary op expression
             Optional<ParseResult<Expression>> rightExp = parseLowerPrecedence.apply(currentPosition);
-            throwParserExceptionOnEmptyOptional(subExpressionName, rightExp, "an expression", currentPosition);
+            throwParserExceptionOnEmptyOptional(subExpressionName, rightExp, "an expression", position, currentPosition);
 
             // Create binary op expression
             Expression binOpExp = new BinaryOpExp(returnValue.get().result, op, rightExp.get().result);
@@ -850,7 +907,7 @@ public class Parser {
         int currentPosition = position;
         // Try to parse an add expression
         Optional<ParseResult<Expression>> returnValue = parseAddExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("add expression", returnValue, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional("add expression", returnValue, "an expression", position, currentPosition);
         currentPosition = returnValue.get().nextPosition;
 
         // If there is another expression to parse
@@ -863,7 +920,7 @@ public class Parser {
             currentPosition += 1;
             // Try to parse an add expression
             Optional<ParseResult<Expression>> rightAddExp = parseAddExp(currentPosition);
-            throwParserExceptionOnEmptyOptional("add expression", rightAddExp, "an expression", currentPosition);
+            throwParserExceptionOnEmptyOptional("add expression", rightAddExp, "an expression", position, currentPosition);
             // Create binary operator, wrap in expression parse result
             BinaryOpExp binOpExp = new BinaryOpExp(returnValue.get().result, op, rightAddExp.get().result);
             returnValue = getOptionalSourcedParseResult(binOpExp, position, rightAddExp.get().nextPosition);
@@ -896,14 +953,14 @@ public class Parser {
             currentPosition += 1;
             // Get dot expresionn
             Optional<ParseResult<Expression>> dotExp = parseDotExp(currentPosition);
-            throwParserExceptionOnEmptyOptional("dot expression", dotExp, "an expression", currentPosition);
+            throwParserExceptionOnEmptyOptional("dot expression", dotExp, "an expression", position, currentPosition);
             // Create a not unary expression, wrap in expression optional
             UnaryOpExp unaryOpExp = new UnaryOpExp(OperatorEnum.NOT, dotExp.get().result);
             returnValue = getOptionalSourcedParseResult(unaryOpExp, position, dotExp.get().nextPosition);
         } else {
             // Return a dot expression as an expression
             returnValue = parseDotExp(currentPosition);
-            throwParserExceptionOnEmptyOptional("dot expression", returnValue, "an expression", currentPosition);
+            throwParserExceptionOnEmptyOptional("dot expression", returnValue, "an expression", position, currentPosition);
         }
         return returnValue;
     }
@@ -916,7 +973,7 @@ public class Parser {
         int currentPosition = position;
         // Make sure there's a primary expression here
         Optional<ParseResult<Expression>> returnValue = parsePrimaryExp(currentPosition);
-        throwParserExceptionOnEmptyOptional(dotExpString, returnValue, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional(dotExpString, returnValue, "an expression", position, currentPosition);
         currentPosition = returnValue.get().nextPosition;
 
         // While there are other variables to parse
@@ -924,7 +981,7 @@ public class Parser {
             currentPosition += 1;
             // Try to parse a variable
             Optional<ParseResult<Variable>> variable = parseVar(currentPosition);
-            throwParserExceptionOnEmptyOptional(dotExpString, variable, "a variable", currentPosition);
+            throwParserExceptionOnEmptyOptional(dotExpString, variable, "a variable", position, currentPosition);
             // Create dot operator, wrap in expression parse result
             DotExp dotExp = new DotExp(returnValue.get().result, variable.get().result);
             returnValue = getOptionalSourcedParseResult(dotExp, position, variable.get().nextPosition);
@@ -1010,20 +1067,20 @@ public class Parser {
             currentPosition += 1;
             // Get the structName - throw exceptions after this point
             Optional<ParseResult<Type>> optionalParsedType = parseType(currentPosition);
-            throwParserExceptionOnEmptyOptional(structAllocString, optionalParsedType, "struct name", currentPosition);
+            throwParserExceptionOnEmptyOptional(structAllocString, optionalParsedType, "struct name", position, currentPosition);
 
             ParseResult<Type> parsedTypeResult = optionalParsedType.get();
             Type parsedType = parsedTypeResult.result;
 
             if (!(parsedType instanceof StructType)) {
-                throwParserException("struct allocation", "a struct name for initialization", position);
+                throwParserException("struct allocation", "a struct name for initialization", position, position);
             }
 
             StructType structType = (StructType) parsedType;
             currentPosition = optionalParsedType.get().nextPosition;
 
             // Skip the left brace
-            throwParserExceptionOnUnexpected(structAllocString, LeftBraceToken.class, "left brace {", currentPosition);
+            throwParserExceptionOnUnexpected(structAllocString, LeftBraceToken.class, "left brace {", position, currentPosition);
             currentPosition += 1;
 
             // Parse struct actual params
@@ -1031,7 +1088,7 @@ public class Parser {
             currentPosition = structActParams.nextPosition;
 
             // Skip right brace
-            throwParserExceptionOnUnexpected(structAllocString, RightBraceToken.class, "right brace }", currentPosition);
+            throwParserExceptionOnUnexpected(structAllocString, RightBraceToken.class, "right brace }", position, currentPosition);
             currentPosition += 1;
 
             // Create and return struct alloc
@@ -1063,7 +1120,7 @@ public class Parser {
             ParseResult<CommaExp> commaExp = parseCommaExp(currentPosition);
             currentPosition = commaExp.nextPosition;
             // Parse right paren
-            throwParserExceptionOnUnexpected(funcCallString, RightParenToken.class, "right paren )", currentPosition);
+            throwParserExceptionOnUnexpected(funcCallString, RightParenToken.class, "right paren )", position, currentPosition);
             currentPosition += 1;
             // return function call
             return getOptionalSourcedParseResult(
@@ -1096,7 +1153,7 @@ public class Parser {
                 // Parse another exp, add it to the list - there has to be one now
                 optionalExp = parseExp(currentPosition);
                 throwParserExceptionOnEmptyOptional(commaString, optionalExp,
-                        "an expression", currentPosition);
+                        "an expression", position, currentPosition);
                 listOfExp.add(optionalExp.get().result);
                 currentPosition = optionalExp.get().nextPosition;
             }
@@ -1119,11 +1176,11 @@ public class Parser {
 
         // Try to parse expression
         Optional<ParseResult<Expression>> optionalExpression = parseExp(currentPosition);
-        throwParserExceptionOnEmptyOptional("paren expression", optionalExpression, "an expression", currentPosition);
+        throwParserExceptionOnEmptyOptional("paren expression", optionalExpression, "an expression", position, currentPosition);
         currentPosition = optionalExpression.get().nextPosition;
 
         // Make sure there's a right paren here
-        throwParserExceptionOnUnexpected(parenExpString, RightParenToken.class, "right paren )", currentPosition);
+        throwParserExceptionOnUnexpected(parenExpString, RightParenToken.class, "right paren )", position, currentPosition);
         currentPosition += 1;
 
         // Return the Expression

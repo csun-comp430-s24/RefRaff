@@ -5,9 +5,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Scanner;
 
-import static org.junit.Assert.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ResourceUtil {
 
@@ -18,7 +16,7 @@ public class ResourceUtil {
 
     public static String readInputFile(String filePath) {
         File file = new File(TEST_DIRECTORY, filePath);
-        assertTrue("Input file " + filePath + " does not exist in " + TEST_DIRECTORY, file.exists());
+        assertTrue(file.exists(), "Input file " + filePath + " does not exist in " + TEST_DIRECTORY);
 
         StringBuffer stringBuffer = new StringBuffer();
 
@@ -38,7 +36,7 @@ public class ResourceUtil {
 
     public static void copyResourceFile(String filePath, File copyDestination) {
         File sourceFile = new File(TEST_DIRECTORY, filePath);
-        assertTrue("Input file " + filePath + " does not exist in " + TEST_DIRECTORY, sourceFile.exists());
+        assertTrue(sourceFile.exists(), "Input file " + filePath + " does not exist in " + TEST_DIRECTORY);
 
         try {
             Files.copy(sourceFile.toPath(), copyDestination.toPath());

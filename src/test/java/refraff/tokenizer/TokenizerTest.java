@@ -1,7 +1,7 @@
 package refraff.tokenizer;
 
-import org.junit.Test;
 import org.junit.jupiter.api.DynamicTest;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
 
 import refraff.Source;
@@ -17,9 +17,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.junit.Assert.*;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 public class TokenizerTest {
@@ -515,8 +513,8 @@ public class TokenizerTest {
                             assertEquals(token, tokenizedToken.getTokenizedValue());
 
                             Class<? extends Token> tokenClass = tokenizedToken.getClass();
-                            assertTrue("Token class does not inherit from proper base class",
-                                    baseClass.isAssignableFrom(tokenClass));
+                            assertTrue(baseClass.isAssignableFrom(tokenClass),
+                                    "Token class does not inherit from proper base class");
                         })
                 )
                 .toList();
