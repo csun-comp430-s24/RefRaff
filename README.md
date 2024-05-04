@@ -2,6 +2,42 @@
 
 The programming language RefRaff supports structs and reference counted memory management.
 
+## Table of Contents
+
+<!-- TABLE OF CONTENTS -->
+<details>
+  <summary>Table of Contents</summary>
+  <ol>
+    <li><a href="#why-refraff">Why RefRaff</a></li>
+    <li><a href="#refraff-examples">RefRaff Examples</a></li>
+    <li><a href="#known-limitations">Known Limitations</a></li>
+    <li><a href="#what-we-would-do-differently">What Would We Do Differently</a></li>
+    <li><a href="#compiling-refraff">Compiling RefRaff</a></li>
+    <li><a href="#running-the-refraff-compiler">Running the RefRaff Compiler</a></li>
+    <li>
+      <a href="#grammar">Formal Syntax Definition</a>
+      <ul>
+        <li><a href="#valid-symbols">Valid Symbols</a></li>
+        <li><a href="#reserved-words">Reserved Words</a></li>
+        <li><a href="#identifier-restrictions">Identifier Restrictions</a></li>
+        <li><a href="#integer-literal-restrictions">Integer Literal Restrictions</a></li>
+      </ul>
+    </li>
+  </ol>
+</details>
+
+## Why RefRaff
+
+## RefRaff Examples
+
+## Known Limitations
+
+## What We Would Do Differently
+
+## Compiling RefRaff
+
+## Running the RefRaff Compiler
+
 ## Grammar
 
 ```
@@ -67,14 +103,14 @@ stmt ::= type var `=` exp `;` |                       // Variable declaration
 program ::= structdef* fdef* stmt*                    // stmt* is the entry point
 ```
 
-### Valid symbols
+### Valid Symbols
 
 ```
 `,`, `{`, `}`, ':', `;`, `(`, `)`, `.`, `!`, `*`, `/`, `+`,
 `-`, `<=`, `>=`, `<`, `>`, `==`, `!=`, `&&`, `||`, `=`
 ```
 
-### Keywords
+### Reserved Words
 
 ```
 `int`, `bool`, `void`, `struct`, `func`, `true`, `false`, `null`,
