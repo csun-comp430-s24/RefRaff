@@ -32,6 +32,11 @@ team of size two.
 
 ## RefRaff Examples
 
+### Example 1: Linked List
+
+The first example shows an implementation of a linked list with a struct and functions to find the length, print the length,
+and check for list equality.
+
 ```
 struct Node {
   int value;
@@ -39,12 +44,11 @@ struct Node {
 }
 
 func length(Node list): int {
-  int retval = 0;
-  while (list != null) {
-     retval = retval + 1;
-     list = list.rest;
+  if (list == null) {
+    return 0;
   }
-  return retval;
+
+  return 1 + length(list.rest);
 }
 
 func printLength(Node list): void {
@@ -52,11 +56,24 @@ func printLength(Node list): void {
 }
 
 func equals(Node list1, Node list2): bool {
+    bool foundInconsistentValue = false;
     while (list1 != null && list2 != null)
-        if (list1.value != list2.value)
-            return false;
+        if (list1.value != list2.value) {
+            foundInconsistentValue = true;
+            break;
+        }
 
-    return list1 == null && list2 == null;
+    return !foundInconsistentValue && list1 == null && list2 == null;
+}
+
+func sumNodes(Node list): int {
+    int sum = 0;
+    while (list != null) {
+        sum = sum + list.value;
+        list = list.rest;
+    }
+
+    return sum;
 }
 
 Node list =
@@ -74,7 +91,63 @@ Node list =
 Node list2 = null;
 
 printLength(list);
+println(sumNodes(list));
+
 println(equals(list, list2));
+println(list.value);
+
+Node list3 = new Node {
+    value: length(list),
+    rest: null
+};
+```
+
+Output (spaces added for clarity):
+```
+3
+3
+
+false
+0
+```
+
+### Example 2: Operators and function overloading
+
+An example showing the operators used in our project and function overloading.
+
+```
+func returnSelf(bool b): bool {
+    return b;
+}
+
+func returnSelf(int i): int {
+    return i;
+}
+
+println(returnSelf(false));
+println(returnSelf(3));
+
+println(!false);
+
+println((3 + 2) * 7 - 4 / 2);
+println(1 > 2 && 2 <= 1);
+
+println(1 >= 2 || 2 < 1);
+println(3 == 3 && 4 != 3);
+```
+
+Output (extra spaces added for clarity):
+```
+false
+3
+
+true
+
+33
+false
+
+false
+true
 ```
 
 ## Known Limitations
@@ -121,14 +194,14 @@ verify that our tests are currently working on a Linux environment.
 #### Meta language
 
 Since our development team was a group of two, we chose Java as a meta language for the compiler out of familiarity
-to complete our compiler before the end of the course. This design decision had the biggest impact on how
+and to complete our compiler before the end of the course. This design decision had the biggest impact on how
 RefRaff was written. We wrote ~4,500 lines of Java in just our compiler and an additional ~3,200 lines of code for
-testing.
+testing (excluding blank lines).
 
-While Java does support enums and pattern matching, these features are extremely limited in comparison to languages like
-Scala, Rust, and Swift. In class, an example of parsing with Scala was shown that used enums, pattern matching,
-and parser combinators that was extremely simple to implement. Using a language with better enums and advanced matching
-features would generate less code bloat. Choosing a "better" meta language, from the start, would undeniably have made
+In class, an example of parsing with Scala was shown that used enums, pattern matching, and parser combinators that was 
+extremely simple to implement. While Java does support enums and pattern matching, these features are extremely limited 
+in comparison to languages like Scala, Rust, and Swift. Using a language with better enums and advanced matching features 
+would generate less code bloat. Choosing a "better" meta language, from the start, would undeniably have made
 our code easier to write, maintain, and read. The downside to choosing a "better" meta language was the possibility
 of not completing our project, with the added complexity of learning a new programming language alongside our compiler
 development.
