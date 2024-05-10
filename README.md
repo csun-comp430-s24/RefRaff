@@ -26,8 +26,8 @@ Our language compiles to C. RefRaff might be useful when writing a program that 
 the restrictions on our language, programs in RefRaff must not include circular data structures, strings, or comments.
 Admittedly, the number of cases where RefRaff would be useful is quite limited.
 
-We chose RefRaff as our project because our development team had an interest in creating a language that used reference 
-counted memory. We thought the language design was achievable over the course of the semester, even with a development 
+We chose RefRaff as our project because our development team had an interest in creating a language that used reference
+counted memory. We thought the language design was achievable over the course of the semester, even with a development
 team of size two.
 
 ## RefRaff Examples
@@ -81,11 +81,13 @@ println(equals(list, list2));
 
 ### Intentional Limitations - Language Design
 
-1. Structs are immutable. This prevents cycles that lead to leaked memory in implementations of reference counting that 
-do not support weak references.
+1. Structs are immutable. This prevents cycles that lead to leaked memory in implementations of reference counting that
+   do not support weak references.
 2. Structs must be defined in order. For example, if struct B uses struct A, struct A must be defined in the file before
-struct B.
-  * This was chosen to prevent structs from having the possibility of cycles and to mimic our target language of C.
+   struct B.
+
+* This was chosen to prevent structs from having the possibility of cycles and to mimic our target language of C.
+
 3. Struct allocations must initialize all fields declared in the struct definition.
 4. Functions must be defined in order. This works the same as is required by structs.
 5. `println` does not allow struct arguments, only ints and bools.
@@ -97,15 +99,15 @@ struct B.
 #### Exhaustive testing
 
 Our compiler reports 91% code coverage using JaCoCo and 94% code coverage using the IntelliJ coverage tool. We have
-created a comprehensive test suite composed of 395 tests. These include unit tests, integration tests, and end-to-end 
-tests (which check for expected code output and no leaked memory). While we believe that we have tested every edge case, 
+created a comprehensive test suite composed of 395 tests. These include unit tests, integration tests, and end-to-end
+tests (which check for expected code output and no leaked memory). While we believe that we have tested every edge case,
 there is a possibility that there are undiscovered issues in our compiler.
 
 #### Testing and compilation on different operating systems
 
-Our compiler has only been tested on Windows (by the developers) and Linux (using GitHub Actions). 
+Our compiler has only been tested on Windows (by the developers) and Linux (using GitHub Actions).
 When setting up the GitHub Action for a Linux environment, we had to modify the commands used by
-Dr. Memory and change how file paths were represented when running command line arguments. We have not 
+Dr. Memory and change how file paths were represented when running command line arguments. We have not
 attempted to run our test suite or compile RefRaff on MacOS. It is currently unknown whether tests for the code
 generator will run properly on MacOS.
 
@@ -120,13 +122,13 @@ verify that our tests are currently working on a Linux environment.
 
 Since our development team was a group of two, we chose Java as a meta language for the compiler out of familiarity
 to complete our compiler before the end of the course. This design decision had the biggest impact on how
-RefRaff was written. We wrote ~4,500 lines of Java in just our compiler and an additional ~3,200 lines of code for 
+RefRaff was written. We wrote ~4,500 lines of Java in just our compiler and an additional ~3,200 lines of code for
 testing.
 
 While Java does support enums and pattern matching, these features are extremely limited in comparison to languages like
-Scala, Rust, and Swift. In class, an example of parsing with Scala was shown that used enums, pattern matching, 
-and parser combinators that was extremely simple to implement. Using a language with better enums and advanced matching 
-features would generate less code bloat. Choosing a "better" meta language, from the start, would undeniably have made 
+Scala, Rust, and Swift. In class, an example of parsing with Scala was shown that used enums, pattern matching,
+and parser combinators that was extremely simple to implement. Using a language with better enums and advanced matching
+features would generate less code bloat. Choosing a "better" meta language, from the start, would undeniably have made
 our code easier to write, maintain, and read. The downside to choosing a "better" meta language was the possibility
 of not completing our project, with the added complexity of learning a new programming language alongside our compiler
 development.
@@ -136,13 +138,13 @@ development.
 When implementing error messages that show more detail, better design decisions could have been made. context is needed
 about the original position of tokens and AST
 nodes. We added this feature after work on the tokenizer and parser were complete. For the tokenizer, a wrapper class of
-`Sourced` was used (e.g. `Sourced<Token>`) since single instances of tokens are created for reserved words and symbols. 
+`Sourced` was used (e.g. `Sourced<Token>`) since single instances of tokens are created for reserved words and symbols.
 For the parser, taking the same approach would have required modifying the definition of each AST node in RefRaff. We
 instead added methods for `getSource` and `setSource` to the abstract class for an AST node. While this approach worked,
 it caused issues later in the typechecker.
 
-The most detailed error messages, found in the typechecker, used the source information from the tokenizer and parser 
-to point to pieces of the code that contained errors. When creating a unit test for the typechecker with an expected 
+The most detailed error messages, found in the typechecker, used the source information from the tokenizer and parser
+to point to pieces of the code that contained errors. When creating a unit test for the typechecker with an expected
 failure, the test would fail because we had not injected the source information to the AST nodes. This created a lot of
 headache and required additional preparation to get our tests running correctly in the code generator. Looking back,
 more thought should have been given to avoiding this issue and coming up with a better solution.
@@ -150,7 +152,7 @@ more thought should have been given to avoiding this issue and coming up with a 
 #### Annotating the AST with type information
 
 Similarly to adding sourcing to the AST, annotating the AST to add type information required many hours of debugging to
-get our tests running. While we are not sure if a reasonable alternative is available, we did not spend much time 
+get our tests running. While we are not sure if a reasonable alternative is available, we did not spend much time
 considering other approaches to this problem.
 
 ## Compiling RefRaff
@@ -169,8 +171,8 @@ and Maven installed. For convenience, some links are provided below to install t
 Once all prerequisites have been installed, RefRaff can be compiled from the terminal using `mvn package`.
 The compiled jar file is saved to the `target/refraff-1.0.0.jar` file.
 
-**Note:** If tests fail because of MacOS incompatibility, `mvn package -D=skipTests` can be used to compile RefRaff 
-without running our test suite. 
+**Note:** If tests fail because of MacOS incompatibility, `mvn package -D=skipTests` can be used to compile RefRaff
+without running our test suite.
 
 ## Running the RefRaff Compiler
 
@@ -182,6 +184,8 @@ where a valid input file ends with either a `.txt` or `.refraff` extension, and 
 extension.
 
 ## Grammar
+
+### Formal Syntax Definition
 
 ```
 type ::= `int` | `bool` |                             // Integers and booleans are types
@@ -271,6 +275,91 @@ program ::= structdef* fdef* stmt*                    // stmt* is the entry poin
 ```
 
 ## Implementation Details
+
+### Reference Counting for Memory Management
+
+This section describes the reference counting mechanism implemented in the compiler to manage the lifecycle of structs.
+Reference counting ensures proper memory management by tracking how many references exist to each struct instance,
+allowing for automatic memory allocation and deallocation.
+
+#### Overview
+
+- **Immutability**: Structs are immutable, preventing cycles and simplifying reference counting.
+
+- **Struct Lifecycle Management**: Functions are automatically generated for each struct to handle allocation, reference
+  retention, and reference release.
+
+#### Features
+
+- **structScopeManager**: Manages struct variables within scopes. When exiting a scope, the manager automatically
+  releases all struct variables declared in that scope.
+
+- **Reference Count Operations**:
+    - **Allocation**: Allocates structs, initializing the reference count to 1. Structs can be allocated without being
+      immediately assigned to a variable.
+
+    - **Retention**: Increments the reference counts of the struct and recursively for all struct fields that are also
+      structs.
+
+    - **Release**: Decrements the reference counts recursively for the struct and its fields. Frees the struct if its
+      reference count drops below one.
+
+#### Struct Allocation and Management Process
+
+1. **Field Allocation**: When a struct has other structs as fields, these fields are allocated first and temporarily
+   held.
+
+2. **Struct Assembly**: Structs are assembled by assigning the allocated fields to the correct struct fields in a parent
+   struct.
+
+3. **Handling Temporary Variables**: Temporary variables used during struct assembly are managed by the same allocation,
+   retention, and release functions, which can lead to wordy programs.
+
+#### Example
+
+Consider a struct `A` with a field of its own type:
+
+```
+struct A {
+  A a;
+}
+
+A a1 = new A {
+  a: new A {
+    a: null
+  }
+};
+```
+
+- **Allocation Order**: The innermost `A` struct is allocated first by assigning `null` to a temporary variable. This
+  process is repeated until the outermost `A` struct is assembled and assigned to a temporary variable.<br>
+  This is then be assigned to a named variable if the struct allocation was part of an assignement or variable
+  declaration statement.
+
+| Generated Code                                         | Explanation                                                                                              |
+|--------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| // Allocating struct A                                 |
+| struct A* _temp_A_struct_alloc_var = NULL;             | Create temporary variable for allocation expression                                                      
+| struct A* _temp_A_a = NULL;                            | Create temporary variable for struct field (this is the deepest 'a' field)                               
+| refraff_A_release(_temp_A_a);                          | This line is superfluous in this case (but it matters in some other assignments)                         
+| _temp_A_a = refraff_A_alloc(_temp_A_a);                | Create middle struct                                                                                     
+| _temp_A_struct_alloc_var = refraff_A_alloc(_temp_A_a); | Create outer struct                                                                                      
+| struct A* a1 = _temp_A_struct_alloc_var;               | Assign struct to named variable                                                                          
+| refraff_A_retain(a1);                                  | This struct has A1 and the temp variable pointing to it. Both will be released when moving out of scope. 
+| // Exiting scope                                       |
+| refraff_A_release(a1);                                 |
+| refraff_A_release(_temp_A_struct_alloc_var);           |
+| refraff_A_release(_temp_A_a);                          |
+
+- **Variable Management**:
+    - In a struct assignment statement, any earlier value the struct variable was holding is "released" before the new
+      value is assigned.
+
+    - In a struct assignment or variable declaration statement where an existing struct is being assigned, the existing
+      struct is then "retained" so that the reference count can reflect that a addition variable points to it. When a
+      new struct is created, it is not retained, as its reference count is initially set to 1.
+
+
 
 ### AST Definition
 
