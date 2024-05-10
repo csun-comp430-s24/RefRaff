@@ -14,29 +14,172 @@ The programming language RefRaff supports structs and reference counted memory m
     <li><a href="#what-we-would-do-differently">What Would We Do Differently</a></li>
     <li><a href="#compiling-refraff">Compiling RefRaff</a></li>
     <li><a href="#running-the-refraff-compiler">Running the RefRaff Compiler</a></li>
-    <li>
-      <a href="#grammar">Formal Syntax Definition</a>
-      <ul>
-        <li><a href="#valid-symbols">Valid Symbols</a></li>
-        <li><a href="#reserved-words">Reserved Words</a></li>
-        <li><a href="#identifier-restrictions">Identifier Restrictions</a></li>
-        <li><a href="#integer-literal-restrictions">Integer Literal Restrictions</a></li>
-      </ul>
-    </li>
+    <li><a href="#grammar">Formal Syntax Definition</a></li>
+    <li><a href="#implementation-details">Implementation Details</a></li>
   </ol>
 </details>
 
 ## Why RefRaff
 
+RefRaff is a simple, memory-safe programming language that supports structs, functions, and typical language operators.
+Our language compiles to C. RefRaff might be useful when writing a program that needs to be fast and memory safe. Given
+the restrictions on our language, programs in RefRaff must not include circular data structures, strings, or comments.
+Admittedly, the number of cases where RefRaff would be useful is quite limited.
+
+We chose RefRaff as our project because our development team had an interest in creating a language that used reference 
+counted memory. We thought the language design was achievable over the course of the semester, even with a development 
+team of size two.
+
 ## RefRaff Examples
+
+```
+struct Node {
+  int value;
+  Node rest;
+}
+
+func length(Node list): int {
+  int retval = 0;
+  while (list != null) {
+     retval = retval + 1;
+     list = list.rest;
+  }
+  return retval;
+}
+
+func printLength(Node list): void {
+    println(length(list));
+}
+
+func equals(Node list1, Node list2): bool {
+    while (list1 != null && list2 != null)
+        if (list1.value != list2.value)
+            return false;
+
+    return list1 == null && list2 == null;
+}
+
+Node list =
+  new Node {
+    value: 0,
+    rest: new Node {
+      value: 1,
+      rest: new Node {
+        value: 2,
+        rest: null
+      }
+    }
+  };
+
+Node list2 = null;
+
+printLength(list);
+println(equals(list, list2));
+```
 
 ## Known Limitations
 
+### Intentional Limitations - Language Design
+
+1. Structs are immutable. This prevents cycles that lead to leaked memory in implementations of reference counting that 
+do not support weak references.
+2. Structs must be defined in order. For example, if struct B uses struct A, struct A must be defined in the file before
+struct B.
+  * This was chosen to prevent structs from having the possibility of cycles and to mimic our target language of C.
+3. Struct allocations must initialize all fields declared in the struct definition.
+4. Functions must be defined in order. This works the same as is required by structs.
+5. `println` does not allow struct arguments, only ints and bools.
+6. Typical language features, such as comments and strings, are not supported.
+7. Integer and identifier restrictions can be found in the grammar section below.
+
+### Unknown Limitations
+
+#### Exhaustive testing
+
+Our compiler reports 91% code coverage using JaCoCo and 94% code coverage using the IntelliJ coverage tool. We have
+created a comprehensive test suite composed of 395 tests. These include unit tests, integration tests, and end-to-end 
+tests (which check for expected code output and no leaked memory). While we believe that we have tested every edge case, 
+there is a possibility that there are undiscovered issues in our compiler.
+
+#### Testing and compilation on different operating systems
+
+Our compiler has only been tested on Windows (by the developers) and Linux (using GitHub Actions). 
+When setting up the GitHub Action for a Linux environment, we had to modify the commands used by
+Dr. Memory and change how file paths were represented when running command line arguments. We have not 
+attempted to run our test suite or compile RefRaff on MacOS. It is currently unknown whether tests for the code
+generator will run properly on MacOS.
+
+Our [GitHub Actions page](https://github.com/csun-comp430-s24/RefRaff/actions) and main commit history can be viewed to
+verify that our tests are currently working on a Linux environment.
+
 ## What We Would Do Differently
+
+### Design Decisions
+
+#### Meta language
+
+Since our development team was a group of two, we chose Java as a meta language for the compiler out of familiarity
+to complete our compiler before the end of the course. This design decision had the biggest impact on how
+RefRaff was written. We wrote ~4,500 lines of Java in just our compiler and an additional ~3,200 lines of code for 
+testing.
+
+While Java does support enums and pattern matching, these features are extremely limited in comparison to languages like
+Scala, Rust, and Swift. In class, an example of parsing with Scala was shown that used enums, pattern matching, 
+and parser combinators that was extremely simple to implement. Using a language with better enums and advanced matching 
+features would generate less code bloat. Choosing a "better" meta language, from the start, would undeniably have made 
+our code easier to write, maintain, and read. The downside to choosing a "better" meta language was the possibility
+of not completing our project, with the added complexity of learning a new programming language alongside our compiler
+development.
+
+#### Sourcing for more detailed error messages
+
+When implementing error messages that show more detail, better design decisions could have been made. context is needed
+about the original position of tokens and AST
+nodes. We added this feature after work on the tokenizer and parser were complete. For the tokenizer, a wrapper class of
+`Sourced` was used (e.g. `Sourced<Token>`) since single instances of tokens are created for reserved words and symbols. 
+For the parser, taking the same approach would have required modifying the definition of each AST node in RefRaff. We
+instead added methods for `getSource` and `setSource` to the abstract class for an AST node. While this approach worked,
+it caused issues later in the typechecker.
+
+The most detailed error messages, found in the typechecker, used the source information from the tokenizer and parser 
+to point to pieces of the code that contained errors. When creating a unit test for the typechecker with an expected 
+failure, the test would fail because we had not injected the source information to the AST nodes. This created a lot of
+headache and required additional preparation to get our tests running correctly in the code generator. Looking back,
+more thought should have been given to avoiding this issue and coming up with a better solution.
+
+#### Annotating the AST with type information
+
+Similarly to adding sourcing to the AST, annotating the AST to add type information required many hours of debugging to
+get our tests running. While we are not sure if a reasonable alternative is available, we did not spend much time 
+considering other approaches to this problem.
 
 ## Compiling RefRaff
 
+In order to compile RefRaff, your machine must have Dr. Memory (a memory leak detection tool for C), GCC, Java JDK 17+,
+and Maven installed. For convenience, some links are provided below to install these dependencies:
+
+- [Installing Dr. Memory](https://drmemory.org/page_install.html)
+- Installation tutorials for GCC:
+    - [Windows](https://dev.to/gamegods3/how-to-install-gcc-in-windows-10-the-easier-way-422j)
+    - [MacOS](https://osxdaily.com/2023/05/02/how-install-gcc-mac/)
+    - [Linux](https://www.geeksforgeeks.org/how-to-install-gcc-compiler-on-linux/)
+- [Installing JDK 17+](https://www.oracle.com/java/technologies/downloads/)
+- [Installing Maven](https://maven.apache.org/install.html)
+
+Once all prerequisites have been installed, RefRaff can be compiled from the terminal using `mvn package`.
+The compiled jar file is saved to the `target/refraff-1.0.0.jar` file.
+
+**Note:** If tests fail because of MacOS incompatibility, `mvn package -D=skipTests` can be used to compile RefRaff 
+without running our test suite. 
+
 ## Running the RefRaff Compiler
+
+RefRaff can be run using the following command:
+
+`java -jar <PATH_TO_REFRAFF_JAR> <INPUT_FILE> <OUTPUT_FILE>`
+
+where a valid input file ends with either a `.txt` or `.refraff` extension, and a valid output file ends with the `.c`
+extension.
 
 ## Grammar
 
@@ -103,6 +246,16 @@ stmt ::= type var `=` exp `;` |                       // Variable declaration
 program ::= structdef* fdef* stmt*                    // stmt* is the entry point
 ```
 
+### Identifier Restrictions
+
+1. Must start with an alphabetic character [a-zA-Z]
+2. Followed by zero or more alphanumeric characters (a-zA-Z0-9)*
+
+### Integer Literal Restrictions
+
+1. Must be a zero or start with a numeric character [1-9]
+2. Followed by any numeric character [0-9]*
+
 ### Valid Symbols
 
 ```
@@ -117,100 +270,57 @@ program ::= structdef* fdef* stmt*                    // stmt* is the entry poin
 `new`, `if`, 'else', `while`, `break`, `println`, `return`
 ```
 
-### Identifier Restrictions
-
-1. Must start with an alphabetic character [a-zA-Z]
-2. Followed by zero or more alphanumeric characters (a-zA-Z0-9)*
-
-### Integer Literal Restrictions
-
-1. Must be a zero or start with a numeric character [1-9]
-2. Followed by any numeric character [0-9]*
+## Implementation Details
 
 ### AST Definition
 
 Node Interface
+
 - AbstactSyntaxTreeNode Abstract Class
-  - Program Class<br>
+    - Program Class<br>
 
   *Expressions:*
-  - Expression Abstract Class
-    - BinaryOpExp Class
-    - DotExp Class
-    - UnaryOpExp Class<br>
+    - Expression Abstract Class
+        - BinaryOpExp Class
+        - DotExp Class
+        - UnaryOpExp Class<br>
 
-    *Primary Expressions:*
-      - PrimaryExpression Class
-        - BoolLiteralExp Class
-        - IntLiteralExp Class
-        - NullExp Class
-        - ParenExp Class
-        - VariableExp Class<br>
+      *Primary Expressions:*
+        - PrimaryExpression Class
+            - BoolLiteralExp Class
+            - IntLiteralExp Class
+            - NullExp Class
+            - ParenExp Class
+            - VariableExp Class<br>
 
   *Functions:*
-  - FuntionDef Class
-  - FunctionName Class (extends Type)<br>
+    - FuntionDef Class
+    - FunctionName Class (extends Type)<br>
 
   *Operators:*
-  - OperatorEnum Enum<br>
+    - OperatorEnum Enum<br>
 
   *Statements:*
-  - Statement Abstract Class
-    - AssignStmt Class
-    - BreakStmt Class
-    - ExpressionStmt Class
-    - IfElseStmt Class
-    - PrintlnStmt Class
-    - ReturnStmt Class
-    - StmtBlock Class
-    - VardecStmt Class
-    - WhileStmt Class<br>
+    - Statement Abstract Class
+        - AssignStmt Class
+        - BreakStmt Class
+        - ExpressionStmt Class
+        - IfElseStmt Class
+        - PrintlnStmt Class
+        - ReturnStmt Class
+        - StmtBlock Class
+        - VardecStmt Class
+        - WhileStmt Class<br>
 
   *Structs:*
-  - Param Class
-  - StructDef Class<br>
+    - Param Class
+    - StructDef Class<br>
 
   *Types:*
-  - Type Abstract Class
-    - BoolType Class
-    - IntType Class
-    - StructName Class
-    - VoidType Class
+    - Type Abstract Class
+        - BoolType Class
+        - IntType Class
+        - StructName Class
+        - VoidType Class
 
 Variable Class
-
-
-## Example Program
-```
-struct Node {
-  int value;
-  Node rest;
-}
-
-func length(Node list): int {
-  int retval = 0;
-  while (list != null) {
-     retval = retval + 1;
-     list = list.rest;
-  }
-  return retval;
-}
-
-Node list =
-  new Node {
-    value: 0,
-    rest: new Node {
-      value: 1,
-      rest: new Node {
-        value: 2,
-        rest: null
-      }
-    }
-  };
-
-println(length(list));
-```
-
-## System Dependencies
-
-In order to run RefRaff, you will need to install gcc and DrMemory. These are used to compile the code into C and generate memory leak reports, respectively.
